@@ -1,30 +1,81 @@
 export interface CategoryTreeQuery {
-  storeScope?: string;
-  categoryLevel?: 1 | 2 | 3;
-  categoryIds?: Array<string | number>;
-  roleNames?: string[];
-  skuAbnormalTypes?: string[];
-  disabledRoles?: string[];
+  deptId?: number;
+  retailTypeId?: string;
+  businessCircleId?: string;
+  deptGroupId?: string;
+  storeNo?: string;
+  classLevel?: number;
+  classNo?: string[];
+  classRole?: string[];
+  skuAbnormal?: string[];
 }
 
-export interface CategoryTreeChildrenQuery {
+export interface CategoryTreeChildrenQuery extends CategoryTreeQuery {
   categoryId: string | number;
   level?: number;
-  disabledRoles?: string[];
-  storeScope?: string;
-  categoryLevel?: 1 | 2 | 3;
-  categoryIds?: Array<string | number>;
-  roleNames?: string[];
-  skuAbnormalTypes?: string[];
 }
 
 export interface OptionVO {
   label: string;
   value: string | number;
+  level?: string;
 }
 
 export interface CategoryRoleVO {
   roleName: string;
+  roleNo?: string;
+}
+
+export interface LegacyTreeNodeVO {
+  classNo: string;
+  className: string;
+  parentClassNo?: string;
+  classLevel?: number;
+  suggestSaleSku?: number;
+  saleSku?: number;
+  roleNo?: string;
+  roleType?: string;
+  skuDiffer?: number | null;
+  sysSuggestSaleSku?: number;
+  subClass?: LegacyTreeNodeVO[] | null;
+}
+
+export interface CategoryFilterPayloadVO {
+  categoryLevels?: OptionVO[];
+  categories?: OptionVO[];
+  categoryRoles?: OptionVO[];
+  skuAbnormal?: OptionVO[];
+  classSalesStatusNo?: Array<{ label?: string; value?: string | number }>;
+  storeOptions?: OptionVO[];
+}
+
+export interface StoreFindRequest {
+  keyword?: string;
+  retailTypeId?: string;
+  businessCircleId?: string;
+  deptGroupId?: string;
+  limit?: number;
+}
+
+export interface StoreOptionResponse {
+  storeNo: string;
+  storeName: string;
+}
+
+export interface CategoryClassTreeNodeVO {
+  level?: string;
+  flevel?: string;
+  levelFlag?: number;
+  className?: string;
+  labelName?: string;
+  canChoose?: boolean;
+  children?: CategoryClassTreeNodeVO[];
+  id?: string;
+  label?: string;
+}
+
+export interface CategoryClassTreeResponseVO {
+  content?: CategoryClassTreeNodeVO[];
 }
 
 export interface SankeyNodeVO {
@@ -52,14 +103,12 @@ export interface SankeyLinkVO {
 }
 
 export interface CategorySankeyVO {
+  success?: boolean;
+  message?: string;
+  code?: number;
   updateTime?: string;
-  currentId?: string | number | null;
-  currentName?: string;
-  currentLevel?: number;
-  parentId?: string | number | null;
-  storeOptions?: OptionVO[];
-  categoryOptions?: OptionVO[];
-  skuAbnormalOptions?: OptionVO[];
+  data?: any;
+  result?: LegacyTreeNodeVO[];
   nodes?: SankeyNodeVO[];
   links?: SankeyLinkVO[];
   nodeList?: SankeyNodeVO[];

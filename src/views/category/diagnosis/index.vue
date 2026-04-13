@@ -1,264 +1,515 @@
-<template>
-  <div class="p-2">
-    <transition :enter-active-class="proxy?.animate.searchAnimate.enter" :leave-active-class="proxy?.animate.searchAnimate.leave">
-      <div v-show="showSearch" class="search">
-        <el-form ref="queryFormRef" :model="queryParams" :inline="true">
-          <el-form-item label="门店" prop="storeCode">
-            <el-select v-model="queryParams.storeCode" clearable filterable placeholder="请选择门店" style="width: 220px">
-              <el-option v-for="item in storeOptions" :key="item.storeCode" :label="item.storeName" :value="item.storeCode" />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="日期" prop="dateRange">
-            <el-date-picker
-              v-model="dateRange"
-              type="daterange"
-              value-format="YYYY-MM-DD"
-              start-placeholder="开始日期"
-              end-placeholder="结束日期"
-              range-separator="-"
-              style="width: 260px"
-            />
-          </el-form-item>
-          <el-form-item>
-            <el-button v-hasPermi="['category:diagnosis:list']" type="primary" icon="Search" @click="handleQuery">查询</el-button>
-            <el-button icon="Refresh" @click="resetQuery">重置</el-button>
-          </el-form-item>
-        </el-form>
-      </div>
-    </transition>
-
-    <el-row :gutter="12" class="mb-3">
-      <el-col :span="6">
-        <el-card shadow="hover">
-          <div class="overview-title">总品类数</div>
-          <div class="overview-value">{{ overview.totalCategory }}</div>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card shadow="hover">
-          <div class="overview-title">健康品类</div>
-          <div class="overview-value success">{{ overview.healthyCategory }}</div>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card shadow="hover">
-          <div class="overview-title">预警品类</div>
-          <div class="overview-value warning">{{ overview.warningCategory }}</div>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card shadow="hover">
-          <div class="overview-title">风险品类</div>
-          <div class="overview-value danger">{{ overview.riskCategory }}</div>
+﻿<template>
+  <div class="p-2 category-diagnosis-page">
+    <el-row :gutter="16" class="feature-row">
+      <el-col v-for="item in featureCards" :key="item.title" :lg="6" :md="12" :sm="12" :xs="24">
+        <el-card shadow="hover" class="feature-card">
+          <img :src="item.image" :alt="item.title" class="feature-image" />
+          <div class="feature-title">{{ item.title }}</div>
+          <div class="feature-subtitle">{{ item.subtitle }}</div>
         </el-card>
       </el-col>
     </el-row>
 
-    <el-card shadow="hover" class="mb-3">
+    <el-card shadow="hover" class="diagnosis-card">
       <template #header>
-        <span>品类健康度趋势</span>
+        <div class="diagnosis-header">
+          <span class="diagnosis-title">诊断对象</span>
+          <el-button type="primary" plain @click="handleHistory">历史诊断记录</el-button>
+        </div>
       </template>
-      <div ref="trendRef" class="trend-chart" v-loading="chartLoading"></div>
-    </el-card>
 
-    <el-card shadow="hover">
-      <template #header>
-        <right-toolbar v-model:show-search="showSearch" @query-table="getList" />
-      </template>
-      <el-table v-loading="loading" border :data="dataList">
-        <el-table-column label="品类ID" prop="categoryId" align="center" width="110" />
-        <el-table-column label="品类名称" prop="categoryName" min-width="160" align="center" show-overflow-tooltip />
-        <el-table-column label="健康得分" prop="healthScore" align="center" width="110" />
-        <el-table-column label="销售额" align="center" width="130">
-          <template #default="scope"> {{ scope.row.salesAmount?.toFixed?.(2) ?? scope.row.salesAmount }} </template>
-        </el-table-column>
-        <el-table-column label="毛利率" align="center" width="110">
-          <template #default="scope"> {{ scope.row.grossMarginRate }}% </template>
-        </el-table-column>
-        <el-table-column label="问题数" prop="issueCount" align="center" width="100" />
-        <el-table-column label="诊断建议" prop="advice" align="center" min-width="220" show-overflow-tooltip />
-      </el-table>
+      <el-form ref="formRef" :model="form" :rules="rules" label-width="90px" class="diagnosis-form">
+        <el-form-item label="品类" prop="categoryId">
+          <el-cascader
+            v-model="form.categoryId"
+            class="full-input category-cascader"
+            :options="categoryTreeOptions"
+            :props="categoryCascaderProps"
+            clearable
+            filterable
+            :show-all-levels="false"
+            placeholder="请选择品类"
+            popper-class="category-cascader-popper"
+          >
+            <template #default="{ node, data }">
+              <span class="category-option-left">
+                <span class="category-radio-wrap">
+                  <span class="category-radio-outer" :class="{ active: isCategoryLeafActive(node, data) }">
+                    <span class="category-radio-inner" />
+                  </span>
+                </span>
+                <span class="category-option-label">{{ data.label }}</span>
+              </span>
+            </template>
+          </el-cascader>
+        </el-form-item>
+        <el-form-item label="门店范围" prop="storeScope">
+          <el-select v-model="form.storeScope" clearable filterable placeholder="请选择门店范围" class="full-input">
+            <el-option v-for="item in storeOptions" :key="String(item.value)" :label="item.label" :value="item.value" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="本期日期" prop="currentDateRange">
+          <el-date-picker
+            v-model="form.currentDateRange"
+            type="daterange"
+            value-format="YYYY-MM-DD"
+            start-placeholder="开始日期"
+            end-placeholder="结束日期"
+            range-separator="-"
+            class="full-input"
+          />
+        </el-form-item>
+        <el-form-item label="对比日期" prop="compareDateRange">
+          <el-date-picker
+            v-model="form.compareDateRange"
+            type="daterange"
+            value-format="YYYY-MM-DD"
+            start-placeholder="开始日期"
+            end-placeholder="结束日期"
+            range-separator="-"
+            class="full-input"
+          />
+        </el-form-item>
 
-      <pagination v-show="total > 0" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" :total="total" @pagination="getList" />
+        <div class="submit-wrap">
+          <el-button type="success" size="large" :loading="submitLoading" @click="handleSubmit">立即诊断</el-button>
+        </div>
+      </el-form>
     </el-card>
   </div>
 </template>
 
 <script setup name="CategoryDiagnosis" lang="ts">
-import * as echarts from 'echarts';
-import { listStoreOptions } from '@/api/category/tree';
-import { StoreOptionVO } from '@/api/category/tree/types';
-import { getCategoryDiagnosisOverview, listCategoryDiagnosis, listCategoryDiagnosisTrend } from '@/api/category/diagnosis';
-import { CategoryDiagnosisOverviewVO, CategoryDiagnosisQuery, CategoryDiagnosisTrendVO, CategoryDiagnosisVO } from '@/api/category/diagnosis/types';
+import type { FormInstance, FormRules } from 'element-plus';
+import aImage from '@/assets/images/a.png';
+import bImage from '@/assets/images/b.png';
+import cImage from '@/assets/images/c.png';
+import dImage from '@/assets/images/d.png';
+import { findStore, queryCategoryClassTree } from '@/api/category/tree';
+import type { CategoryClassTreeNodeVO, OptionVO } from '@/api/category/tree/types';
+import { useRequest } from '@/hooks/useRequest';
 
-const { proxy } = getCurrentInstance() as ComponentInternalInstance;
+interface DiagnosisForm {
+  categoryId: string | number | undefined;
+  storeScope: string | number | undefined;
+  currentDateRange: string[];
+  compareDateRange: string[];
+}
 
-const showSearch = ref(true);
-const loading = ref(false);
-const chartLoading = ref(false);
-const total = ref(0);
-const dataList = ref<CategoryDiagnosisVO[]>([]);
-const storeOptions = ref<StoreOptionVO[]>([]);
-const dateRange = ref<[string, string]>(['', '']);
-const trendRef = ref<HTMLDivElement>();
-const trendIns = ref<echarts.ECharts>();
+interface CategoryTreeOption {
+  label: string;
+  value: string;
+  children?: CategoryTreeOption[];
+}
 
-const overview = reactive<CategoryDiagnosisOverviewVO>({
-  totalCategory: 0,
-  healthyCategory: 0,
-  warningCategory: 0,
-  riskCategory: 0
+const featureCards = [
+  { title: '纵观品类整体', subtitle: '掌握品类整体情况和发力点', image: aImage },
+  { title: '定位异常品项', subtitle: '及时优化表现差的商品', image: bImage },
+  { title: '深究用户需求', subtitle: '助力品项优化与补充', image: cImage },
+  { title: '整合调整方向', subtitle: '指导品类优化与执行', image: dImage }
+];
+
+const formRef = ref<FormInstance>();
+const router = useRouter();
+const categoryTreeOptions = ref<CategoryTreeOption[]>([]);
+const storeOptions = ref<OptionVO[]>([]);
+const submitLoading = ref(false);
+
+const form = reactive<DiagnosisForm>({
+  categoryId: undefined,
+  storeScope: undefined,
+  currentDateRange: [],
+  compareDateRange: []
 });
 
-const queryFormRef = ref<ElFormInstance>();
-
-const queryParams = reactive<CategoryDiagnosisQuery>({
-  pageNum: 1,
-  pageSize: 10,
-  storeCode: '',
-  startDate: '',
-  endDate: ''
-});
-
-const syncDateRange = () => {
-  queryParams.startDate = dateRange.value?.[0] || '';
-  queryParams.endDate = dateRange.value?.[1] || '';
+const rules: FormRules<DiagnosisForm> = {
+  categoryId: [{ required: true, message: '品类不能为空', trigger: 'change' }],
+  storeScope: [{ required: true, message: '门店范围不能为空', trigger: 'change' }],
+  currentDateRange: [{ required: true, message: '本期日期不能为空', trigger: 'change' }],
+  compareDateRange: [{ required: true, message: '对比日期不能为空', trigger: 'change' }]
 };
 
-const initTrendChart = () => {
-  if (!trendRef.value) {
-    return;
+const normalizeText = (value?: string | number | null) => String(value ?? '').trim();
+
+const parseClassTreePayload = (raw: any): CategoryClassTreeNodeVO[] => {
+  const isCategoryNodeArray = (arr: any[]) =>
+    Array.isArray(arr) &&
+    arr.some((item) => typeof item === 'object' && item && (item.classNo || item.className || item.labelName || item.label || item.id || item.level));
+
+  const queue: any[] = [raw];
+  while (queue.length) {
+    const current = queue.shift();
+    if (Array.isArray(current) && isCategoryNodeArray(current)) {
+      return current as CategoryClassTreeNodeVO[];
+    }
+    if (current && typeof current === 'object') {
+      const preferred = [current.content, current.rows, current.list, current.result, current.data];
+      preferred.forEach((item) => item != null && queue.push(item));
+      Object.keys(current).forEach((key) => {
+        const value = current[key];
+        if (value != null && !preferred.includes(value)) {
+          queue.push(value);
+        }
+      });
+    }
   }
-  if (!trendIns.value) {
-    trendIns.value = echarts.init(trendRef.value);
-  }
+  return [];
 };
 
-const renderTrend = (rows: CategoryDiagnosisTrendVO[]) => {
-  initTrendChart();
-  trendIns.value?.setOption({
-    tooltip: { trigger: 'axis' },
-    xAxis: {
-      type: 'category',
-      data: rows.map((item) => item.categoryName),
-      axisLabel: { rotate: 30 }
-    },
-    yAxis: {
-      type: 'value',
-      min: 0,
-      max: 100
-    },
-    grid: {
-      left: 40,
-      right: 20,
-      bottom: 60
-    },
-    series: [
-      {
-        type: 'bar',
-        data: rows.map((item) => item.healthScore),
-        itemStyle: { color: '#409EFF' },
-        barMaxWidth: 36
-      }
-    ]
-  });
+const categoryCascaderProps = {
+  value: 'value',
+  label: 'label',
+  children: 'children',
+  emitPath: false as const,
+  checkStrictly: false,
+  expandTrigger: 'hover' as const
 };
 
-const getStoreList = async () => {
-  const res = await listStoreOptions();
-  storeOptions.value = res.data || [];
+const formatCategoryLabel = (value: string, name: string) => {
+  if (!value) return name;
+  if (!name) return value;
+  return name.startsWith(value) ? name : `${value}${name}`;
 };
 
-const getOverview = async () => {
-  const res = await getCategoryDiagnosisOverview({
-    storeCode: queryParams.storeCode,
-    startDate: queryParams.startDate,
-    endDate: queryParams.endDate
-  });
-  Object.assign(overview, res.data || {});
-};
+const toCategoryTreeOptions = (nodes: CategoryClassTreeNodeVO[]): CategoryTreeOption[] => {
+  const resolveChildren = (node: any): CategoryClassTreeNodeVO[] => {
+    if (Array.isArray(node?.children)) return node.children as CategoryClassTreeNodeVO[];
+    if (Array.isArray(node?.subClass)) return node.subClass as CategoryClassTreeNodeVO[];
+    return [];
+  };
 
-const getTrend = async () => {
-  chartLoading.value = true;
-  try {
-    const res = await listCategoryDiagnosisTrend({
-      storeCode: queryParams.storeCode,
-      startDate: queryParams.startDate,
-      endDate: queryParams.endDate
+  const resolveValue = (node: any) => normalizeText(node?.level || node?.id || node?.classNo || node?.value);
+  const resolveName = (node: any) => normalizeText(node?.labelName || node?.label || node?.className || node?.name);
+  const resolveParent = (node: any) => normalizeText(node?.parentClassNo || node?.parentId || node?.pId || node?.pid);
+
+  const normalizeTree = (list: CategoryClassTreeNodeVO[]): CategoryClassTreeNodeVO[] => {
+    const hasNested = list.some((item: any) => resolveChildren(item).length > 0);
+    if (hasNested) return list;
+
+    const hasParentField = list.some((item: any) => resolveParent(item));
+    if (!hasParentField) return list;
+
+    const nodeMap = new Map<string, any>();
+    const roots: any[] = [];
+    list.forEach((item: any) => {
+      const key = resolveValue(item);
+      if (!key) return;
+      nodeMap.set(key, { ...item, children: [] });
     });
-    renderTrend(res.data || []);
-  } finally {
-    chartLoading.value = false;
+    nodeMap.forEach((item) => {
+      const parentKey = resolveParent(item);
+      if (!parentKey || parentKey === '0' || !nodeMap.has(parentKey)) {
+        roots.push(item);
+      } else {
+        nodeMap.get(parentKey).children.push(item);
+      }
+    });
+    return roots as CategoryClassTreeNodeVO[];
+  };
+
+  const toNodeList = (list: CategoryClassTreeNodeVO[]): CategoryTreeOption[] => {
+    const result: CategoryTreeOption[] = [];
+    list.forEach((node) => {
+      const value = resolveValue(node);
+      const name = resolveName(node);
+      const children = toNodeList(resolveChildren(node));
+      // 跳过“全部/0”等无效节点，但继续下钻其子节点
+      if (!value || value === '0' || !name) {
+        if (children.length) {
+          result.push(...children);
+        }
+        return;
+      }
+      const current: CategoryTreeOption = {
+        label: formatCategoryLabel(value, name),
+        value
+      };
+      if (children.length) {
+        current.children = children;
+      }
+      result.push(current);
+    });
+    return result;
+  };
+  return toNodeList(normalizeTree(nodes));
+};
+
+const classTreeRequest = useRequest(async () => await queryCategoryClassTree(4), {
+  onSuccess: (res) => {
+    const tree = parseClassTreePayload(res);
+    categoryTreeOptions.value = toCategoryTreeOptions(tree);
   }
-};
-
-const getList = async () => {
-  loading.value = true;
-  try {
-    const res = await listCategoryDiagnosis(queryParams);
-    dataList.value = res.rows || [];
-    total.value = res.total || 0;
-  } finally {
-    loading.value = false;
-  }
-};
-
-const handleQuery = async () => {
-  syncDateRange();
-  queryParams.pageNum = 1;
-  await Promise.all([getOverview(), getTrend(), getList()]);
-};
-
-const resetQuery = async () => {
-  queryFormRef.value?.resetFields();
-  dateRange.value = ['', ''];
-  queryParams.pageNum = 1;
-  queryParams.pageSize = 10;
-  syncDateRange();
-  await Promise.all([getOverview(), getTrend(), getList()]);
-};
-
-const resizeHandler = () => trendIns.value?.resize();
-
-onMounted(async () => {
-  await getStoreList();
-  await handleQuery();
-  window.addEventListener('resize', resizeHandler);
 });
 
-onBeforeUnmount(() => {
-  window.removeEventListener('resize', resizeHandler);
-  trendIns.value?.dispose();
+const storeRequest = useRequest(async () => await findStore({ keyword: '', limit: 50 }), {
+  onSuccess: (res) => {
+    const rows = (res?.result || res?.data?.result || res?.data || res || []) as any[];
+    const stores = rows
+      .map((item) => {
+        const storeNo = normalizeText(item.storeNo || item.value);
+        const storeName = normalizeText(item.storeName || item.label);
+        return {
+          label: storeName ? `${storeNo} ${storeName}` : storeNo,
+          value: storeNo
+        } as OptionVO;
+      })
+      .filter((item) => item.value);
+    storeOptions.value = [{ label: '全店', value: '0' }, ...stores];
+  }
+});
+
+const initOptions = async () => {
+  await Promise.all([classTreeRequest.run(undefined as never), storeRequest.run(undefined as never)]);
+};
+
+const isCategoryLeafActive = (node: any, data: CategoryTreeOption) => {
+  const isLeaf = !node?.children?.length && !data.children?.length;
+  return isLeaf && String(form.categoryId || '') === String(data.value);
+};
+
+const handleHistory = () => {
+  ElMessage.info('历史诊断记录功能待接入');
+};
+
+const handleSubmit = async () => {
+  if (!formRef.value) return;
+  await formRef.value.validate(async (valid) => {
+    if (!valid) return;
+    submitLoading.value = true;
+    try {
+      await router.push({
+        path: '/category/diagnosis/detail',
+        query: {
+          categoryId: form.categoryId ? String(form.categoryId) : '',
+          storeNo: form.storeScope ? String(form.storeScope) : '',
+          startDate: form.currentDateRange?.[0] || '',
+          endDate: form.currentDateRange?.[1] || '',
+          compareStartDate: form.compareDateRange?.[0] || '',
+          compareEndDate: form.compareDateRange?.[1] || ''
+        }
+      });
+    } finally {
+      submitLoading.value = false;
+    }
+  });
+};
+
+onMounted(() => {
+  initOptions();
 });
 </script>
 
-<style lang="scss" scoped>
-.overview-title {
-  color: var(--el-text-color-secondary);
-  font-size: 13px;
+<style scoped lang="scss">
+.category-diagnosis-page {
+  background: #f5f7fa;
+  min-height: calc(100vh - 84px);
 }
 
-.overview-value {
-  margin-top: 8px;
-  font-size: 28px;
+.feature-row {
+  margin-bottom: 16px;
+}
+
+.feature-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  text-align: center;
+  min-height: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.feature-image {
+  width: 100px;
+  height: 100px;
+  object-fit: contain;
+  margin: 4px auto 14px;
+  display: block;
+}
+
+.feature-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 8px;
+}
+
+.feature-subtitle {
+  font-size: 14px;
+  font-weight: 400;
+  color: #111827;
+  line-height: 1.4;
+}
+
+.diagnosis-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.diagnosis-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.diagnosis-title {
+  font-size: 16px;
   font-weight: 600;
   color: var(--el-text-color-primary);
 }
 
-.success {
-  color: var(--el-color-success);
+.diagnosis-form {
+  padding-top: 8px;
+  max-width: 800px;
+  margin: 0 auto;
 }
 
-.warning {
-  color: var(--el-color-warning);
+.diagnosis-form :deep(.el-form-item) {
+  margin-bottom: 18px;
+  justify-content: center;
 }
 
-.danger {
-  color: var(--el-color-danger);
+.diagnosis-form :deep(.el-form-item__label) {
+  text-align: left;
+  color: #111827;
 }
 
-.trend-chart {
-  height: 340px;
+.diagnosis-form :deep(.el-form-item__content) {
+  max-width: 480px;
+  flex: 0 1 480px;
+}
+
+.full-input {
   width: 100%;
+}
+
+.full-input :deep(.el-input__wrapper),
+.full-input :deep(.el-range-editor.el-input__wrapper) {
+  min-height: 40px;
+}
+
+.category-cascader :deep(.el-input__wrapper) {
+  border-radius: 6px;
+}
+
+:deep(.category-cascader-popper) {
+  border-radius: 6px;
+  padding: 0;
+}
+
+:deep(.category-cascader-popper .el-cascader-panel) {
+  border: 0;
+}
+
+:deep(.category-cascader-popper .el-scrollbar__wrap) {
+  overflow-x: hidden;
+}
+
+:deep(.category-cascader-popper .el-cascader-menu) {
+  min-width: 220px;
+}
+
+:deep(.category-cascader-popper .el-cascader-menu:first-child) {
+  border-right: 1px solid var(--el-border-color-lighter);
+}
+
+:deep(.category-cascader-popper .el-cascader-node) {
+  padding: 0 10px;
+}
+
+:deep(.category-cascader-popper .el-cascader-node__label) {
+  width: 100%;
+  padding: 0;
+}
+
+:deep(.category-cascader-popper .el-cascader-node__postfix) {
+  color: #9ca3af;
+}
+
+:deep(.category-cascader-popper .el-cascader-node:hover .el-cascader-node__postfix) {
+  color: #4b5563;
+}
+
+.category-option-left {
+  display: inline-flex;
+  align-items: center;
+  width: 100%;
+  color: #111827;
+  font-size: 14px;
+}
+
+.category-radio-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-right: 8px;
+}
+
+.category-radio-outer {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1.5px solid #9ca3af;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.category-radio-inner {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: transparent;
+}
+
+.category-radio-outer.active {
+  border-color: #20b2aa;
+}
+
+.category-radio-outer.active .category-radio-inner {
+  background: #20b2aa;
+}
+
+.category-option-label {
+  flex: 1;
+}
+
+:deep(.category-cascader-popper .el-cascader-node.is-active .category-option-label) {
+  color: #20b2aa;
+  font-weight: 700;
+}
+
+.submit-wrap {
+  margin-top: 20px;
+  text-align: center;
+}
+
+.submit-wrap :deep(.el-button--success) {
+  min-width: 160px;
+  border-radius: 8px;
+  background: #20b2aa;
+  border-color: #20b2aa;
+}
+
+.submit-wrap :deep(.el-button--success:hover),
+.submit-wrap :deep(.el-button--success:focus) {
+  background: #1ca29b;
+  border-color: #1ca29b;
+}
+
+@media (max-width: 992px) {
+  .feature-card {
+    min-height: 190px;
+  }
+
+  .diagnosis-form :deep(.el-form-item__content) {
+    max-width: 100%;
+    flex: 1 1 auto;
+  }
 }
 </style>
