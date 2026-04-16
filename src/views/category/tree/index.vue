@@ -119,6 +119,7 @@
       <div v-loading="treeLoading" class="chart-wrap" :style="{ height: chartHeight }">
         <div ref="chartRef" class="chart-inner" />
       </div>
+      <el-empty v-if="!treeLoading && !hasSearched" description="请先设置筛选条件并点击查询" class="mt-[12px]" />
     </el-card>
   </div>
 </template>
@@ -143,6 +144,7 @@ const chartIns = ref<echarts.ECharts>();
 const queryCollapsed = ref(false);
 const treeLoading = ref(false);
 const storeLoading = ref(false);
+const hasSearched = ref(false);
 const updateTime = ref('');
 const chartHeight = ref('560px');
 
@@ -173,6 +175,11 @@ const ROLE_COLOR_MAP: Record<string, string> = {
 
 const DEFAULT_CLASS_ROLE = ['0', '1', '2', '3', '4', '5'];
 const DEFAULT_SKU_ABNORMAL = ['0', '1', '2', '3'];
+const MAX_RENDER_NODES = 800;
+const LARGE_TREE_NODE_THRESHOLD = 600;
+const MAX_CHILDREN_PER_NODE = 60;
+const MAX_CHART_HEIGHT = 2000;
+const LABEL_DENSE_THRESHOLD = 350;
 
 const queryForm = reactive({
   storeScopeMode: '0',
@@ -330,6 +337,66 @@ const countNodes = (nodes: LegacyTreeNodeVO[]): number => {
   return count;
 };
 
+const trimTreeNodes = (nodes: LegacyTreeNodeVO[], maxNodes: number): LegacyTreeNodeVO[] => {
+  let remain = Math.max(1, maxNodes);
+  const walk = (list: LegacyTreeNodeVO[]): LegacyTreeNodeVO[] => {
+    const result: LegacyTreeNodeVO[] = [];
+    for (const node of list) {
+      if (remain <= 0) break;
+      remain -= 1;
+      const children = resolveNodeChildren(node);
+      result.push({
+        ...(node as any),
+        subClass: children.length ? walk(children) : []
+      } as LegacyTreeNodeVO);
+      if (remain <= 0) break;
+    }
+    return result;
+  };
+  return walk(nodes);
+};
+
+const sumSku = (nodes: LegacyTreeNodeVO[]): number => {
+  let total = 0;
+  const walk = (list: LegacyTreeNodeVO[]) => {
+    list.forEach((node) => {
+      total += Number((node as any).saleSku ?? (node as any).skuCount ?? 0);
+      const children = resolveNodeChildren(node);
+      if (children.length) walk(children);
+    });
+  };
+  walk(nodes);
+  return total;
+};
+
+const compactTreeByChildren = (nodes: LegacyTreeNodeVO[], maxChildren: number): LegacyTreeNodeVO[] => {
+  const walk = (list: LegacyTreeNodeVO[]): LegacyTreeNodeVO[] => {
+    return list.map((node) => {
+      const code = normalizeText((node as any).classNo);
+      const children = resolveNodeChildren(node);
+      if (!children.length) return node;
+      let visibleChildren = children;
+      if (children.length > maxChildren) {
+        const kept = children.slice(0, maxChildren);
+        const hidden = children.slice(maxChildren);
+        const mergedNode = {
+          classNo: `${code || 'node'}_more`,
+          className: `其余${hidden.length}个子类`,
+          saleSku: sumSku(hidden),
+          roleType: '结构品类',
+          subClass: []
+        } as unknown as LegacyTreeNodeVO;
+        visibleChildren = [...kept, mergedNode];
+      }
+      return {
+        ...(node as any),
+        subClass: walk(visibleChildren)
+      } as LegacyTreeNodeVO;
+    });
+  };
+  return walk(nodes);
+};
+
 const buildTreeSeriesData = (nodes: LegacyTreeNodeVO[], isRoot = false): any[] => {
   return nodes
     .filter((item) => normalizeText((item as any).classNo))
@@ -358,7 +425,7 @@ const buildTreeSeriesData = (nodes: LegacyTreeNodeVO[], isRoot = false): any[] =
     });
 };
 
-const renderTree = (treeRows: LegacyTreeNodeVO[]) => {
+const renderTree = (treeRows: LegacyTreeNodeVO[], rawNodeCount: number) => {
   if (!chartRef.value) return;
   if (!chartIns.value) {
     chartIns.value = echarts.init(chartRef.value);
@@ -383,15 +450,18 @@ const renderTree = (treeRows: LegacyTreeNodeVO[]) => {
         subClass: treeRows
       } as any);
 
-  const totalCount = countNodes([rootNode]);
-  const targetHeight = Math.max(560, totalCount * 30 + 160);
+  const renderNodeCount = countNodes([rootNode]);
+  const targetHeight = Math.min(MAX_CHART_HEIGHT, Math.max(560, renderNodeCount * 26 + 160));
   chartHeight.value = `${targetHeight}px`;
 
   const data = buildTreeSeriesData([rootNode], true);
+  const denseMode = renderNodeCount > LABEL_DENSE_THRESHOLD;
+  const largeMode = rawNodeCount > LARGE_TREE_NODE_THRESHOLD;
 
   chartIns.value.setOption({
-    animationDuration: 300,
-    animationDurationUpdate: 250,
+    animation: !largeMode,
+    animationDuration: largeMode ? 0 : 300,
+    animationDurationUpdate: largeMode ? 0 : 250,
     tooltip: {
       trigger: 'item',
       triggerOn: 'mousemove',
@@ -417,7 +487,7 @@ const renderTree = (treeRows: LegacyTreeNodeVO[]) => {
         orient: 'LR',
         edgeShape: 'curve',
         edgeForkPosition: '50%',
-        initialTreeDepth: -1,
+        initialTreeDepth: largeMode ? 2 : -1,
         expandAndCollapse: true,
         roam: true,
         lineStyle: {
@@ -430,15 +500,16 @@ const renderTree = (treeRows: LegacyTreeNodeVO[]) => {
           align: 'left',
           verticalAlign: 'middle',
           distance: 8,
-          fontSize: 13,
+          fontSize: denseMode ? 11 : 13,
           color: '#2f3b52'
         },
         leaves: {
           label: {
+            show: !denseMode,
             position: 'right',
             align: 'left',
             verticalAlign: 'middle',
-            fontSize: 13,
+            fontSize: denseMode ? 11 : 13,
             color: '#2f3b52'
           }
         },
@@ -464,7 +535,18 @@ const loadTreeData = async () => {
       ElMessage.warning('未查询到品类树数据');
       return;
     }
-    renderTree(rows);
+    const totalNodes = countNodes(rows);
+    let renderRows = rows;
+    if (totalNodes > LARGE_TREE_NODE_THRESHOLD) {
+      renderRows = compactTreeByChildren(rows, MAX_CHILDREN_PER_NODE);
+      ElMessage.warning(`树节点较多（${totalNodes}），已启用前端降载渲染（默认折叠深层并聚合部分子节点）`);
+    }
+    const renderNodeCount = countNodes(renderRows);
+    if (renderNodeCount > MAX_RENDER_NODES) {
+      renderRows = trimTreeNodes(renderRows, MAX_RENDER_NODES);
+      ElMessage.warning(`渲染节点仍过多，已限制为前 ${MAX_RENDER_NODES} 个节点`);
+    }
+    renderTree(renderRows, totalNodes);
   } finally {
     treeLoading.value = false;
   }
@@ -475,6 +557,7 @@ const handleSearch = async () => {
     ElMessage.warning('请选择门店');
     return;
   }
+  hasSearched.value = true;
   await loadTreeData();
 };
 
@@ -485,6 +568,9 @@ const handleReset = () => {
   queryForm.categoryIds = [];
   queryForm.roleNos = [];
   queryForm.skuAbnormalTypes = [];
+  hasSearched.value = false;
+  chartHeight.value = '560px';
+  chartIns.value?.clear();
   void loadClassTreeOptions(1);
 };
 
@@ -504,7 +590,9 @@ const downloadTreeImage = () => {
 const resizeChart = () => chartIns.value?.resize();
 
 onMounted(async () => {
-  await Promise.all([initFilterOptions(), loadClassTreeOptions(queryForm.categoryLevel), loadTreeData()]);
+  await Promise.all([initFilterOptions(), loadClassTreeOptions(queryForm.categoryLevel)]);
+  hasSearched.value = true;
+  await loadTreeData();
   window.addEventListener('resize', resizeChart);
 });
 

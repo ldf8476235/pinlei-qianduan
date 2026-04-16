@@ -34,7 +34,7 @@
             <template #default="{ node, data }">
               <span class="category-option-left">
                 <span class="category-radio-wrap">
-                  <span class="category-radio-outer" :class="{ active: isCategoryLeafActive(node, data) }">
+                  <span class="category-radio-outer" :class="{ active: isCategoryActive(data) }">
                     <span class="category-radio-inner" />
                   </span>
                 </span>
@@ -87,6 +87,7 @@ import cImage from '@/assets/images/c.png';
 import dImage from '@/assets/images/d.png';
 import { findStore, queryCategoryClassTree } from '@/api/category/tree';
 import type { CategoryClassTreeNodeVO, OptionVO } from '@/api/category/tree/types';
+import { createDiagnosisSession } from '@/api/category/diagnosis';
 import { useRequest } from '@/hooks/useRequest';
 
 interface DiagnosisForm {
@@ -99,6 +100,8 @@ interface DiagnosisForm {
 interface CategoryTreeOption {
   label: string;
   value: string;
+  classLevel?: number;
+  className?: string;
   children?: CategoryTreeOption[];
 }
 
@@ -131,6 +134,11 @@ const rules: FormRules<DiagnosisForm> = {
 
 const normalizeText = (value?: string | number | null) => String(value ?? '').trim();
 
+const normalizeLevel = (value?: string | number | null): number | undefined => {
+  const level = Number(value);
+  return Number.isInteger(level) && level > 0 ? level : undefined;
+};
+
 const parseClassTreePayload = (raw: any): CategoryClassTreeNodeVO[] => {
   const isCategoryNodeArray = (arr: any[]) =>
     Array.isArray(arr) &&
@@ -161,7 +169,7 @@ const categoryCascaderProps = {
   label: 'label',
   children: 'children',
   emitPath: false as const,
-  checkStrictly: false,
+  checkStrictly: true,
   expandTrigger: 'hover' as const
 };
 
@@ -178,9 +186,10 @@ const toCategoryTreeOptions = (nodes: CategoryClassTreeNodeVO[]): CategoryTreeOp
     return [];
   };
 
-  const resolveValue = (node: any) => normalizeText(node?.level || node?.id || node?.classNo || node?.value);
+  const resolveValue = (node: any) => normalizeText(node?.id || node?.classNo || node?.value || node?.level);
   const resolveName = (node: any) => normalizeText(node?.labelName || node?.label || node?.className || node?.name);
   const resolveParent = (node: any) => normalizeText(node?.parentClassNo || node?.parentId || node?.pId || node?.pid);
+  const resolveLevel = (node: any) => normalizeLevel(node?.classLevel || node?.levelFlag || node?.level || node?.flevel);
 
   const normalizeTree = (list: CategoryClassTreeNodeVO[]): CategoryClassTreeNodeVO[] => {
     const hasNested = list.some((item: any) => resolveChildren(item).length > 0);
@@ -207,13 +216,12 @@ const toCategoryTreeOptions = (nodes: CategoryClassTreeNodeVO[]): CategoryTreeOp
     return roots as CategoryClassTreeNodeVO[];
   };
 
-  const toNodeList = (list: CategoryClassTreeNodeVO[]): CategoryTreeOption[] => {
+  const toNodeList = (list: CategoryClassTreeNodeVO[], depth = 1): CategoryTreeOption[] => {
     const result: CategoryTreeOption[] = [];
     list.forEach((node) => {
       const value = resolveValue(node);
       const name = resolveName(node);
-      const children = toNodeList(resolveChildren(node));
-      // 跳过“全部/0”等无效节点，但继续下钻其子节点
+      const children = toNodeList(resolveChildren(node), depth + 1);
       if (!value || value === '0' || !name) {
         if (children.length) {
           result.push(...children);
@@ -222,7 +230,9 @@ const toCategoryTreeOptions = (nodes: CategoryClassTreeNodeVO[]): CategoryTreeOp
       }
       const current: CategoryTreeOption = {
         label: formatCategoryLabel(value, name),
-        value
+        value,
+        classLevel: resolveLevel(node) || depth,
+        className: name
       };
       if (children.length) {
         current.children = children;
@@ -232,6 +242,24 @@ const toCategoryTreeOptions = (nodes: CategoryClassTreeNodeVO[]): CategoryTreeOp
     return result;
   };
   return toNodeList(normalizeTree(nodes));
+};
+
+const findCategoryOption = (
+  value: string | number | undefined,
+  list: CategoryTreeOption[]
+): CategoryTreeOption | undefined => {
+  const target = String(value || '');
+  if (!target) return undefined;
+  for (const item of list) {
+    if (String(item.value) === target) {
+      return item;
+    }
+    if (item.children?.length) {
+      const child = findCategoryOption(target, item.children);
+      if (child) return child;
+    }
+  }
+  return undefined;
 };
 
 const classTreeRequest = useRequest(async () => await queryCategoryClassTree(4), {
@@ -262,13 +290,10 @@ const initOptions = async () => {
   await Promise.all([classTreeRequest.run(undefined as never), storeRequest.run(undefined as never)]);
 };
 
-const isCategoryLeafActive = (node: any, data: CategoryTreeOption) => {
-  const isLeaf = !node?.children?.length && !data.children?.length;
-  return isLeaf && String(form.categoryId || '') === String(data.value);
-};
+const isCategoryActive = (data: CategoryTreeOption) => String(form.categoryId || '') === String(data.value);
 
 const handleHistory = () => {
-  ElMessage.info('历史诊断记录功能待接入');
+  router.push('/category/diagnosis/record');
 };
 
 const handleSubmit = async () => {
@@ -277,11 +302,43 @@ const handleSubmit = async () => {
     if (!valid) return;
     submitLoading.value = true;
     try {
+      const categoryId = form.categoryId ? String(form.categoryId) : '';
+      const categoryOption = findCategoryOption(form.categoryId, categoryTreeOptions.value);
+      const categoryName = categoryOption?.className || categoryOption?.label || '';
+      const classLevel = categoryOption?.classLevel || 1;
+      const storeNo = form.storeScope && String(form.storeScope) !== '0' ? String(form.storeScope) : '';
+      const response = await createDiagnosisSession({
+        classLevel,
+        classNo: categoryId,
+        className: categoryName,
+        storeNo,
+        periodStart: form.currentDateRange?.[0] || '',
+        periodEnd: form.currentDateRange?.[1] || '',
+        compareStart: form.compareDateRange?.[0] || '',
+        compareEnd: form.compareDateRange?.[1] || '',
+        triggerIfMissing: true,
+        waitSeconds: 0
+      });
+      const session = response?.data;
+      if (!session?.sessionId) {
+        ElMessage.error('诊断会话创建失败');
+        return;
+      }
+      if (!session.ready) {
+        await ElMessageBox.alert('当前诊断任务正在计算中，请稍后在历史诊断记录中查看。', '提示', {
+          confirmButtonText: '我知道了',
+          type: 'info'
+        });
+        return;
+      }
       await router.push({
         path: '/category/diagnosis/detail',
         query: {
-          categoryId: form.categoryId ? String(form.categoryId) : '',
-          storeNo: form.storeScope ? String(form.storeScope) : '',
+          sessionId: session.sessionId,
+          categoryId,
+          categoryName,
+          categoryLevel: String(classLevel),
+          storeNo,
           startDate: form.currentDateRange?.[0] || '',
           endDate: form.currentDateRange?.[1] || '',
           compareStartDate: form.compareDateRange?.[0] || '',

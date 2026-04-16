@@ -1,44 +1,46 @@
-import request from '@/utils/request';
+﻿import request from '@/utils/request';
 import { AxiosPromise } from 'axios';
-import { CategoryDiagnosisOverviewVO, CategoryDiagnosisQuery, CategoryDiagnosisTrendVO, CategoryDiagnosisVO } from './types';
+import {
+  DiagnosisApiResponse,
+  DiagnosisRecordPageResponse,
+  DiagnosisRecordQuery,
+  DiagnosisSessionCreateRequest,
+  DiagnosisSessionCreateResponse,
+  DiagnosisSessionStatusResponse
+} from './types';
 
-/**
- * 查询品类诊断概览
- */
-export const getCategoryDiagnosisOverview = (
-  query: Omit<CategoryDiagnosisQuery, 'pageNum' | 'pageSize'>
-): AxiosPromise<CategoryDiagnosisOverviewVO> => {
+export const createDiagnosisSession = (
+  data: DiagnosisSessionCreateRequest
+): AxiosPromise<DiagnosisApiResponse<DiagnosisSessionCreateResponse>> => {
   return request({
-    url: '/category/diagnosis/overview',
-    method: 'get',
-    params: query
+    url: '/api/v1/diagnosis/sessions',
+    method: 'post',
+    data
   });
 };
 
-/**
- * 查询品类诊断趋势
- */
-export const listCategoryDiagnosisTrend = (query: Omit<CategoryDiagnosisQuery, 'pageNum' | 'pageSize'>): AxiosPromise<CategoryDiagnosisTrendVO[]> => {
+export const getDiagnosisSessionStatus = (
+  sessionId: string
+): AxiosPromise<DiagnosisApiResponse<DiagnosisSessionStatusResponse>> => {
   return request({
-    url: '/category/diagnosis/trend',
+    url: `/api/v1/diagnosis/sessions/${sessionId}/status`,
     method: 'get',
-    params: query
+    params: {}
   });
 };
 
-/**
- * 查询品类诊断列表
- */
-export const listCategoryDiagnosis = (query: CategoryDiagnosisQuery): AxiosPromise<CategoryDiagnosisVO[]> => {
+export const listDiagnosisRecords = (
+  data: DiagnosisRecordQuery
+): AxiosPromise<DiagnosisApiResponse<DiagnosisRecordPageResponse>> => {
   return request({
-    url: '/category/diagnosis/list',
-    method: 'get',
-    params: query
+    url: '/api/v1/diagnosis/records',
+    method: 'post',
+    data
   });
 };
 
 export default {
-  getCategoryDiagnosisOverview,
-  listCategoryDiagnosisTrend,
-  listCategoryDiagnosis
+  createDiagnosisSession,
+  getDiagnosisSessionStatus,
+  listDiagnosisRecords
 };

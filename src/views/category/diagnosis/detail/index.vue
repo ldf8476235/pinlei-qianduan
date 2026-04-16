@@ -1,25 +1,32 @@
-<template>
+﻿<template>
   <div class="p-2 category-diagnosis-detail-page">
     <el-card shadow="hover" class="mb-[12px]">
-      <div class="filter-line">数据日期: {{ summary.filterInfo.currentDateRangeText }}；对比日期: {{ summary.filterInfo.compareDateRangeText }}</div>
-      <div class="filter-line">
-        组织: {{ summary.filterInfo.orgName }}；业态: {{ summary.filterInfo.retailTypeName }}；商圈: {{ summary.filterInfo.circleName }}；
-      </div>
+      <div class="filter-line">本期日期: {{ summary.filterInfo.currentDateRangeText }}；对比日期: {{ summary.filterInfo.compareDateRangeText }}</div>
+      <div class="filter-line">组织: {{ summary.filterInfo.orgName }}；业态: {{ summary.filterInfo.retailTypeName }}；商圈: {{ summary.filterInfo.circleName }}</div>
       <div class="filter-line">门店: {{ summary.filterInfo.storeRangeName }}</div>
 
       <div class="core-line mt-[10px]">
-        <div class="core-left">
-          {{ summary.coreInfo.categoryCode }}{{ summary.coreInfo.categoryName }}（{{ summary.coreInfo.categoryLevelName }}）
-        </div>
+        <div class="core-left">{{ summary.coreInfo.categoryCode }} {{ summary.coreInfo.categoryName }}（{{ summary.coreInfo.categoryLevelName }}）</div>
         <div class="core-center">
-          本期角色:
-          <el-tag type="success" effect="dark" class="ml-1">{{ summary.coreInfo.currentRoleName }}</el-tag>
+          诊断状态:
+          <el-tag :type="statusTagType" effect="dark" class="ml-1">{{ statusText }}</el-tag>
         </div>
         <div class="core-right">
-          该门店范围下品类的预设角色为“{{ summary.coreInfo.presetRoleName }}”，预设SKU数为{{ formatNumber(summary.coreInfo.presetSkuCount) }}
+          sessionId: {{ sessionId || '--' }}
+          <span v-if="statusState?.dataVersion">；版本: {{ statusState.dataVersion }}</span>
         </div>
       </div>
     </el-card>
+
+    <el-alert
+      v-if="!sessionReady"
+      class="mb-[12px]"
+      type="info"
+      :closable="false"
+      :title="`诊断预计算中，当前阶段：${statusState?.currentStage || 'WAIT_PRECOMPUTE'}`"
+      :description="`进度 ${formatPercent(statusState?.progressPercent)}，页面会自动刷新。`"
+      show-icon
+    />
 
     <el-row :gutter="12">
       <el-col :lg="5" :md="7" :sm="24" :xs="24">
@@ -32,7 +39,7 @@
               :key="item.key"
               class="left-nav-item"
               :class="{ active: activeMainNav === item.key }"
-              @click="activeMainNav = item.key"
+              @click="handleMainNavClick(item.key)"
             >
               <span class="left-nav-icon">{{ item.icon }}</span>
               <span>{{ item.label }}</span>
@@ -42,7 +49,7 @@
           <div class="left-sub-modules">
             <div class="left-sub-item">
               <div class="left-sub-title">定位异常品项</div>
-              <div class="left-sub-desc">及时优化表现差单品</div>
+              <div class="left-sub-desc">及时优化表现差的商品</div>
             </div>
             <div class="left-sub-item">
               <div class="left-sub-title">深究用户需求</div>
@@ -61,7 +68,7 @@
           <el-empty description="该模块待接入" />
         </div>
         <template v-else>
-          <el-card shadow="hover" class="mb-[12px]">
+          <el-card shadow="hover" class="mb-[12px]" v-loading="overviewLoading">
             <template #header>
               <div class="section-title">品类业绩</div>
             </template>
@@ -128,42 +135,39 @@
 <script setup name="CategoryDiagnosisDetail" lang="ts">
 import * as echarts from 'echarts';
 import { useRequest } from '@/hooks/useRequest';
-import {
-  getCategoryDiagnosisDetailMetrics,
-  getCategoryDiagnosisDetailSummary,
-  getCategoryDiagnosisDetailTrend
-} from '@/api/category/diagnosis/detail';
+import { getDiagnosisSessionStatus } from '@/api/category/diagnosis';
+import { getCategoryDiagnosisDetailSummary, getCategoryDiagnosisDetailTrend } from '@/api/category/diagnosis/detail';
 import type {
   CategoryDiagnosisDetailQuery,
   CategoryDiagnosisDetailSummaryVO,
   CategoryDiagnosisMetricGroupVO,
   CategoryDiagnosisMetricVO,
-  CategoryDiagnosisTrendVO
+  CategoryDiagnosisTrendVO,
+  DiagnosisOverviewResponse
 } from '@/api/category/diagnosis/detail/types';
+import type { DiagnosisSessionStatusResponse } from '@/api/category/diagnosis/types';
 
 const route = useRoute();
+const router = useRouter();
 
 const chartRef = ref<HTMLDivElement>();
 const chartIns = ref<echarts.ECharts>();
+const pollTimer = ref<number | null>(null);
 
 const activeMainNav = ref('performance');
-const activeTrendMetric = ref('salesAmount');
+const activeTrendMetric = ref('sales');
+const statusState = ref<DiagnosisSessionStatusResponse>();
 
 const mainNavList = [
-  { key: 'performance', label: '品类业绩', icon: '◉' },
-  { key: 'subCategory', label: '子类贡献', icon: '◉' },
-  { key: 'channel', label: '渠道业绩', icon: '◉' },
-  { key: 'customer', label: '客户分析', icon: '◉' }
+  { key: 'performance', label: '品类业绩', icon: '•' },
+  { key: 'subCategory', label: '子类贡献', icon: '•' },
+  { key: 'channel', label: '渠道业绩', icon: '•' },
+  { key: 'customer', label: '客户分析', icon: '•' }
 ];
 
 const trendMetricTabs = [
-  { key: 'salesAmount', label: '销售额' },
-  { key: 'salesQty', label: '销售量' },
-  { key: 'grossProfit', label: '毛利额' },
-  { key: 'grossMarginRate', label: '毛利率' },
-  { key: 'customerCount', label: '客数' },
-  { key: 'customerUnitPrice', label: '客单价' },
-  { key: 'stockSalesRatio', label: '库销比' }
+  { key: 'sales', label: '销售额', unit: '元' },
+  { key: 'gross', label: '毛利额', unit: '元' }
 ];
 
 const summary = reactive<CategoryDiagnosisDetailSummaryVO>({
@@ -178,7 +182,7 @@ const summary = reactive<CategoryDiagnosisDetailSummaryVO>({
   coreInfo: {
     categoryCode: '--',
     categoryName: '--',
-    categoryLevelName: '一级品类',
+    categoryLevelName: '四级品类',
     currentRoleName: '--',
     presetRoleName: '--',
     presetSkuCount: 0
@@ -191,15 +195,18 @@ const metrics = reactive<CategoryDiagnosisMetricGroupVO>({
 });
 
 const trendData = ref<CategoryDiagnosisTrendVO>({
-  metricKey: 'salesAmount',
+  metricKey: 'sales',
   metricName: '销售额',
-  unit: '',
+  unit: '元',
   currentSeries: [],
   compareSeries: []
 });
 
 const query = computed<CategoryDiagnosisDetailQuery>(() => ({
+  sessionId: (route.query.sessionId as string) || '',
   categoryId: route.query.categoryId as string,
+  categoryName: (route.query.categoryName as string) || '',
+  categoryLevel: (route.query.categoryLevel as string) || '',
   storeNo: (route.query.storeNo as string) || '',
   startDate: (route.query.startDate as string) || '',
   endDate: (route.query.endDate as string) || '',
@@ -207,38 +214,50 @@ const query = computed<CategoryDiagnosisDetailQuery>(() => ({
   compareEndDate: (route.query.compareEndDate as string) || ''
 }));
 
-const summaryRequest = useRequest(async (params: CategoryDiagnosisDetailQuery) => await getCategoryDiagnosisDetailSummary(params), {
+const formatCategoryLevelName = (level?: string | number) => {
+  const levelNumber = Number(level || 0);
+  if (levelNumber >= 1 && levelNumber <= 5) {
+    return `${['', '一级', '二级', '三级', '四级', '五级'][levelNumber]}品类`;
+  }
+  return '品类';
+};
+
+const sessionId = computed(() => query.value.sessionId || '');
+const sessionReady = computed(() => Boolean(statusState.value?.ready));
+const statusText = computed(() => (sessionReady.value ? 'READY' : statusState.value?.status || 'PENDING'));
+const statusTagType = computed(() => {
+  if (sessionReady.value) return 'success';
+  if (statusState.value?.status === 'FAILED') return 'danger';
+  return 'warning';
+});
+
+const statusRequest = useRequest(async (id: string) => await getDiagnosisSessionStatus(id), {
   onSuccess: (res) => {
     if (res?.data) {
-      Object.assign(summary, res.data);
+      statusState.value = res.data;
     }
   }
 });
 
-const metricsRequest = useRequest(async (params: CategoryDiagnosisDetailQuery) => await getCategoryDiagnosisDetailMetrics(params), {
+const overviewRequest = useRequest(async (id: string) => await getCategoryDiagnosisDetailSummary(id), {
   onSuccess: (res) => {
     if (res?.data) {
-      const firstRow = Array.isArray(res.data.firstRow) ? res.data.firstRow : [];
-      const secondRow = Array.isArray(res.data.secondRow) ? res.data.secondRow : [];
-      metrics.firstRow = firstRow;
-      metrics.secondRow = secondRow;
+      applyOverview(res.data);
     }
   }
 });
 
-const trendRequest = useRequest(
-  async (params: CategoryDiagnosisDetailQuery & { metricKey: string }) => await getCategoryDiagnosisDetailTrend(params),
-  {
-    onSuccess: (res) => {
-      if (res?.data) {
-        trendData.value = res.data;
-        renderTrendChart();
-      }
+const trendRequest = useRequest(async (params: { sessionId: string; metricCode: string }) => await getCategoryDiagnosisDetailTrend(params.sessionId, params.metricCode), {
+  onSuccess: (res) => {
+    if (res?.data) {
+      trendData.value = buildTrendView(res.data, activeTrendMetric.value);
+      renderTrendChart();
     }
   }
-);
+});
 
-const trendLoading = computed(() => trendRequest.loading.value);
+const overviewLoading = computed(() => overviewRequest.loading.value || statusRequest.loading.value);
+const trendLoading = computed(() => trendRequest.loading.value || statusRequest.loading.value);
 
 const compareClass = (value: number) => {
   if (value > 0) return 'is-up';
@@ -249,7 +268,7 @@ const compareClass = (value: number) => {
 const compareArrow = (value: number) => {
   if (value > 0) return '▲';
   if (value < 0) return '▼';
-  return '—';
+  return '•';
 };
 
 const compareText = (value: number, type: string) => {
@@ -260,9 +279,89 @@ const compareText = (value: number, type: string) => {
   return `对比增长 ${abs.toFixed(2)}%`;
 };
 
-const formatNumber = (value: number | string) => {
-  const n = Number(value || 0);
-  return Number.isFinite(n) ? n.toLocaleString('zh-CN') : value;
+const formatNumber = (value: number | string | undefined, digits = 2) => {
+  const n = Number(value ?? 0);
+  return Number.isFinite(n) ? n.toLocaleString('zh-CN', { minimumFractionDigits: 0, maximumFractionDigits: digits }) : '--';
+};
+
+const formatPercent = (value?: number) => `${Number(value || 0).toFixed(0)}%`;
+
+const buildMetric = (
+  metricKey: string,
+  metricName: string,
+  currentValue: number | undefined,
+  compareValue: number | undefined,
+  compareType: 'growth' | 'diff',
+  metricDesc: string,
+  unit = ''
+): CategoryDiagnosisMetricVO => ({
+  metricKey,
+  metricName,
+  metricDesc,
+  currentValue: unit === '%' ? `${Number(currentValue || 0).toFixed(2)}%` : formatNumber(currentValue),
+  compareValue: Number(compareValue || 0),
+  compareType,
+  unit
+});
+
+const buildMetrics = (overview: DiagnosisOverviewResponse): CategoryDiagnosisMetricGroupVO => ({
+  firstRow: [
+    buildMetric('sku', 'SKU数', overview.currentClassSku, overview.comparativeGrowthRate, 'growth', '当前品类SKU数量'),
+    buildMetric('sales', '销售额', overview.currentSales, overview.comparativeSales, 'growth', '当前品类销售额'),
+    buildMetric('gross', '毛利额', overview.currentGross, overview.comparativeGross, 'growth', '当前品类毛利额'),
+    buildMetric('grossRate', '毛利率', overview.currentGrossRate, overview.comparativeGrossRate, 'diff', '毛利率', '%'),
+    buildMetric('saleQuantity', '销售量', overview.currentSaleQuantity, overview.comparativeSaleQuantity, 'growth', '当前品类销售量'),
+    buildMetric('customerCount', '客数', overview.currentCustomerCount, overview.comparativeCustomerCount, 'growth', '当前品类客数'),
+    buildMetric('customerPrice', '客单价', overview.currentCustomerPrice, overview.comparativeCustomerPrice, 'growth', '当前品类客单价')
+  ],
+  secondRow: [
+    buildMetric('avgInventory', '平均库存', overview.currentAvgInventory, overview.comparativeAvgInventory, 'growth', '当前品类平均库存'),
+    buildMetric('inventorySales', '库销比', overview.currentInventorySales, overview.comparativeInventorySales, 'growth', '库存销售比'),
+    buildMetric('turnoverDays', '周转天数', overview.currentTurnoverDays, overview.comparativeTurnoverDays, 'growth', '库存周转天数'),
+    buildMetric('turnoverRate', '周转率', overview.currentTurnoverRate, overview.comparativeTurnoverRate, 'growth', '库存周转率'),
+    buildMetric('penetrateRate', '渗透率', overview.currentPenetrateRate, overview.comparativePenetrateRate, 'diff', '渗透率', '%'),
+    buildMetric('pieceAvgPrice', '件单价', overview.currentPieceAvgPrice, overview.comparativePieceAvgPrice, 'growth', '件单价'),
+    buildMetric('customerAvgQuantity', '客单量', overview.currentCustomerAvgQuantity, overview.comparativeCustomerAvgQuantity, 'growth', '客单量')
+  ]
+});
+
+const buildTrendView = (payload: any, metricCode: string): CategoryDiagnosisTrendVO => {
+  const currentSeries = Array.isArray(payload?.trends)
+    ? payload.trends.map((item: any) => ({
+        date: item.pointDate,
+        value: Number(item.currentValue || 0)
+      }))
+    : [];
+  const compareSeries = Array.isArray(payload?.trends)
+    ? payload.trends.map((item: any) => ({
+        date: item.pointDate,
+        value: Number(item.compareValue || 0)
+      }))
+    : [];
+  const tab = trendMetricTabs.find((item) => item.key === metricCode);
+  return {
+    metricKey: metricCode,
+    metricName: tab?.label || metricCode,
+    unit: tab?.unit || '',
+    currentSeries,
+    compareSeries
+  };
+};
+
+const applyOverview = (overview: DiagnosisOverviewResponse) => {
+  summary.filterInfo.currentDateRangeText = `${query.value.startDate || '--'} ~ ${query.value.endDate || '--'}`;
+  summary.filterInfo.compareDateRangeText = `${query.value.compareStartDate || '--'} ~ ${query.value.compareEndDate || '--'}`;
+  summary.filterInfo.orgName = '--';
+  summary.filterInfo.retailTypeName = '全部业态';
+  summary.filterInfo.circleName = '全部商圈';
+  summary.filterInfo.storeRangeName = query.value.storeNo || '全店';
+  summary.coreInfo.categoryCode = overview.classNo || String(query.value.categoryId || '--');
+  summary.coreInfo.categoryName = overview.className || query.value.categoryName || '--';
+  summary.coreInfo.categoryLevelName = formatCategoryLevelName(query.value.categoryLevel);
+  summary.coreInfo.currentRoleName = statusText.value;
+  summary.coreInfo.presetRoleName = '--';
+  summary.coreInfo.presetSkuCount = Number(overview.currentClassSku || 0);
+  Object.assign(metrics, buildMetrics(overview));
 };
 
 const initChart = () => {
@@ -284,9 +383,7 @@ const renderTrendChart = () => {
   const unit = trendData.value.unit || '';
 
   chartIns.value.setOption({
-    tooltip: {
-      trigger: 'axis'
-    },
+    tooltip: { trigger: 'axis' },
     legend: {
       top: 6,
       data: ['本期', '对比日期']
@@ -326,39 +423,90 @@ const renderTrendChart = () => {
   });
 };
 
-const handleTrendMetricChange = async (metricKey: string) => {
-  if (activeTrendMetric.value === metricKey) return;
-  activeTrendMetric.value = metricKey;
-  await loadTrend();
+const clearPolling = () => {
+  if (pollTimer.value != null) {
+    window.clearTimeout(pollTimer.value);
+    pollTimer.value = null;
+  }
 };
 
-const loadSummary = async () => {
-  await summaryRequest.run(query.value);
+const schedulePolling = () => {
+  clearPolling();
+  pollTimer.value = window.setTimeout(async () => {
+    await loadSessionState();
+  }, 2000);
 };
 
-const loadMetrics = async () => {
-  await metricsRequest.run(query.value);
+const loadOverview = async () => {
+  if (!sessionId.value) return;
+  await overviewRequest.run(sessionId.value);
 };
 
 const loadTrend = async () => {
+  if (!sessionId.value) return;
   await trendRequest.run({
-    ...query.value,
-    metricKey: activeTrendMetric.value
+    sessionId: sessionId.value,
+    metricCode: activeTrendMetric.value
   });
 };
 
-const loadPageData = async () => {
-  await Promise.all([loadSummary(), loadMetrics(), loadTrend()]);
+const loadReadyData = async () => {
+  await Promise.all([loadOverview(), loadTrend()]);
+};
+
+const loadSessionState = async () => {
+  if (!sessionId.value) {
+    ElMessage.error('缺少 sessionId，无法加载诊断详情');
+    return;
+  }
+  const statusRes = await statusRequest.run(sessionId.value);
+  const current = statusRes?.data;
+  if (!current) {
+    return;
+  }
+  if (current.ready) {
+    clearPolling();
+    await loadReadyData();
+    return;
+  }
+  if (current.status === 'FAILED' || current.status === 'STOPPED') {
+    clearPolling();
+    ElMessage.error(`诊断任务状态异常: ${current.status}`);
+    return;
+  }
+  schedulePolling();
+};
+
+const handleMainNavClick = async (navKey: string) => {
+  if (navKey === 'subCategory') {
+    await router.push({
+      path: '/category/diagnosis/detail/sub-class',
+      query: {
+        ...route.query
+      }
+    });
+    return;
+  }
+  activeMainNav.value = navKey;
+};
+
+const handleTrendMetricChange = async (metricKey: string) => {
+  if (activeTrendMetric.value === metricKey) return;
+  activeTrendMetric.value = metricKey;
+  if (sessionReady.value) {
+    await loadTrend();
+  }
 };
 
 const resizeChart = () => chartIns.value?.resize();
 
 onMounted(async () => {
-  await loadPageData();
+  await loadSessionState();
   window.addEventListener('resize', resizeChart);
 });
 
 onBeforeUnmount(() => {
+  clearPolling();
   window.removeEventListener('resize', resizeChart);
   chartIns.value?.dispose();
 });

@@ -1,44 +1,72 @@
-import request from '@/utils/request';
+﻿import request from '@/utils/request';
 import { AxiosPromise } from 'axios';
-import { CategoryDiagnosisDetailQuery, CategoryDiagnosisDetailSummaryVO, CategoryDiagnosisMetricGroupVO, CategoryDiagnosisTrendVO } from './types';
+import { DiagnosisApiResponse } from '../types';
+import {
+  DiagnosisOverviewResponse,
+  DiagnosisSubClassPieItem,
+  DiagnosisSubClassTableResponse,
+  DiagnosisSubClassTrendResponse,
+  DiagnosisTrendsResponse
+} from './types';
 
-/**
- * 查询品类诊断详情头部信息
- */
-export const getCategoryDiagnosisDetailSummary = (query: CategoryDiagnosisDetailQuery): AxiosPromise<CategoryDiagnosisDetailSummaryVO> => {
+export const getCategoryDiagnosisDetailSummary = (
+  sessionId: string
+): AxiosPromise<DiagnosisApiResponse<DiagnosisOverviewResponse>> => {
   return request({
-    url: '/category/diagnosis/detail/summary',
+    url: '/api/v1/diagnosis/overview',
     method: 'get',
-    params: query
+    params: { sessionId }
   });
 };
 
-/**
- * 查询品类诊断详情指标卡片
- */
-export const getCategoryDiagnosisDetailMetrics = (query: CategoryDiagnosisDetailQuery): AxiosPromise<CategoryDiagnosisMetricGroupVO> => {
-  return request({
-    url: '/category/diagnosis/detail/metrics',
-    method: 'get',
-    params: query
-  });
-};
-
-/**
- * 查询品类诊断详情趋势图
- */
 export const getCategoryDiagnosisDetailTrend = (
-  query: CategoryDiagnosisDetailQuery & { metricKey: string }
-): AxiosPromise<CategoryDiagnosisTrendVO> => {
+  sessionId: string,
+  metricCode?: string
+): AxiosPromise<DiagnosisApiResponse<DiagnosisTrendsResponse>> => {
   return request({
-    url: '/category/diagnosis/detail/trend',
+    url: '/api/v1/diagnosis/trends',
     method: 'get',
-    params: query
+    params: {
+      sessionId,
+      metricCode
+    }
+  });
+};
+
+export const getCategoryDiagnosisSubClassPie = (
+  sessionId: string
+): AxiosPromise<DiagnosisApiResponse<DiagnosisSubClassPieItem[]>> => {
+  return request({
+    url: '/api/v1/diagnosis/subClass/pie',
+    method: 'get',
+    params: { sessionId }
+  });
+};
+
+export const getCategoryDiagnosisSubClassTrend = (
+  sessionId: string
+): AxiosPromise<DiagnosisApiResponse<DiagnosisSubClassTrendResponse>> => {
+  return request({
+    url: '/api/v1/diagnosis/subClass/trend',
+    method: 'get',
+    params: { sessionId }
+  });
+};
+
+export const getCategoryDiagnosisSubClassTable = (
+  sessionId: string
+): AxiosPromise<DiagnosisApiResponse<DiagnosisSubClassTableResponse>> => {
+  return request({
+    url: '/api/v1/diagnosis/subClass/table',
+    method: 'get',
+    params: { sessionId }
   });
 };
 
 export default {
   getCategoryDiagnosisDetailSummary,
-  getCategoryDiagnosisDetailMetrics,
-  getCategoryDiagnosisDetailTrend
+  getCategoryDiagnosisDetailTrend,
+  getCategoryDiagnosisSubClassPie,
+  getCategoryDiagnosisSubClassTrend,
+  getCategoryDiagnosisSubClassTable
 };

@@ -1,5 +1,8 @@
-export interface CategoryDiagnosisDetailQuery {
+﻿export interface CategoryDiagnosisDetailQuery {
+  sessionId?: string;
   categoryId?: string | number;
+  categoryName?: string;
+  categoryLevel?: string | number;
   storeNo?: string;
   startDate?: string;
   endDate?: string;
@@ -58,4 +61,131 @@ export interface CategoryDiagnosisTrendVO {
   unit: string;
   currentSeries: CategoryDiagnosisTrendPointVO[];
   compareSeries: CategoryDiagnosisTrendPointVO[];
+}
+
+export interface DiagnosisOverviewResponse {
+  classNo?: string;
+  className?: string;
+  currentClassSku?: number;
+  compareClassSku?: number;
+  comparativeGrowthRate?: number;
+  currentTurnoverRate?: number;
+  compareTurnoverRate?: number;
+  comparativeTurnoverRate?: number;
+  currentPenetrateRate?: number;
+  comparePenetrateRate?: number;
+  comparativePenetrateRate?: number;
+  currentTurnoverDays?: number;
+  compareTurnoverDays?: number;
+  comparativeTurnoverDays?: number;
+  currentInventorySales?: number;
+  compareInventorySales?: number;
+  comparativeInventorySales?: number;
+  currentAvgInventory?: number;
+  compareAvgInventory?: number;
+  comparativeAvgInventory?: number;
+  currentSaleQuantity?: number;
+  compareSaleQuantity?: number;
+  comparativeSaleQuantity?: number;
+  currentSales?: number;
+  compareSales?: number;
+  comparativeSales?: number;
+  currentGross?: number;
+  compareGross?: number;
+  comparativeGross?: number;
+  currentGrossRate?: number;
+  compareGrossRate?: number;
+  comparativeGrossRate?: number;
+  currentCustomerCount?: number;
+  compareCustomerCount?: number;
+  comparativeCustomerCount?: number;
+  currentCustomerPrice?: number;
+  compareCustomerPrice?: number;
+  comparativeCustomerPrice?: number;
+  currentCustomerAvgQuantity?: number;
+  compareCustomerAvgQuantity?: number;
+  comparativeCustomerAvgQuantity?: number;
+  currentPieceAvgPrice?: number;
+  comparePieceAvgPrice?: number;
+  comparativePieceAvgPrice?: number;
+  currentSalesCost?: number;
+  compareSalesCost?: number;
+  currentCustomerCountTotal?: number;
+  compareCustomerCountTotal?: number;
+}
+
+export interface DiagnosisTrendSnapshotRow {
+  metricCode?: string;
+  pointDate: string;
+  currentValue?: number;
+  compareValue?: number;
+  growthRate?: number;
+  periodLabel?: string;
+}
+
+export interface DiagnosisTrendsResponse {
+  sessionId: string;
+  metricCode?: string;
+  dataVersion?: string;
+  cacheHit: boolean;
+  trends: DiagnosisTrendSnapshotRow[];
+}
+
+export interface DiagnosisSubClassQuery {
+  sessionId?: string;
+  categoryId?: string | number;
+  categoryName?: string;
+  storeNo?: string;
+  startDate?: string;
+  endDate?: string;
+  compareStartDate?: string;
+  compareEndDate?: string;
+}
+
+export interface DiagnosisSubClassPieItem {
+  classNo: string;
+  className: string;
+  salesAmount: number;
+  salesShare: number;
+}
+
+export interface DiagnosisSubClassTrendSeriesItem {
+  classNo: string;
+  className: string;
+  color?: string;
+  values: number[];
+}
+
+export interface DiagnosisSubClassTrendResponse {
+  dates: string[];
+  unit?: string;
+  series: DiagnosisSubClassTrendSeriesItem[];
+}
+
+export interface DiagnosisSubClassTableRow {
+  classNo: string;
+  className: string;
+  salesAmount: number;
+  salesShare: number;
+  grossAmount: number;
+  grossShare: number;
+  grossRate: number;
+  customerCount: number;
+  customerPrice: number;
+  compareSalesAmount: number;
+  compareSalesShare: number;
+  salesGrowthRate: number;
+  compareGrossAmount: number;
+  compareGrossRate: number;
+  compareCustomerCount: number;
+  customerCountGrowthRate: number;
+  compareCustomerPrice: number;
+  customerPriceGrowthRate: number;
+  turnoverRate: number;
+  turnoverDays: number;
+  gmroi: number;
+}
+
+export interface DiagnosisSubClassTableResponse {
+  rows: DiagnosisSubClassTableRow[];
 }
