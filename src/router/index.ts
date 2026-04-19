@@ -88,6 +88,108 @@ export const constantRoutes: RouteRecordRaw[] = [
         meta: { title: '个人中心', icon: 'user' }
       }
     ]
+  },
+  {
+    path: '/abc',
+    component: Layout,
+    hidden: true,
+    children: [
+      {
+        path: 'analysis',
+        component: () => import('@/views/abc/analysis.vue'),
+        name: 'AbcAnalysis',
+        meta: { title: 'ABC结构分析', activeMenu: '/category/diagnosis/detail' }
+      },
+      {
+        path: 'analysis/detail',
+        component: () => import('@/views/abc/goods-list.vue'),
+        name: 'AbcGoodsList',
+        meta: { title: '品类ABC商品清单', activeMenu: '/category/diagnosis/detail' }
+      }
+    ]
+  },
+  {
+    path: '/gross-contribution',
+    component: Layout,
+    hidden: true,
+    children: [
+      {
+        path: 'analysis',
+        component: () => import('@/views/gross-contribution/analysis.vue'),
+        name: 'GrossContributionAnalysis',
+        meta: { title: '毛利贡献率分析', activeMenu: '/category/diagnosis/detail' }
+      },
+      {
+        path: 'analysis/detail',
+        component: () => import('@/views/gross-contribution/goods-list.vue'),
+        name: 'GrossContributionGoodsList',
+        meta: { title: '毛利贡献率商品明细', activeMenu: '/category/diagnosis/detail' }
+      }
+    ]
+  },
+  {
+    path: '/gmroi',
+    component: Layout,
+    hidden: true,
+    children: [
+      {
+        path: 'analysis',
+        component: () => import('@/views/gmroi/analysis.vue'),
+        name: 'GmroiAnalysis',
+        meta: { title: 'GMROI分析', activeMenu: '/category/diagnosis/detail' }
+      },
+      {
+        path: 'analysis/detail',
+        component: () => import('@/views/gmroi/goods-list.vue'),
+        name: 'GmroiGoodsList',
+        meta: { title: 'GMROI商品明细', activeMenu: '/category/diagnosis/detail' }
+      }
+    ]
+  },
+  {
+    path: '/supplier',
+    component: Layout,
+    hidden: true,
+    children: [
+      {
+        path: 'analysis',
+        component: () => import('@/views/supplier/analysis.vue'),
+        name: 'SupplierAnalysis',
+        meta: { title: '供应商分析', activeMenu: '/category/diagnosis/detail' }
+      },
+      {
+        path: 'analysis/detail',
+        component: () => import('@/views/supplier/detail.vue'),
+        name: 'SupplierDetail',
+        meta: { title: '供应商明细', activeMenu: '/category/diagnosis/detail' }
+      }
+    ]
+  },
+  {
+    path: '/price-band',
+    component: Layout,
+    hidden: true,
+    children: [
+      {
+        path: 'analysis/detail',
+        component: () => import('@/views/price-band/detail.vue'),
+        name: 'PriceBandDetail',
+        meta: { title: '价格带商品明细', activeMenu: '/category/diagnosis/detail' }
+      }
+    ]
+  },
+  {
+    path: '/brand',
+    component: Layout,
+    hidden: true,
+    children: [
+      {
+        path: 'analysis/detail',
+        component: () => import('@/views/brand/detail.vue'),
+        name: 'BrandDetail',
+        meta: { title: '品牌商品明细', activeMenu: '/category/diagnosis/detail' }
+      }
+    ]
   }
 ];
 

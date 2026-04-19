@@ -1,11 +1,11 @@
 <template>
-  <div class="p-2 category-diagnosis-sub-class-page">
+  <div class="p-2 category-diagnosis-channel-page">
     <el-card shadow="hover" class="page-card header-card">
       <div class="page-header">
         <div class="page-header-left">
           <div class="page-title-wrap">
             <span class="page-title-line" />
-            <span class="page-title">子类贡献</span>
+            <span class="page-title">销售渠道业绩</span>
           </div>
           <el-tag effect="plain" type="success" class="role-tag">本期角色：结构品类</el-tag>
         </div>
@@ -46,56 +46,74 @@
         </div>
       </template>
 
-      <el-table :data="tableRows" border stripe row-key="categoryKey" class="sub-class-table">
-        <el-table-column label="品类" fixed="left" min-width="200" align="left">
+      <el-table :data="tableRows" border stripe row-key="channelKey" class="channel-table">
+        <el-table-column label="销售渠道" fixed="left" min-width="180" align="left">
           <template #default="{ row }">
-            <div class="category-cell">
-              <span class="category-code">{{ row.classNo }}</span>
-              <span class="category-name">{{ row.className }}</span>
+            <div class="channel-cell">
+              <span class="channel-name">{{ row.channelName || '-' }}</span>
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="本期销售额" min-width="130" align="right">
+        <el-table-column label="本期-销售额" min-width="130" align="right">
           <template #default="{ row }">{{ formatAmount(row.salesAmount) }}</template>
         </el-table-column>
-        <el-table-column label="本期销售额占比" min-width="130" align="right">
+        <el-table-column label="本期-占比" min-width="120" align="right">
           <template #default="{ row }">{{ formatPercent(row.salesShare) }}</template>
         </el-table-column>
-        <el-table-column label="本期毛利额" min-width="130" align="right">
+        <el-table-column label="本期-毛利额" min-width="130" align="right">
           <template #default="{ row }">{{ formatAmount(row.grossAmount) }}</template>
         </el-table-column>
-        <el-table-column label="本期毛利额占比" min-width="130" align="right">
+        <el-table-column label="本期-毛利额占比" min-width="140" align="right">
           <template #default="{ row }">{{ formatPercent(row.grossShare) }}</template>
         </el-table-column>
-        <el-table-column label="毛利率" min-width="110" align="right">
+        <el-table-column label="本期-毛利率" min-width="120" align="right">
           <template #default="{ row }">{{ formatPercent(row.grossRate) }}</template>
         </el-table-column>
-        <el-table-column label="客数" min-width="100" align="right">
+        <el-table-column label="本期-客数" min-width="110" align="right">
           <template #default="{ row }">{{ formatInteger(row.customerCount) }}</template>
         </el-table-column>
-        <el-table-column label="客单价" min-width="110" align="right">
+        <el-table-column label="本期-客单价" min-width="120" align="right">
           <template #default="{ row }">{{ formatAmount(row.customerPrice) }}</template>
         </el-table-column>
-        <el-table-column label="对比期销售额" min-width="130" align="right">
+        <el-table-column label="对比日期-销售额" min-width="140" align="right">
           <template #default="{ row }">{{ formatAmount(row.compareSalesAmount) }}</template>
         </el-table-column>
-        <el-table-column label="对比期销售额占比" min-width="140" align="right">
+        <el-table-column label="对比日期-占比" min-width="130" align="right">
           <template #default="{ row }">{{ formatPercent(row.compareSalesShare) }}</template>
         </el-table-column>
-        <el-table-column label="销售额对比增长" min-width="130" align="right">
+        <el-table-column label="对比日期-对比增长" min-width="140" align="right">
           <template #default="{ row }">
             <span :class="growthClass(row.salesGrowthRate)">{{ formatGrowth(row.salesGrowthRate) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="对比期毛利额" min-width="130" align="right">
+        <el-table-column label="对比日期-毛利额" min-width="140" align="right">
           <template #default="{ row }">{{ formatAmount(row.compareGrossAmount) }}</template>
         </el-table-column>
-        <el-table-column label="对比期毛利额占比" min-width="140" align="right">
+        <el-table-column label="对比日期-毛利额占比" min-width="150" align="right">
           <template #default="{ row }">{{ formatPercent(row.compareGrossShare) }}</template>
         </el-table-column>
-        <el-table-column label="毛利额对比增长" min-width="130" align="right">
+        <el-table-column label="对比日期-毛利额对比增长" min-width="170" align="right">
           <template #default="{ row }">
             <span :class="growthClass(row.grossGrowthRate)">{{ formatGrowth(row.grossGrowthRate) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="对比日期-毛利率" min-width="130" align="right">
+          <template #default="{ row }">{{ formatPercent(row.compareGrossRate) }}</template>
+        </el-table-column>
+        <el-table-column label="对比日期-客数" min-width="120" align="right">
+          <template #default="{ row }">{{ formatInteger(row.compareCustomerCount) }}</template>
+        </el-table-column>
+        <el-table-column label="对比日期-客数对比增长" min-width="170" align="right">
+          <template #default="{ row }">
+            <span :class="growthClass(row.customerCountGrowthRate)">{{ formatGrowth(row.customerCountGrowthRate) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="对比日期-客单价" min-width="140" align="right">
+          <template #default="{ row }">{{ formatAmount(row.compareCustomerPrice) }}</template>
+        </el-table-column>
+        <el-table-column label="对比日期-客单价对比增长" min-width="180" align="right">
+          <template #default="{ row }">
+            <span :class="growthClass(row.customerPriceGrowthRate)">{{ formatGrowth(row.customerPriceGrowthRate) }}</span>
           </template>
         </el-table-column>
       </el-table>
@@ -103,37 +121,35 @@
   </div>
 </template>
 
-<script setup name="CategoryDiagnosisSubClassDetail" lang="ts">
+<script setup name="CategoryDiagnosisChannelDetail" lang="ts">
 import * as echarts from 'echarts';
 import type { EChartsOption } from 'echarts';
 import { download } from '@/utils/request';
 import { useRequest } from '@/hooks/useRequest';
 import {
-  getCategoryDiagnosisSubClassPie,
-  getCategoryDiagnosisSubClassTable,
-  getCategoryDiagnosisSubClassTrend
+  getCategoryDiagnosisChannelPie,
+  getCategoryDiagnosisChannelTable,
+  getCategoryDiagnosisChannelTrend
 } from '@/api/category/diagnosis/detail';
 import type {
-  DiagnosisSubClassPieItem,
-  DiagnosisSubClassQuery,
-  DiagnosisSubClassTableResponse,
-  DiagnosisSubClassTableRow,
-  DiagnosisSubClassTrendResponse,
-  DiagnosisSubClassTrendSeriesItem
+  DiagnosisChannelPieItem,
+  DiagnosisChannelTableResponse,
+  DiagnosisChannelTableRow,
+  DiagnosisChannelTrendResponse,
+  DiagnosisChannelTrendSeriesItem,
+  DiagnosisSubClassQuery
 } from '@/api/category/diagnosis/detail/types';
 
-interface SubClassTableViewRow extends DiagnosisSubClassTableRow {
-  categoryKey: string;
-  compareGrossShare: number;
-  grossGrowthRate: number;
+interface ChannelTableViewRow extends DiagnosisChannelTableRow {
+  channelKey: string;
 }
 
-interface PieChartItem extends DiagnosisSubClassPieItem {
+interface PieChartItem extends DiagnosisChannelPieItem {
   displayName: string;
   color: string;
 }
 
-interface TrendChartSeriesItem extends DiagnosisSubClassTrendSeriesItem {
+interface TrendChartSeriesItem extends DiagnosisChannelTrendSeriesItem {
   displayName: string;
   color: string;
 }
@@ -145,41 +161,41 @@ const trendChartRef = ref<HTMLDivElement>();
 const pieChartIns = ref<echarts.ECharts>();
 const trendChartIns = ref<echarts.ECharts>();
 
-const fallbackCategoryMap: Record<string, string> = {
-  '00401': '个人护理',
-  '00402': '清洁用品',
-  '00403': '卫生用品'
+const fallbackChannelMap: Record<string, string> = {
+  offline: '线下',
+  meituan: '线上-美团外卖',
+  vending: '线上-自动贩卖机'
 };
 
-const fallbackPieData: DiagnosisSubClassPieItem[] = [
-  { classNo: '00401', className: '个人护理', salesAmount: 386200, salesShare: 43.25 },
-  { classNo: '00402', className: '清洁用品', salesAmount: 291600, salesShare: 32.67 },
-  { classNo: '00403', className: '卫生用品', salesAmount: 215400, salesShare: 24.08 }
+const fallbackPieData: DiagnosisChannelPieItem[] = [
+  { channelCode: 'offline', channelName: '线下', salesAmount: 468520, salesShare: 52.44 },
+  { channelCode: 'meituan', channelName: '线上-美团外卖', salesAmount: 278630, salesShare: 31.21 },
+  { channelCode: 'vending', channelName: '线上-自动贩卖机', salesAmount: 145980, salesShare: 16.35 }
 ];
 
-const fallbackTrendData: DiagnosisSubClassTrendResponse = {
+const fallbackTrendData: DiagnosisChannelTrendResponse = {
   dates: Array.from({ length: 10 }).map((_, index) => `2024/10/${String(index + 1).padStart(2, '0')}`),
   unit: '元',
   series: [
-    { classNo: '00401', className: '个人护理', values: [35200, 37100, 38900, 40200, 39400, 41800, 43100, 44600, 45200, 46800] },
-    { classNo: '00402', className: '清洁用品', values: [26800, 27400, 28100, 29500, 30100, 31200, 31800, 32600, 33300, 34100] },
-    { classNo: '00403', className: '卫生用品', values: [19600, 20300, 21100, 21900, 22500, 23200, 23800, 24500, 25100, 25900] }
+    { channelCode: 'offline', channelName: '线下', values: [41800, 43200, 44700, 45800, 46900, 48100, 49500, 50300, 51700, 52800] },
+    { channelCode: 'meituan', channelName: '线上-美团外卖', values: [24300, 25200, 26100, 27400, 28100, 28900, 29700, 30400, 31500, 32700] },
+    { channelCode: 'vending', channelName: '线上-自动贩卖机', values: [12100, 12600, 13200, 13700, 14100, 14600, 14900, 15300, 15800, 16200] }
   ]
 };
 
 const colorMap: Record<string, string> = {
-  '00401': '#27b0d6',
-  '00402': '#f06b4f',
-  '00403': '#b69cff'
+  offline: '#ff6b4a',
+  meituan: '#4ecdc4',
+  vending: '#a78bfa'
 };
 
 const pieData = ref<PieChartItem[]>([]);
-const trendData = ref<DiagnosisSubClassTrendResponse>({
+const trendData = ref<DiagnosisChannelTrendResponse>({
   dates: [],
   unit: '元',
   series: []
 });
-const tableRows = ref<SubClassTableViewRow[]>([]);
+const tableRows = ref<ChannelTableViewRow[]>([]);
 
 const query = computed<DiagnosisSubClassQuery>(() => ({
   sessionId: (route.query.sessionId as string) || '',
@@ -211,13 +227,13 @@ const normalizePercent = (value: unknown) => {
   return Number(num.toFixed(2));
 };
 
-const resolveColor = (classNo: string, index: number) => {
+const resolveColor = (channelCode: string, index: number) => {
   const colors = Object.values(colorMap);
-  return colorMap[classNo] || colors[index % colors.length] || '#27b0d6';
+  return colorMap[channelCode] || colors[index % colors.length] || '#ff6b4a';
 };
 
-const resolveDisplayName = (classNo: string, className: string) => {
-  return `${classNo} ${className || fallbackCategoryMap[classNo] || ''}`.trim();
+const resolveDisplayName = (channelCode: string, channelName: string) => {
+  return channelName || fallbackChannelMap[channelCode] || '-';
 };
 
 const extractArrayPayload = (raw: any): any[] => {
@@ -243,33 +259,33 @@ const normalizePieData = (payload: any): PieChartItem[] => {
   const rows = source.length ? source : fallbackPieData;
   return rows
     .map((item: any, index: number) => {
-      const classNo = String(item.classNo || item.subClassNo || item.categoryCode || item.code || fallbackPieData[index]?.classNo || '');
-      const className = String(item.className || item.subClassName || item.categoryName || item.name || fallbackCategoryMap[classNo] || '');
+      const channelCode = String(item.channelCode || item.code || item.channelType || fallbackPieData[index]?.channelCode || '');
+      const channelName = String(item.channelName || item.name || item.channelLabel || fallbackChannelMap[channelCode] || '');
       return {
-        classNo,
-        className,
+        channelCode,
+        channelName,
         salesAmount: toNumber(item.salesAmount ?? item.currentSales ?? item.value ?? fallbackPieData[index]?.salesAmount ?? 0, 2),
         salesShare: normalizePercent(item.salesShare ?? item.share ?? item.ratio ?? item.proportion ?? fallbackPieData[index]?.salesShare ?? 0),
-        displayName: resolveDisplayName(classNo, className),
-        color: resolveColor(classNo, index)
+        displayName: resolveDisplayName(channelCode, channelName),
+        color: resolveColor(channelCode, index)
       };
     })
-    .filter((item) => item.classNo || item.className);
+    .filter((item) => item.channelCode || item.channelName);
 };
 
-const normalizeTrendData = (payload: any): DiagnosisSubClassTrendResponse => {
+const normalizeTrendData = (payload: any): DiagnosisChannelTrendResponse => {
   const source = payload && typeof payload === 'object' ? payload : {};
   const fallbackSource = fallbackTrendData;
   const dates = extractArrayPayload(source.dates || source.xAxis || source.labels || fallbackSource.dates).map((item) => String(item || ''));
   const rawSeries = extractArrayPayload(source.series || source.rows || source.items || fallbackSource.series);
   const series = rawSeries
     .map((item: any, index: number) => {
-      const classNo = String(item.classNo || item.subClassNo || item.categoryCode || item.code || fallbackSource.series[index]?.classNo || '');
-      const className = String(item.className || item.subClassName || item.categoryName || item.name || fallbackCategoryMap[classNo] || '');
+      const channelCode = String(item.channelCode || item.code || item.channelType || fallbackSource.series[index]?.channelCode || '');
+      const channelName = String(item.channelName || item.name || item.channelLabel || fallbackChannelMap[channelCode] || '');
       return {
-        classNo,
-        className,
-        color: resolveColor(classNo, index),
+        channelCode,
+        channelName,
+        color: resolveColor(channelCode, index),
         values: extractArrayPayload(item.values || item.data || fallbackSource.series[index]?.values || []).map((value) => toNumber(value, 2))
       };
     })
@@ -282,16 +298,16 @@ const normalizeTrendData = (payload: any): DiagnosisSubClassTrendResponse => {
   };
 };
 
-const normalizeTableRows = (payload: any): SubClassTableViewRow[] => {
+const normalizeTableRows = (payload: any): ChannelTableViewRow[] => {
   const source = payload && typeof payload === 'object' ? payload : {};
   const rows = extractArrayPayload(source.rows || source.list || source.items || payload);
   return rows.map((item: any, index: number) => {
-    const classNo = String(item.classNo || item.subClassNo || item.categoryCode || item.code || '');
-    const className = String(item.className || item.subClassName || item.categoryName || item.name || fallbackCategoryMap[classNo] || '');
+    const channelCode = String(item.channelCode || item.code || item.channelType || '');
+    const channelName = String(item.channelName || item.name || item.channelLabel || fallbackChannelMap[channelCode] || '');
     return {
-      categoryKey: `${classNo || 'sub-class'}-${index}`,
-      classNo,
-      className,
+      channelKey: `${channelCode || 'channel'}-${index}`,
+      channelCode,
+      channelName,
       salesAmount: toNumber(item.salesAmount ?? item.currentSales ?? 0, 2),
       salesShare: normalizePercent(item.salesShare ?? item.currentSalesShare ?? item.salesRatio ?? 0),
       grossAmount: toNumber(item.grossAmount ?? item.currentGross ?? 0, 2),
@@ -303,16 +319,13 @@ const normalizeTableRows = (payload: any): SubClassTableViewRow[] => {
       compareSalesShare: normalizePercent(item.compareSalesShare ?? item.compareSalesRatio ?? 0),
       salesGrowthRate: normalizePercent(item.salesGrowthRate ?? item.comparativeSales ?? item.compareSalesGrowthRate ?? 0),
       compareGrossAmount: toNumber(item.compareGrossAmount ?? item.compareGross ?? 0, 2),
+      compareGrossShare: normalizePercent(item.compareGrossShare ?? item.compareGrossRatio ?? item.lastGrossShare ?? 0),
+      grossGrowthRate: normalizePercent(item.grossGrowthRate ?? item.comparativeGross ?? item.compareGrossGrowthRate ?? 0),
       compareGrossRate: normalizePercent(item.compareGrossRate ?? item.lastGrossRate ?? 0),
       compareCustomerCount: toNumber(item.compareCustomerCount ?? 0),
       customerCountGrowthRate: normalizePercent(item.customerCountGrowthRate ?? item.comparativeCustomerCount ?? 0),
       compareCustomerPrice: toNumber(item.compareCustomerPrice ?? 0, 2),
-      customerPriceGrowthRate: normalizePercent(item.customerPriceGrowthRate ?? item.comparativeCustomerPrice ?? 0),
-      turnoverRate: toNumber(item.turnoverRate ?? item.inventoryTurnoverRate ?? 0, 2),
-      turnoverDays: toNumber(item.turnoverDays ?? item.inventoryTurnoverDays ?? 0, 2),
-      gmroi: toNumber(item.gmroi ?? item.GMROI ?? 0, 2),
-      compareGrossShare: normalizePercent(item.compareGrossShare ?? item.compareGrossRatio ?? item.lastGrossShare ?? 0),
-      grossGrowthRate: normalizePercent(item.grossGrowthRate ?? item.comparativeGross ?? item.compareGrossGrowthRate ?? 0)
+      customerPriceGrowthRate: normalizePercent(item.customerPriceGrowthRate ?? item.comparativeCustomerPrice ?? 0)
     };
   });
 };
@@ -320,12 +333,12 @@ const normalizeTableRows = (payload: any): SubClassTableViewRow[] => {
 const trendSeries = computed<TrendChartSeriesItem[]>(() =>
   trendData.value.series.map((item, index) => ({
     ...item,
-    displayName: resolveDisplayName(item.classNo, item.className),
-    color: resolveColor(item.classNo, index)
+    displayName: resolveDisplayName(item.channelCode, item.channelName),
+    color: resolveColor(item.channelCode, index)
   }))
 );
 
-const pieRequest = useRequest(async (id: string) => await getCategoryDiagnosisSubClassPie(id), {
+const pieRequest = useRequest(async (id: string) => await getCategoryDiagnosisChannelPie(id), {
   onSuccess: async (res) => {
     pieData.value = normalizePieData(res?.data);
     await nextTick();
@@ -333,7 +346,7 @@ const pieRequest = useRequest(async (id: string) => await getCategoryDiagnosisSu
   }
 });
 
-const trendRequest = useRequest(async (id: string) => await getCategoryDiagnosisSubClassTrend(id), {
+const trendRequest = useRequest(async (id: string) => await getCategoryDiagnosisChannelTrend(id), {
   onSuccess: async (res) => {
     trendData.value = normalizeTrendData(res?.data);
     await nextTick();
@@ -341,9 +354,9 @@ const trendRequest = useRequest(async (id: string) => await getCategoryDiagnosis
   }
 });
 
-const tableRequest = useRequest(async (id: string) => await getCategoryDiagnosisSubClassTable(id), {
+const tableRequest = useRequest(async (id: string) => await getCategoryDiagnosisChannelTable(id), {
   onSuccess: (res) => {
-    tableRows.value = normalizeTableRows((res?.data || {}) as DiagnosisSubClassTableResponse);
+    tableRows.value = normalizeTableRows((res?.data || {}) as DiagnosisChannelTableResponse);
   }
 });
 
@@ -393,12 +406,8 @@ const renderPieChart = () => {
         radius: ['52%', '72%'],
         center: ['34%', '50%'],
         avoidLabelOverlap: true,
-        label: {
-          show: false
-        },
-        labelLine: {
-          show: false
-        },
+        label: { show: false },
+        labelLine: { show: false },
         emphasis: {
           scale: true,
           scaleSize: 6
@@ -426,9 +435,7 @@ const renderTrendChart = () => {
       formatter: (params: any) => {
         const rows = Array.isArray(params) ? params : [params];
         const title = rows[0]?.axisValueLabel || rows[0]?.axisValue || '';
-        const lines = rows.map((item) => {
-          return `${item.marker}${item.seriesName}：${formatAmount(item.value)}`;
-        });
+        const lines = rows.map((item) => `${item.marker}${item.seriesName}：${formatAmount(item.value)}`);
         return [title, ...lines].join('<br/>');
       }
     },
@@ -518,7 +525,7 @@ const renderTrendChart = () => {
 
 const loadPageData = async () => {
   if (!sessionId.value) {
-    ElMessage.error('缺少 sessionId，无法加载子类贡献详情');
+    ElMessage.error('缺少 sessionId，无法加载渠道业绩详情');
     return;
   }
   await Promise.all([pieRequest.run(sessionId.value), trendRequest.run(sessionId.value), tableRequest.run(sessionId.value)]);
@@ -529,12 +536,12 @@ const handleExport = () => {
     ElMessage.warning('缺少 sessionId，无法导出');
     return;
   }
-  download('/api/v1/diagnosis/subClass/export', { sessionId: sessionId.value }, `子类贡献_${sessionId.value}.xlsx`);
+  download('/api/v1/diagnosis/channel/export', { sessionId: sessionId.value }, `渠道业绩_${sessionId.value}.xlsx`);
 };
 
 const formatAmount = (value: unknown, digits = 2) => {
   const num = Number(value ?? 0);
-  if (!Number.isFinite(num)) return '--';
+  if (!Number.isFinite(num)) return '-';
   return num.toLocaleString('zh-CN', {
     minimumFractionDigits: 0,
     maximumFractionDigits: digits
@@ -543,12 +550,17 @@ const formatAmount = (value: unknown, digits = 2) => {
 
 const formatInteger = (value: unknown) => formatAmount(value, 0);
 
-const formatPercent = (value: unknown) => `${toNumber(value, 2).toFixed(2)}%`;
+const formatPercent = (value: unknown) => {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return '-';
+  return `${toNumber(value, 2).toFixed(2)}%`;
+};
 
 const formatGrowth = (value: unknown) => {
-  const num = toNumber(value, 2);
-  const prefix = num > 0 ? '+' : '';
-  return `${prefix}${num.toFixed(2)}%`;
+  const num = Number(value);
+  if (!Number.isFinite(num)) return '-';
+  const fixed = toNumber(value, 2).toFixed(2);
+  return `${Number(fixed) > 0 ? '+' : ''}${fixed}%`;
 };
 
 const growthClass = (value: unknown) => {
@@ -588,7 +600,7 @@ onUnmounted(() => {
 </script>
 
 <style scoped lang="scss">
-.category-diagnosis-sub-class-page {
+.category-diagnosis-channel-page {
   background: #f5f7fa;
   min-height: calc(100vh - 84px);
 }
@@ -677,20 +689,13 @@ onUnmounted(() => {
   height: 360px;
 }
 
-.category-cell {
+.channel-cell {
   display: flex;
   align-items: center;
-  gap: 6px;
   min-width: 0;
 }
 
-.category-code {
-  flex-shrink: 0;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-}
-
-.category-name {
+.channel-name {
   color: var(--el-text-color-regular);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -713,21 +718,21 @@ onUnmounted(() => {
   color: var(--el-text-color-secondary);
 }
 
-.sub-class-table :deep(.el-table__header th) {
+.channel-table :deep(.el-table__header th) {
   background: #f8fafc;
   color: var(--el-text-color-primary);
   font-weight: 600;
 }
 
-.sub-class-table :deep(.cell) {
+.channel-table :deep(.cell) {
   font-size: 13px;
 }
 
-.sub-class-table :deep(.el-table__body td) {
+.channel-table :deep(.el-table__body td) {
   color: var(--el-text-color-regular);
 }
 
-.sub-class-table :deep(.el-table__empty-block) {
+.channel-table :deep(.el-table__empty-block) {
   min-height: 220px;
 }
 

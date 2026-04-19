@@ -189,3 +189,50 @@ export interface DiagnosisSubClassTableRow {
 export interface DiagnosisSubClassTableResponse {
   rows: DiagnosisSubClassTableRow[];
 }
+
+export interface DiagnosisChannelPieItem {
+  channelCode: string;
+  channelName: string;
+  salesAmount: number;
+  salesShare: number;
+}
+
+export interface DiagnosisChannelTrendSeriesItem {
+  channelCode: string;
+  channelName: string;
+  color?: string;
+  values: number[];
+}
+
+export interface DiagnosisChannelTrendResponse {
+  dates: string[];
+  unit?: string;
+  series: DiagnosisChannelTrendSeriesItem[];
+}
+
+export interface DiagnosisChannelTableRow {
+  channelCode: string;
+  channelName: string;
+  salesAmount: number;
+  salesShare: number;
+  grossAmount: number;
+  grossShare: number;
+  grossRate: number;
+  customerCount: number;
+  customerPrice: number;
+  compareSalesAmount: number;
+  compareSalesShare: number;
+  salesGrowthRate: number;
+  compareGrossAmount: number;
+  compareGrossShare: number;
+  grossGrowthRate: number;
+  compareGrossRate: number;
+  compareCustomerCount: number;
+  customerCountGrowthRate: number;
+  compareCustomerPrice: number;
+  customerPriceGrowthRate: number;
+}
+
+export interface DiagnosisChannelTableResponse {
+  rows: DiagnosisChannelTableRow[];
+}

@@ -38,7 +38,7 @@
               v-for="item in mainNavList"
               :key="item.key"
               class="left-nav-item"
-              :class="{ active: activeMainNav === item.key }"
+              :class="{ active: !activeSideModule && activeMainNav === item.key }"
               @click="handleMainNavClick(item.key)"
             >
               <span class="left-nav-icon">{{ item.icon }}</span>
@@ -47,27 +47,23 @@
           </div>
 
           <div class="left-sub-modules">
-            <div class="left-sub-item">
-              <div class="left-sub-title">定位异常品项</div>
-              <div class="left-sub-desc">及时优化表现差的商品</div>
-            </div>
-            <div class="left-sub-item">
-              <div class="left-sub-title">深究用户需求</div>
-              <div class="left-sub-desc">助力品项优化与补充</div>
-            </div>
-            <div class="left-sub-item">
-              <div class="left-sub-title">整合调整方向</div>
-              <div class="left-sub-desc">指导品类优化与执行</div>
+            <div
+              v-for="item in sideModules"
+              :key="item.key"
+              class="left-sub-item"
+              :class="{ clickable: true, active: activeSideModule === item.key }"
+              @click="handleSideModuleClick(item)"
+            >
+              <div class="left-sub-title">{{ item.title }}</div>
+              <div class="left-sub-desc">{{ item.desc }}</div>
+              <div v-if="item.extra" class="left-sub-extra">{{ item.extra }}</div>
             </div>
           </div>
         </el-card>
       </el-col>
 
       <el-col :lg="19" :md="17" :sm="24" :xs="24">
-        <div v-if="activeMainNav !== 'performance'" class="placeholder-panel">
-          <el-empty description="该模块待接入" />
-        </div>
-        <template v-else>
+        <template v-if="isPerformanceView">
           <el-card shadow="hover" class="mb-[12px]" v-loading="overviewLoading">
             <template #header>
               <div class="section-title">品类业绩</div>
@@ -127,6 +123,10 @@
             </div>
           </el-card>
         </template>
+        <component :is="activeEmbeddedComponent" v-else-if="activeEmbeddedComponent" />
+        <div v-else class="placeholder-panel">
+          <el-empty description="该模块待接入" />
+        </div>
       </el-col>
     </el-row>
   </div>
@@ -134,6 +134,7 @@
 
 <script setup name="CategoryDiagnosisDetail" lang="ts">
 import * as echarts from 'echarts';
+import { markRaw } from 'vue';
 import { useRequest } from '@/hooks/useRequest';
 import { getDiagnosisSessionStatus } from '@/api/category/diagnosis';
 import { getCategoryDiagnosisDetailSummary, getCategoryDiagnosisDetailTrend } from '@/api/category/diagnosis/detail';
@@ -146,15 +147,23 @@ import type {
   DiagnosisOverviewResponse
 } from '@/api/category/diagnosis/detail/types';
 import type { DiagnosisSessionStatusResponse } from '@/api/category/diagnosis/types';
+import SubClassView from './sub-class.vue';
+import ChannelView from './channel.vue';
+import AbcAnalysisView from '@/views/abc/analysis.vue';
+import GrossContributionAnalysisView from '@/views/gross-contribution/analysis.vue';
+import GmroiAnalysisView from '@/views/gmroi/analysis.vue';
+import SupplierAnalysisView from '@/views/supplier/analysis.vue';
+import PriceBandAnalysisView from '@/views/price-band/analysis.vue';
+import BrandAnalysisView from '@/views/brand/analysis.vue';
 
 const route = useRoute();
-const router = useRouter();
 
 const chartRef = ref<HTMLDivElement>();
 const chartIns = ref<echarts.ECharts>();
 const pollTimer = ref<number | null>(null);
 
 const activeMainNav = ref('performance');
+const activeSideModule = ref('');
 const activeTrendMetric = ref('sales');
 const statusState = ref<DiagnosisSessionStatusResponse>();
 
@@ -164,6 +173,31 @@ const mainNavList = [
   { key: 'channel', label: '渠道业绩', icon: '•' },
   { key: 'customer', label: '客户分析', icon: '•' }
 ];
+
+const sideModules = [
+  { key: 'abcAnalysis', title: '定位异常品项', desc: '及时优化表现差的商品', extra: 'ABC结构分析' },
+  { key: 'grossContribution', title: '定位异常品项', desc: '聚焦高销低毛与低销高毛商品', extra: '毛利贡献率分析' },
+  { key: 'gmroiAnalysis', title: '定位异常品项', desc: '识别低回报与高潜力商品结构', extra: 'GMROI分析' },
+  { key: 'supplierAnalysis', title: '定位异常品项', desc: '识别供应商贡献与履约风险', extra: '供应商分析' },
+  { key: 'priceBandAnalysis', title: '深究用户需求', desc: '洞察用户偏好价格区间', extra: '价格带分析' },
+  { key: 'brandAnalysis', title: '深究用户需求', desc: '识别品牌表现与用户偏好', extra: '品牌分析' },
+  { key: 'customerNeed', title: '深究用户需求', desc: '助力品项优化与补充' },
+  { key: 'adjustDirection', title: '整合调整方向', desc: '指导品类优化与执行' }
+];
+
+const embeddedMainViewMap = {
+  subCategory: markRaw(SubClassView),
+  channel: markRaw(ChannelView)
+} as const;
+
+const embeddedSideViewMap = {
+  abcAnalysis: markRaw(AbcAnalysisView),
+  grossContribution: markRaw(GrossContributionAnalysisView),
+  gmroiAnalysis: markRaw(GmroiAnalysisView),
+  supplierAnalysis: markRaw(SupplierAnalysisView),
+  priceBandAnalysis: markRaw(PriceBandAnalysisView),
+  brandAnalysis: markRaw(BrandAnalysisView)
+} as const;
 
 const trendMetricTabs = [
   { key: 'sales', label: '销售额', unit: '元' },
@@ -229,6 +263,17 @@ const statusTagType = computed(() => {
   if (sessionReady.value) return 'success';
   if (statusState.value?.status === 'FAILED') return 'danger';
   return 'warning';
+});
+
+const isPerformanceView = computed(() => !activeSideModule.value && activeMainNav.value === 'performance');
+const activeEmbeddedComponent = computed(() => {
+  if (activeSideModule.value && activeSideModule.value in embeddedSideViewMap) {
+    return embeddedSideViewMap[activeSideModule.value as keyof typeof embeddedSideViewMap];
+  }
+  if (activeMainNav.value in embeddedMainViewMap) {
+    return embeddedMainViewMap[activeMainNav.value as keyof typeof embeddedMainViewMap];
+  }
+  return null;
 });
 
 const statusRequest = useRequest(async (id: string) => await getDiagnosisSessionStatus(id), {
@@ -478,16 +523,12 @@ const loadSessionState = async () => {
 };
 
 const handleMainNavClick = async (navKey: string) => {
-  if (navKey === 'subCategory') {
-    await router.push({
-      path: '/category/diagnosis/detail/sub-class',
-      query: {
-        ...route.query
-      }
-    });
-    return;
-  }
+  activeSideModule.value = '';
   activeMainNav.value = navKey;
+};
+
+const handleSideModuleClick = async (item: { key: string }) => {
+  activeSideModule.value = item.key;
 };
 
 const handleTrendMetricChange = async (metricKey: string) => {
@@ -607,6 +648,22 @@ onBeforeUnmount(() => {
   background: rgba(255, 255, 255, 0.55);
 }
 
+.left-sub-item.clickable {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.left-sub-item.clickable:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 6px 14px rgba(15, 118, 110, 0.08);
+}
+
+.left-sub-item.active {
+  background: #ffffff;
+  box-shadow: inset 0 0 0 1px rgba(15, 118, 110, 0.18), 0 8px 18px rgba(15, 118, 110, 0.08);
+}
+
 .left-sub-title {
   font-size: 14px;
   font-weight: 600;
@@ -617,6 +674,13 @@ onBeforeUnmount(() => {
   font-size: 12px;
   color: #0f766e;
   margin-top: 2px;
+}
+
+.left-sub-extra {
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #0f766e;
 }
 
 .placeholder-panel {

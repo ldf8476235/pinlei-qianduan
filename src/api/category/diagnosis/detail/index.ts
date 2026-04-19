@@ -2,6 +2,9 @@
 import { AxiosPromise } from 'axios';
 import { DiagnosisApiResponse } from '../types';
 import {
+  DiagnosisChannelPieItem,
+  DiagnosisChannelTableResponse,
+  DiagnosisChannelTrendResponse,
   DiagnosisOverviewResponse,
   DiagnosisSubClassPieItem,
   DiagnosisSubClassTableResponse,
@@ -63,10 +66,43 @@ export const getCategoryDiagnosisSubClassTable = (
   });
 };
 
+export const getCategoryDiagnosisChannelPie = (
+  sessionId: string
+): AxiosPromise<DiagnosisApiResponse<DiagnosisChannelPieItem[]>> => {
+  return request({
+    url: '/api/v1/diagnosis/channel/pie',
+    method: 'get',
+    params: { sessionId }
+  });
+};
+
+export const getCategoryDiagnosisChannelTrend = (
+  sessionId: string
+): AxiosPromise<DiagnosisApiResponse<DiagnosisChannelTrendResponse>> => {
+  return request({
+    url: '/api/v1/diagnosis/channel/trend',
+    method: 'get',
+    params: { sessionId }
+  });
+};
+
+export const getCategoryDiagnosisChannelTable = (
+  sessionId: string
+): AxiosPromise<DiagnosisApiResponse<DiagnosisChannelTableResponse>> => {
+  return request({
+    url: '/api/v1/diagnosis/channel/table',
+    method: 'get',
+    params: { sessionId }
+  });
+};
+
 export default {
   getCategoryDiagnosisDetailSummary,
   getCategoryDiagnosisDetailTrend,
   getCategoryDiagnosisSubClassPie,
   getCategoryDiagnosisSubClassTrend,
-  getCategoryDiagnosisSubClassTable
+  getCategoryDiagnosisSubClassTable,
+  getCategoryDiagnosisChannelPie,
+  getCategoryDiagnosisChannelTrend,
+  getCategoryDiagnosisChannelTable
 };
