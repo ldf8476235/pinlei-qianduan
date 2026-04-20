@@ -2,13 +2,19 @@
 import { AxiosPromise } from 'axios';
 import { DiagnosisApiResponse } from '../types';
 import {
-  DiagnosisChannelPieItem,
-  DiagnosisChannelTableResponse,
-  DiagnosisChannelTrendResponse,
+  ChannelSalesDetailsResponse,
+  ChannelSalesPieItemResponse,
+  ChannelSalesTrendResponse,
   DiagnosisOverviewResponse,
-  DiagnosisSubClassPieItem,
-  DiagnosisSubClassTableResponse,
-  DiagnosisSubClassTrendResponse,
+  LegacySubclassContributionListRequest,
+  LegacySubclassContributionRequest,
+  LegacyNodeResponse,
+  LegacySubclassSalesListResponse,
+  LegacySubclassSalesPerItem,
+  LegacySubclassSalesTrendResponse,
+  CustomerAgeBucketResponse,
+  CustomerSalesDetailsResponse,
+  CustomerSalesRadarItemResponse,
   DiagnosisTrendsResponse
 } from './types';
 
@@ -37,40 +43,40 @@ export const getCategoryDiagnosisDetailTrend = (
 };
 
 export const getCategoryDiagnosisSubClassPie = (
-  sessionId: string
-): AxiosPromise<DiagnosisApiResponse<DiagnosisSubClassPieItem[]>> => {
+  data: LegacySubclassContributionRequest
+): AxiosPromise<LegacyNodeResponse<LegacySubclassSalesPerItem[]>> => {
   return request({
-    url: '/api/v1/diagnosis/subClass/pie',
-    method: 'get',
-    params: { sessionId }
+    url: '/salesStoreClass/sonClassSalesPer',
+    method: 'post',
+    data
   });
 };
 
 export const getCategoryDiagnosisSubClassTrend = (
-  sessionId: string
-): AxiosPromise<DiagnosisApiResponse<DiagnosisSubClassTrendResponse>> => {
+  data: LegacySubclassContributionRequest
+): AxiosPromise<LegacyNodeResponse<LegacySubclassSalesTrendResponse>> => {
   return request({
-    url: '/api/v1/diagnosis/subClass/trend',
-    method: 'get',
-    params: { sessionId }
+    url: '/salesStoreClass/sonClassSalesTrendChart',
+    method: 'post',
+    data
   });
 };
 
 export const getCategoryDiagnosisSubClassTable = (
-  sessionId: string
-): AxiosPromise<DiagnosisApiResponse<DiagnosisSubClassTableResponse>> => {
+  data: LegacySubclassContributionListRequest
+): AxiosPromise<LegacyNodeResponse<LegacySubclassSalesListResponse>> => {
   return request({
-    url: '/api/v1/diagnosis/subClass/table',
-    method: 'get',
-    params: { sessionId }
+    url: '/salesStoreClass/sonClassSalesList',
+    method: 'post',
+    data
   });
 };
 
 export const getCategoryDiagnosisChannelPie = (
   sessionId: string
-): AxiosPromise<DiagnosisApiResponse<DiagnosisChannelPieItem[]>> => {
+): AxiosPromise<DiagnosisApiResponse<ChannelSalesPieItemResponse[]>> => {
   return request({
-    url: '/api/v1/diagnosis/channel/pie',
+    url: '/api/v1/channel-performance/pie',
     method: 'get',
     params: { sessionId }
   });
@@ -78,9 +84,9 @@ export const getCategoryDiagnosisChannelPie = (
 
 export const getCategoryDiagnosisChannelTrend = (
   sessionId: string
-): AxiosPromise<DiagnosisApiResponse<DiagnosisChannelTrendResponse>> => {
+): AxiosPromise<DiagnosisApiResponse<ChannelSalesTrendResponse>> => {
   return request({
-    url: '/api/v1/diagnosis/channel/trend',
+    url: '/api/v1/channel-performance/trend',
     method: 'get',
     params: { sessionId }
   });
@@ -88,11 +94,45 @@ export const getCategoryDiagnosisChannelTrend = (
 
 export const getCategoryDiagnosisChannelTable = (
   sessionId: string
-): AxiosPromise<DiagnosisApiResponse<DiagnosisChannelTableResponse>> => {
+): AxiosPromise<DiagnosisApiResponse<ChannelSalesDetailsResponse>> => {
   return request({
-    url: '/api/v1/diagnosis/channel/table',
+    url: '/api/v1/channel-performance/details',
     method: 'get',
     params: { sessionId }
+  });
+};
+
+export const getCategoryDiagnosisCustomerAgeBuckets = (
+  sessionId: string
+): AxiosPromise<DiagnosisApiResponse<CustomerAgeBucketResponse[]>> => {
+  return request({
+    url: '/api/v1/customer-analysis/ages',
+    method: 'get',
+    params: { sessionId }
+  });
+};
+
+export const getCategoryDiagnosisCustomerRadar = (
+  sessionId: string
+): AxiosPromise<DiagnosisApiResponse<CustomerSalesRadarItemResponse[]>> => {
+  return request({
+    url: '/api/v1/customer-analysis/radar',
+    method: 'get',
+    params: { sessionId }
+  });
+};
+
+export const getCategoryDiagnosisCustomerDetails = (
+  sessionId: string,
+  page?: number,
+  size?: number,
+  order?: string,
+  orderType?: string
+): AxiosPromise<DiagnosisApiResponse<CustomerSalesDetailsResponse>> => {
+  return request({
+    url: '/api/v1/customer-analysis/details',
+    method: 'get',
+    params: { sessionId, page, size, order, orderType }
   });
 };
 
@@ -104,5 +144,8 @@ export default {
   getCategoryDiagnosisSubClassTable,
   getCategoryDiagnosisChannelPie,
   getCategoryDiagnosisChannelTrend,
-  getCategoryDiagnosisChannelTable
+  getCategoryDiagnosisChannelTable,
+  getCategoryDiagnosisCustomerAgeBuckets,
+  getCategoryDiagnosisCustomerRadar,
+  getCategoryDiagnosisCustomerDetails
 };

@@ -33,6 +33,14 @@ export interface CategoryDiagnosisDetailSummaryVO {
   coreInfo: CategoryDiagnosisDetailCoreVO;
 }
 
+export interface LegacyNodeResponse<T> {
+  success: boolean;
+  message: string;
+  code: number;
+  result: T;
+  timestamp: number;
+}
+
 export type CompareType = 'growth' | 'diff';
 
 export interface CategoryDiagnosisMetricVO {
@@ -135,11 +143,99 @@ export interface DiagnosisSubClassQuery {
   sessionId?: string;
   categoryId?: string | number;
   categoryName?: string;
+  classLevel?: string | number;
   storeNo?: string;
   startDate?: string;
   endDate?: string;
   compareStartDate?: string;
   compareEndDate?: string;
+  deptId?: string;
+  retailTypeId?: string;
+  businessCircleId?: string;
+  deptGroupId?: string;
+}
+
+export interface LegacySubclassContributionRequest {
+  sessionId?: string;
+  deptId?: string;
+  retailTypeId?: string;
+  businessCircleId?: string;
+  deptGroupId?: string;
+  storeNo?: string;
+  classLevel?: string | number;
+  classNo?: string;
+  currentStartDate?: string;
+  currentEndDate?: string;
+  compareStartDate?: string;
+  compareEndDate?: string;
+}
+
+export interface LegacySubclassContributionListRequest extends LegacySubclassContributionRequest {
+  page?: number;
+  size?: number;
+  order?: string;
+  orderType?: string;
+}
+
+export interface LegacySubclassSalesPerItem {
+  classNo?: string;
+  className?: string;
+  classLevel?: number;
+  parentClassNo?: string;
+  sales?: number;
+  salesPer?: number;
+  dataDate?: string;
+}
+
+export interface LegacySubclassSalesTrendPointItem {
+  dataDate?: string;
+  classNo?: string;
+  className?: string;
+  sales?: number;
+}
+
+export interface LegacySubclassSalesTrendResponse {
+  legend?: string[];
+  lineDate?: LegacySubclassSalesTrendPointItem[];
+  xdata?: string[];
+}
+
+export interface LegacySubclassSalesListItem {
+  classNo: string;
+  className: string;
+  classLevel?: number;
+  parentClassNo?: string;
+  currentSales?: number;
+  currentSalesPer?: number;
+  currentGross?: number;
+  currentGrossPer?: number;
+  currentGrossRate?: number;
+  currentSaleQuantity?: number;
+  currentCustomerCount?: number;
+  currentCustomerPrice?: number;
+  compareSales?: number;
+  compareSalesPer?: number;
+  compareSalesAddRate?: number;
+  compareGross?: number;
+  compareGrossPer?: number;
+  compareGrossAddRate?: number;
+  compareGrossRate?: number;
+  compareSaleQuantity?: number;
+  compareSaleQuantityAddRate?: number;
+  compareCustomerCount?: number;
+  compareCustomerPrice?: number;
+  compareCustomerPriceAddRate?: number;
+  currentTurnoverRate?: number;
+  currentTurnoverDays?: number;
+  gmroi?: number;
+  saleCost?: number;
+}
+
+export interface LegacySubclassSalesListResponse {
+  content?: LegacySubclassSalesListItem[];
+  totalElements?: number;
+  list?: LegacySubclassSalesListItem[];
+  total?: number;
 }
 
 export interface DiagnosisSubClassPieItem {
@@ -147,47 +243,46 @@ export interface DiagnosisSubClassPieItem {
   className: string;
   salesAmount: number;
   salesShare: number;
-}
-
-export interface DiagnosisSubClassTrendSeriesItem {
-  classNo: string;
-  className: string;
-  color?: string;
-  values: number[];
-}
-
-export interface DiagnosisSubClassTrendResponse {
-  dates: string[];
-  unit?: string;
-  series: DiagnosisSubClassTrendSeriesItem[];
+  salesPer?: number;
 }
 
 export interface DiagnosisSubClassTableRow {
   classNo: string;
   className: string;
-  salesAmount: number;
-  salesShare: number;
-  grossAmount: number;
-  grossShare: number;
-  grossRate: number;
-  customerCount: number;
-  customerPrice: number;
-  compareSalesAmount: number;
-  compareSalesShare: number;
-  salesGrowthRate: number;
-  compareGrossAmount: number;
+  classLevel?: number;
+  parentClassNo?: string;
+  currentSales: number;
+  currentSalesPer: number;
+  currentGross: number;
+  currentGrossPer: number;
+  currentGrossRate: number;
+  currentSaleQuantity: number;
+  currentCustomerCount: number;
+  currentCustomerPrice: number;
+  compareSales: number;
+  compareSalesPer: number;
+  compareSalesAddRate: number;
+  compareGross: number;
+  compareGrossPer: number;
+  compareGrossAddRate: number;
   compareGrossRate: number;
+  compareSaleQuantity: number;
+  compareSaleQuantityAddRate: number;
   compareCustomerCount: number;
-  customerCountGrowthRate: number;
   compareCustomerPrice: number;
-  customerPriceGrowthRate: number;
-  turnoverRate: number;
-  turnoverDays: number;
+  compareCustomerPriceAddRate: number;
+  currentTurnoverRate: number;
+  currentTurnoverDays: number;
   gmroi: number;
+  saleCost: number;
 }
 
 export interface DiagnosisSubClassTableResponse {
-  rows: DiagnosisSubClassTableRow[];
+  content?: DiagnosisSubClassTableRow[];
+  list?: DiagnosisSubClassTableRow[];
+  rows?: DiagnosisSubClassTableRow[];
+  totalElements?: number;
+  total?: number;
 }
 
 export interface DiagnosisChannelPieItem {
@@ -195,6 +290,12 @@ export interface DiagnosisChannelPieItem {
   channelName: string;
   salesAmount: number;
   salesShare: number;
+}
+
+export interface ChannelSalesPieItemResponse {
+  name: string;
+  value: number;
+  per?: number;
 }
 
 export interface DiagnosisChannelTrendSeriesItem {
@@ -208,6 +309,19 @@ export interface DiagnosisChannelTrendResponse {
   dates: string[];
   unit?: string;
   series: DiagnosisChannelTrendSeriesItem[];
+}
+
+export interface ChannelSalesTrendPointResponse {
+  dataDate?: string;
+  saleChannel?: number;
+  onlineType?: number;
+  onlineName?: string;
+  sales?: number;
+}
+
+export interface ChannelSalesTrendResponse {
+  lineDate?: ChannelSalesTrendPointResponse[];
+  xdata?: string[];
 }
 
 export interface DiagnosisChannelTableRow {
@@ -235,4 +349,116 @@ export interface DiagnosisChannelTableRow {
 
 export interface DiagnosisChannelTableResponse {
   rows: DiagnosisChannelTableRow[];
+}
+
+export interface ChannelSalesDetailsItemResponse {
+  channelName?: string;
+  saleChannel?: number;
+  onlineType?: number;
+  onlineName?: string;
+  currentSales?: number;
+  currentSalesPer?: number;
+  currentGross?: number;
+  currentGrossPer?: number;
+  currentGrossRate?: number;
+  currentCustomerCount?: number;
+  currentCustomerPrice?: number;
+  compareSales?: number;
+  compareSalesPer?: number;
+  compareSalesInc?: number;
+  compareGross?: number;
+  compareGrossPer?: number;
+  compareGrossInc?: number;
+  compareGrossRate?: number;
+  compareCustomerCount?: number;
+  compareCustomerCountInc?: number;
+  compareCustomerPrice?: number;
+  compareCustomerPriceInc?: number;
+}
+
+export interface ChannelSalesDetailsResponse {
+  records?: ChannelSalesDetailsItemResponse[];
+  total?: number;
+  size?: number;
+  current?: number;
+  pages?: number;
+}
+
+export interface CustomerAgeBucketResponse {
+  ageCode?: string;
+  ageName?: string;
+  ageStart?: number;
+  ageEnd?: number;
+  orderNumber?: number;
+}
+
+export interface CustomerSalesRadarItemResponse {
+  gender?: number;
+  ageCode?: string;
+  ageName?: string;
+  ageStart?: number;
+  ageEnd?: number;
+  currentSales?: number;
+  currentCustomerCount?: number;
+  currentCustomerPrice?: number;
+  currentUnitPrice?: number;
+  currentCountAve?: number;
+  currentSaleQuantity?: number;
+  compareSales?: number;
+  compareCustomerCount?: number;
+  compareCustomerPrice?: number;
+  compareUnitPrice?: number;
+  compareCountAve?: number;
+  compareSaleQuantity?: number;
+  salesGrowth?: number;
+  customerGrowth?: number;
+}
+
+export interface CustomerSalesDetailsItemResponse {
+  ageCode?: string;
+  ageName?: string;
+  ageStart?: number;
+  ageEnd?: number;
+  ageOrder?: number;
+  currentSales?: number;
+  currentCustomerCount?: number;
+  currentCustomerPrice?: number;
+  currentUnitPrice?: number;
+  currentCountAve?: number;
+  currentSaleQuantity?: number;
+  compareSales?: number;
+  compareCustomerCount?: number;
+  compareCustomerPrice?: number;
+  compareUnitPrice?: number;
+  compareCountAve?: number;
+  compareSaleQuantity?: number;
+  salesGrowth?: number;
+  customerGrowth?: number;
+  customerPriceGrowth?: number;
+  unitPriceGrowth?: number;
+  countAveGrowth?: number;
+  saleQuantityGrowth?: number;
+  currentManSales?: number;
+  currentManCustomerCount?: number;
+  currentManCustomerPrice?: number;
+  currentManUnitPrice?: number;
+  currentManCountAve?: number;
+  currentWomanSales?: number;
+  currentWomanCustomerCount?: number;
+  currentWomanCustomerPrice?: number;
+  currentWomanUnitPrice?: number;
+  currentWomanCountAve?: number;
+  currentUnknownSales?: number;
+  currentUnknownCustomerCount?: number;
+  currentUnknownCustomerPrice?: number;
+  currentUnknownUnitPrice?: number;
+  currentUnknownCountAve?: number;
+}
+
+export interface CustomerSalesDetailsResponse {
+  records?: CustomerSalesDetailsItemResponse[];
+  total?: number;
+  size?: number;
+  current?: number;
+  pages?: number;
 }

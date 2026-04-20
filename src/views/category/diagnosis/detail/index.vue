@@ -164,6 +164,7 @@ import type {
 import type { DiagnosisSessionStatusResponse } from '@/api/category/diagnosis/types';
 import SubClassView from './sub-class.vue';
 import ChannelView from './channel.vue';
+import CustomerView from './customer.vue';
 import AbcAnalysisView from '@/views/abc/analysis.vue';
 import GrossContributionAnalysisView from '@/views/gross-contribution/analysis.vue';
 import GmroiAnalysisView from '@/views/gmroi/analysis.vue';
@@ -261,7 +262,8 @@ const expandedGroupKeys = ref<string[]>([]);
 
 const embeddedMainViewMap = {
   subCategory: markRaw(SubClassView),
-  channel: markRaw(ChannelView)
+  channel: markRaw(ChannelView),
+  customer: markRaw(CustomerView)
 } as const;
 
 const embeddedSideViewMap = {
@@ -274,8 +276,13 @@ const embeddedSideViewMap = {
 } as const;
 
 const trendMetricTabs = [
-  { key: 'sales', label: '销售额', unit: '元' },
-  { key: 'gross', label: '毛利额', unit: '元' }
+  { key: 'sales', label: '销售额', unit: '万元' },
+  { key: 'salesQuantity', label: '销售量', unit: '件' },
+  { key: 'gross', label: '毛利额', unit: '万元' },
+  { key: 'grossRate', label: '毛利率', unit: '%' },
+  { key: 'customerCount', label: '客数', unit: '人' },
+  { key: 'customerPrice', label: '客单价', unit: '元' },
+  { key: 'inventorySales', label: '库销比', unit: '比' }
 ];
 
 const summary = reactive<CategoryDiagnosisDetailSummaryVO>({
@@ -441,6 +448,9 @@ const compareArrow = (value: number) => {
 
 const compareText = (value: number, type: string) => {
   const abs = Math.abs(Number(value || 0));
+  if (abs === 0) {
+    return '·';
+  }
   if (type === 'diff') {
     return `对比差距 ${abs.toFixed(2)}`;
   }
@@ -474,22 +484,22 @@ const buildMetric = (
 
 const buildMetrics = (overview: DiagnosisOverviewResponse): CategoryDiagnosisMetricGroupVO => ({
   firstRow: [
-    buildMetric('sku', 'SKU数', overview.currentClassSku, overview.comparativeGrowthRate, 'growth', '当前品类SKU数量'),
-    buildMetric('sales', '销售额', overview.currentSales, overview.comparativeSales, 'growth', '当前品类销售额'),
-    buildMetric('gross', '毛利额', overview.currentGross, overview.comparativeGross, 'growth', '当前品类毛利额'),
-    buildMetric('grossRate', '毛利率', overview.currentGrossRate, overview.comparativeGrossRate, 'diff', '毛利率', '%'),
-    buildMetric('saleQuantity', '销售量', overview.currentSaleQuantity, overview.comparativeSaleQuantity, 'growth', '当前品类销售量'),
-    buildMetric('customerCount', '客数', overview.currentCustomerCount, overview.comparativeCustomerCount, 'growth', '当前品类客数'),
-    buildMetric('customerPrice', '客单价', overview.currentCustomerPrice, overview.comparativeCustomerPrice, 'growth', '当前品类客单价')
+    buildMetric('sku', '本期在售SKU', overview.currentClassSku, overview.compareClassSku, 'growth', '当前品类在售SKU数量'),
+    buildMetric('sellRate', '动销率', overview.currentTurnoverRate, overview.comparativeTurnoverRate, 'diff', '品类动销率', '%'),
+    buildMetric('penetrateRate', '渗透率', overview.currentPenetrateRate, overview.comparativePenetrateRate, 'diff', '品类渗透率', '%'),
+    buildMetric('turnoverDays', '库存周转天数', overview.currentTurnoverDays, overview.comparativeTurnoverDays, 'diff', '库存周转天数'),
+    buildMetric('inventorySales', '库销比', overview.currentInventorySales, overview.comparativeInventorySales, 'diff', '库存销售比'),
+    buildMetric('avgInventory', '平均库存成本', overview.currentAvgInventory, overview.comparativeAvgInventory, 'growth', '平均库存成本'),
+    buildMetric('saleQuantity', '销售量', overview.currentSaleQuantity, overview.comparativeSaleQuantity, 'growth', '当前品类销售量')
   ],
   secondRow: [
-    buildMetric('avgInventory', '平均库存', overview.currentAvgInventory, overview.comparativeAvgInventory, 'growth', '当前品类平均库存'),
-    buildMetric('inventorySales', '库销比', overview.currentInventorySales, overview.comparativeInventorySales, 'growth', '库存销售比'),
-    buildMetric('turnoverDays', '周转天数', overview.currentTurnoverDays, overview.comparativeTurnoverDays, 'growth', '库存周转天数'),
-    buildMetric('turnoverRate', '周转率', overview.currentTurnoverRate, overview.comparativeTurnoverRate, 'growth', '库存周转率'),
-    buildMetric('penetrateRate', '渗透率', overview.currentPenetrateRate, overview.comparativePenetrateRate, 'diff', '渗透率', '%'),
-    buildMetric('pieceAvgPrice', '件单价', overview.currentPieceAvgPrice, overview.comparativePieceAvgPrice, 'growth', '件单价'),
-    buildMetric('customerAvgQuantity', '客单量', overview.currentCustomerAvgQuantity, overview.comparativeCustomerAvgQuantity, 'growth', '客单量')
+    buildMetric('sales', '销售额(万元)', overview.currentSales, overview.comparativeSales, 'growth', '当前品类销售额'),
+    buildMetric('gross', '毛利额(万元)', overview.currentGross, overview.comparativeGross, 'growth', '当前品类毛利额'),
+    buildMetric('grossRate', '毛利率', overview.currentGrossRate, overview.comparativeGrossRate, 'diff', '毛利率', '%'),
+    buildMetric('customerCount', '客数', overview.currentCustomerCount, overview.comparativeCustomerCount, 'growth', '当前品类客数'),
+    buildMetric('customerPrice', '客单价', overview.currentCustomerPrice, overview.comparativeCustomerPrice, 'growth', '当前品类客单价'),
+    buildMetric('customerAvgQuantity', '客均件数', overview.currentCustomerAvgQuantity, overview.comparativeCustomerAvgQuantity, 'growth', '客均件数'),
+    buildMetric('pieceAvgPrice', '件均价', overview.currentPieceAvgPrice, overview.comparativePieceAvgPrice, 'growth', '件均价')
   ]
 });
 
@@ -551,24 +561,48 @@ const renderTrendChart = () => {
   const unit = trendData.value.unit || '';
 
   chartIns.value.setOption({
-    tooltip: { trigger: 'axis' },
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'line' },
+      backgroundColor: 'rgba(17, 24, 39, 0.92)',
+      borderWidth: 0,
+      textStyle: { color: '#fff' },
+      formatter: (params: any) => {
+        const rows = Array.isArray(params) ? params : [params];
+        const title = rows[0]?.axisValueLabel || rows[0]?.axisValue || '--';
+        const current = rows.find((item: any) => item.seriesName === '本期')?.value ?? 0;
+        const compare = rows.find((item: any) => item.seriesName === '对比日期')?.value ?? 0;
+        return [title, `${rows[0]?.marker || ''}本期：${formatNumber(current)}`, `${rows[1]?.marker || ''}对比日期：${formatNumber(compare)}`].join('<br/>');
+      }
+    },
     legend: {
-      top: 6,
+      top: 8,
+      right: 12,
+      itemWidth: 12,
+      itemHeight: 8,
       data: ['本期', '对比日期']
     },
     grid: {
-      left: 48,
-      right: 20,
-      top: 42,
-      bottom: 34
+      left: 56,
+      right: 28,
+      top: 56,
+      bottom: 32,
+      containLabel: true
     },
     xAxis: {
       type: 'category',
-      data: xAxis
+      data: xAxis,
+      boundaryGap: false,
+      axisTick: { alignWithLabel: true },
+      axisLine: { lineStyle: { color: '#d1d5db' } },
+      axisLabel: { color: '#6b7280' }
     },
     yAxis: {
       type: 'value',
-      name: unit
+      name: unit,
+      nameTextStyle: { color: '#6b7280', padding: [0, 0, 0, 24] },
+      axisLabel: { color: '#6b7280', formatter: (value: number) => formatNumber(value, 2) },
+      splitLine: { lineStyle: { color: '#eef2f7' } }
     },
     series: [
       {
@@ -576,16 +610,22 @@ const renderTrendChart = () => {
         type: 'line',
         smooth: true,
         data: currentValues,
+        symbol: 'circle',
+        symbolSize: 7,
         itemStyle: { color: '#3b82f6' },
-        lineStyle: { width: 2, color: '#3b82f6' }
+        lineStyle: { width: 3, color: '#3b82f6' },
+        emphasis: { focus: 'series' }
       },
       {
         name: '对比日期',
         type: 'line',
         smooth: true,
         data: compareValues,
+        symbol: 'circle',
+        symbolSize: 7,
         itemStyle: { color: '#f59e0b' },
-        lineStyle: { width: 2, color: '#f59e0b' }
+        lineStyle: { width: 3, color: '#f59e0b' },
+        emphasis: { focus: 'series' }
       }
     ]
   });
@@ -900,16 +940,21 @@ onBeforeUnmount(() => {
 
 .metrics-row {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.metrics-row::after {
+  content: '';
 }
 
 .metric-card {
   border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  background: #fff;
-  padding: 8px 10px;
-  min-height: 108px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+  padding: 12px 12px 10px;
+  min-height: 132px;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
 }
 
 .metric-name {
@@ -918,7 +963,8 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   gap: 4px;
   font-size: 12px;
-  color: #4b5563;
+  color: #6b7280;
+  line-height: 1.2;
 }
 
 .metric-tip {
@@ -932,22 +978,25 @@ onBeforeUnmount(() => {
   justify-content: center;
   font-size: 11px;
   cursor: help;
+  flex: 0 0 auto;
 }
 
 .metric-value {
-  margin-top: 8px;
-  font-size: 22px;
+  margin-top: 14px;
+  font-size: 24px;
   font-weight: 700;
   color: #111827;
   line-height: 1.2;
+  word-break: break-all;
 }
 
 .metric-compare {
-  margin-top: 8px;
+  margin-top: 12px;
   font-size: 12px;
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
+  line-height: 1;
 }
 
 .metric-compare.is-up {
@@ -979,10 +1028,26 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
 }
 
+.trend-tabs :deep(.el-button) {
+  border-radius: 999px;
+  border: 1px solid #d8e2f1;
+  background: #fff;
+  color: #475569;
+  padding: 7px 14px;
+}
+
+.trend-tabs :deep(.el-button.is-active),
+.trend-tabs :deep(.el-button--success) {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  border-color: transparent;
+  color: #fff;
+}
+
 .trend-chart-wrap {
   border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  border-radius: 12px;
   min-height: 380px;
+  background: #fff;
 }
 
 .trend-chart {

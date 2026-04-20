@@ -56,46 +56,46 @@
           </template>
         </el-table-column>
         <el-table-column label="本期销售额" min-width="130" align="right">
-          <template #default="{ row }">{{ formatAmount(row.salesAmount) }}</template>
+          <template #default="{ row }">{{ formatAmount(row.currentSales) }}</template>
         </el-table-column>
         <el-table-column label="本期销售额占比" min-width="130" align="right">
-          <template #default="{ row }">{{ formatPercent(row.salesShare) }}</template>
+          <template #default="{ row }">{{ formatPercent(row.currentSalesPer) }}</template>
         </el-table-column>
         <el-table-column label="本期毛利额" min-width="130" align="right">
-          <template #default="{ row }">{{ formatAmount(row.grossAmount) }}</template>
+          <template #default="{ row }">{{ formatAmount(row.currentGross) }}</template>
         </el-table-column>
         <el-table-column label="本期毛利额占比" min-width="130" align="right">
-          <template #default="{ row }">{{ formatPercent(row.grossShare) }}</template>
+          <template #default="{ row }">{{ formatPercent(row.currentGrossPer) }}</template>
         </el-table-column>
         <el-table-column label="毛利率" min-width="110" align="right">
-          <template #default="{ row }">{{ formatPercent(row.grossRate) }}</template>
+          <template #default="{ row }">{{ formatPercent(row.currentGrossRate) }}</template>
         </el-table-column>
         <el-table-column label="客数" min-width="100" align="right">
-          <template #default="{ row }">{{ formatInteger(row.customerCount) }}</template>
+          <template #default="{ row }">{{ formatInteger(row.currentCustomerCount) }}</template>
         </el-table-column>
         <el-table-column label="客单价" min-width="110" align="right">
-          <template #default="{ row }">{{ formatAmount(row.customerPrice) }}</template>
+          <template #default="{ row }">{{ formatAmount(row.currentCustomerPrice) }}</template>
         </el-table-column>
         <el-table-column label="对比期销售额" min-width="130" align="right">
-          <template #default="{ row }">{{ formatAmount(row.compareSalesAmount) }}</template>
+          <template #default="{ row }">{{ formatAmount(row.compareSales) }}</template>
         </el-table-column>
         <el-table-column label="对比期销售额占比" min-width="140" align="right">
-          <template #default="{ row }">{{ formatPercent(row.compareSalesShare) }}</template>
+          <template #default="{ row }">{{ formatPercent(row.compareSalesPer) }}</template>
         </el-table-column>
         <el-table-column label="销售额对比增长" min-width="130" align="right">
           <template #default="{ row }">
-            <span :class="growthClass(row.salesGrowthRate)">{{ formatGrowth(row.salesGrowthRate) }}</span>
+            <span :class="growthClass(row.compareSalesAddRate)">{{ formatGrowth(row.compareSalesAddRate) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="对比期毛利额" min-width="130" align="right">
-          <template #default="{ row }">{{ formatAmount(row.compareGrossAmount) }}</template>
+          <template #default="{ row }">{{ formatAmount(row.compareGross) }}</template>
         </el-table-column>
         <el-table-column label="对比期毛利额占比" min-width="140" align="right">
-          <template #default="{ row }">{{ formatPercent(row.compareGrossShare) }}</template>
+          <template #default="{ row }">{{ formatPercent(row.compareGrossPer) }}</template>
         </el-table-column>
         <el-table-column label="毛利额对比增长" min-width="130" align="right">
           <template #default="{ row }">
-            <span :class="growthClass(row.grossGrowthRate)">{{ formatGrowth(row.grossGrowthRate) }}</span>
+            <span :class="growthClass(row.compareGrossAddRate)">{{ formatGrowth(row.compareGrossAddRate) }}</span>
           </template>
         </el-table-column>
       </el-table>
@@ -114,28 +114,32 @@ import {
   getCategoryDiagnosisSubClassTrend
 } from '@/api/category/diagnosis/detail';
 import type {
-  DiagnosisSubClassPieItem,
   DiagnosisSubClassQuery,
-  DiagnosisSubClassTableResponse,
-  DiagnosisSubClassTableRow,
-  DiagnosisSubClassTrendResponse,
-  DiagnosisSubClassTrendSeriesItem
+  LegacySubclassContributionListRequest,
+  LegacySubclassContributionRequest,
+  LegacySubclassSalesListItem,
+  LegacySubclassSalesListResponse,
+  LegacySubclassSalesPerItem,
+  LegacySubclassSalesTrendResponse,
 } from '@/api/category/diagnosis/detail/types';
 
-interface SubClassTableViewRow extends DiagnosisSubClassTableRow {
+interface SubClassTableViewRow extends LegacySubclassSalesListItem {
   categoryKey: string;
-  compareGrossShare: number;
-  grossGrowthRate: number;
 }
 
-interface PieChartItem extends DiagnosisSubClassPieItem {
+interface PieChartItem extends LegacySubclassSalesPerItem {
+  salesAmount: number;
+  salesShare: number;
   displayName: string;
   color: string;
 }
 
-interface TrendChartSeriesItem extends DiagnosisSubClassTrendSeriesItem {
+interface TrendChartSeriesItem {
+  classNo: string;
+  className: string;
   displayName: string;
   color: string;
+  values: number[];
 }
 
 const route = useRoute();
@@ -145,28 +149,6 @@ const trendChartRef = ref<HTMLDivElement>();
 const pieChartIns = ref<echarts.ECharts>();
 const trendChartIns = ref<echarts.ECharts>();
 
-const fallbackCategoryMap: Record<string, string> = {
-  '00401': '个人护理',
-  '00402': '清洁用品',
-  '00403': '卫生用品'
-};
-
-const fallbackPieData: DiagnosisSubClassPieItem[] = [
-  { classNo: '00401', className: '个人护理', salesAmount: 386200, salesShare: 43.25 },
-  { classNo: '00402', className: '清洁用品', salesAmount: 291600, salesShare: 32.67 },
-  { classNo: '00403', className: '卫生用品', salesAmount: 215400, salesShare: 24.08 }
-];
-
-const fallbackTrendData: DiagnosisSubClassTrendResponse = {
-  dates: Array.from({ length: 10 }).map((_, index) => `2024/10/${String(index + 1).padStart(2, '0')}`),
-  unit: '元',
-  series: [
-    { classNo: '00401', className: '个人护理', values: [35200, 37100, 38900, 40200, 39400, 41800, 43100, 44600, 45200, 46800] },
-    { classNo: '00402', className: '清洁用品', values: [26800, 27400, 28100, 29500, 30100, 31200, 31800, 32600, 33300, 34100] },
-    { classNo: '00403', className: '卫生用品', values: [19600, 20300, 21100, 21900, 22500, 23200, 23800, 24500, 25100, 25900] }
-  ]
-};
-
 const colorMap: Record<string, string> = {
   '00401': '#27b0d6',
   '00402': '#f06b4f',
@@ -174,10 +156,10 @@ const colorMap: Record<string, string> = {
 };
 
 const pieData = ref<PieChartItem[]>([]);
-const trendData = ref<DiagnosisSubClassTrendResponse>({
-  dates: [],
-  unit: '元',
-  series: []
+const trendData = ref<LegacySubclassSalesTrendResponse>({
+  legend: [],
+  xdata: [],
+  lineDate: []
 });
 const tableRows = ref<SubClassTableViewRow[]>([]);
 
@@ -185,11 +167,16 @@ const query = computed<DiagnosisSubClassQuery>(() => ({
   sessionId: (route.query.sessionId as string) || '',
   categoryId: route.query.categoryId as string,
   categoryName: (route.query.categoryName as string) || '',
+  classLevel: route.query.categoryLevel as string,
   storeNo: (route.query.storeNo as string) || '',
   startDate: (route.query.startDate as string) || '',
   endDate: (route.query.endDate as string) || '',
   compareStartDate: (route.query.compareStartDate as string) || '',
-  compareEndDate: (route.query.compareEndDate as string) || ''
+  compareEndDate: (route.query.compareEndDate as string) || '',
+  deptId: (route.query.deptId as string) || '',
+  retailTypeId: (route.query.retailTypeId as string) || '',
+  businessCircleId: (route.query.businessCircleId as string) || '',
+  deptGroupId: (route.query.deptGroupId as string) || ''
 }));
 
 const sessionId = computed(() => query.value.sessionId || '');
@@ -203,147 +190,112 @@ const toNumber = (value: unknown, digits?: number) => {
   return num;
 };
 
-const normalizePercent = (value: unknown) => {
-  const num = toNumber(value, 4);
-  if (Math.abs(num) <= 1) {
-    return Number((num * 100).toFixed(2));
-  }
-  return Number(num.toFixed(2));
-};
-
 const resolveColor = (classNo: string, index: number) => {
   const colors = Object.values(colorMap);
   return colorMap[classNo] || colors[index % colors.length] || '#27b0d6';
 };
 
 const resolveDisplayName = (classNo: string, className: string) => {
-  return `${classNo} ${className || fallbackCategoryMap[classNo] || ''}`.trim();
+  return `${classNo} ${className}`.trim();
 };
 
-const extractArrayPayload = (raw: any): any[] => {
-  if (Array.isArray(raw)) return raw;
-  const queue: any[] = [raw];
-  while (queue.length) {
-    const current = queue.shift();
-    if (Array.isArray(current)) return current;
-    if (current && typeof current === 'object') {
-      Object.keys(current).forEach((key) => {
-        const value = current[key];
-        if (value != null) {
-          queue.push(value);
-        }
-      });
-    }
-  }
-  return [];
-};
-
-const normalizePieData = (payload: any): PieChartItem[] => {
-  const source = extractArrayPayload(payload);
-  const rows = source.length ? source : fallbackPieData;
-  return rows
-    .map((item: any, index: number) => {
-      const classNo = String(item.classNo || item.subClassNo || item.categoryCode || item.code || fallbackPieData[index]?.classNo || '');
-      const className = String(item.className || item.subClassName || item.categoryName || item.name || fallbackCategoryMap[classNo] || '');
-      return {
-        classNo,
-        className,
-        salesAmount: toNumber(item.salesAmount ?? item.currentSales ?? item.value ?? fallbackPieData[index]?.salesAmount ?? 0, 2),
-        salesShare: normalizePercent(item.salesShare ?? item.share ?? item.ratio ?? item.proportion ?? fallbackPieData[index]?.salesShare ?? 0),
-        displayName: resolveDisplayName(classNo, className),
-        color: resolveColor(classNo, index)
-      };
-    })
-    .filter((item) => item.classNo || item.className);
-};
-
-const normalizeTrendData = (payload: any): DiagnosisSubClassTrendResponse => {
-  const source = payload && typeof payload === 'object' ? payload : {};
-  const fallbackSource = fallbackTrendData;
-  const dates = extractArrayPayload(source.dates || source.xAxis || source.labels || fallbackSource.dates).map((item) => String(item || ''));
-  const rawSeries = extractArrayPayload(source.series || source.rows || source.items || fallbackSource.series);
-  const series = rawSeries
-    .map((item: any, index: number) => {
-      const classNo = String(item.classNo || item.subClassNo || item.categoryCode || item.code || fallbackSource.series[index]?.classNo || '');
-      const className = String(item.className || item.subClassName || item.categoryName || item.name || fallbackCategoryMap[classNo] || '');
-      return {
-        classNo,
-        className,
-        color: resolveColor(classNo, index),
-        values: extractArrayPayload(item.values || item.data || fallbackSource.series[index]?.values || []).map((value) => toNumber(value, 2))
-      };
-    })
-    .filter((item) => item.values.length);
-
-  return {
-    dates,
-    unit: String(source.unit || fallbackSource.unit || '元'),
-    series
-  };
-};
-
-const normalizeTableRows = (payload: any): SubClassTableViewRow[] => {
-  const source = payload && typeof payload === 'object' ? payload : {};
-  const rows = extractArrayPayload(source.rows || source.list || source.items || payload);
-  return rows.map((item: any, index: number) => {
-    const classNo = String(item.classNo || item.subClassNo || item.categoryCode || item.code || '');
-    const className = String(item.className || item.subClassName || item.categoryName || item.name || fallbackCategoryMap[classNo] || '');
+const normalizePieData = (payload: LegacySubclassSalesPerItem[] | undefined): PieChartItem[] => {
+  const rows = Array.isArray(payload) ? payload : [];
+  return rows.map((item, index) => {
+    const classNo = String(item.classNo || '');
+    const className = String(item.className || '');
     return {
-      categoryKey: `${classNo || 'sub-class'}-${index}`,
+      ...item,
       classNo,
       className,
-      salesAmount: toNumber(item.salesAmount ?? item.currentSales ?? 0, 2),
-      salesShare: normalizePercent(item.salesShare ?? item.currentSalesShare ?? item.salesRatio ?? 0),
-      grossAmount: toNumber(item.grossAmount ?? item.currentGross ?? 0, 2),
-      grossShare: normalizePercent(item.grossShare ?? item.currentGrossShare ?? item.grossRatio ?? 0),
-      grossRate: normalizePercent(item.grossRate ?? item.currentGrossRate ?? 0),
-      customerCount: toNumber(item.customerCount ?? item.currentCustomerCount ?? 0),
-      customerPrice: toNumber(item.customerPrice ?? item.currentCustomerPrice ?? 0, 2),
-      compareSalesAmount: toNumber(item.compareSalesAmount ?? item.compareSales ?? 0, 2),
-      compareSalesShare: normalizePercent(item.compareSalesShare ?? item.compareSalesRatio ?? 0),
-      salesGrowthRate: normalizePercent(item.salesGrowthRate ?? item.comparativeSales ?? item.compareSalesGrowthRate ?? 0),
-      compareGrossAmount: toNumber(item.compareGrossAmount ?? item.compareGross ?? 0, 2),
-      compareGrossRate: normalizePercent(item.compareGrossRate ?? item.lastGrossRate ?? 0),
-      compareCustomerCount: toNumber(item.compareCustomerCount ?? 0),
-      customerCountGrowthRate: normalizePercent(item.customerCountGrowthRate ?? item.comparativeCustomerCount ?? 0),
-      compareCustomerPrice: toNumber(item.compareCustomerPrice ?? 0, 2),
-      customerPriceGrowthRate: normalizePercent(item.customerPriceGrowthRate ?? item.comparativeCustomerPrice ?? 0),
-      turnoverRate: toNumber(item.turnoverRate ?? item.inventoryTurnoverRate ?? 0, 2),
-      turnoverDays: toNumber(item.turnoverDays ?? item.inventoryTurnoverDays ?? 0, 2),
-      gmroi: toNumber(item.gmroi ?? item.GMROI ?? 0, 2),
-      compareGrossShare: normalizePercent(item.compareGrossShare ?? item.compareGrossRatio ?? item.lastGrossShare ?? 0),
-      grossGrowthRate: normalizePercent(item.grossGrowthRate ?? item.comparativeGross ?? item.compareGrossGrowthRate ?? 0)
+      salesAmount: toNumber(item.sales ?? 0, 2),
+      salesShare: toNumber(item.salesPer ?? 0, 2),
+      displayName: resolveDisplayName(classNo, className),
+      color: resolveColor(classNo, index)
     };
   });
 };
 
-const trendSeries = computed<TrendChartSeriesItem[]>(() =>
-  trendData.value.series.map((item, index) => ({
-    ...item,
-    displayName: resolveDisplayName(item.classNo, item.className),
-    color: resolveColor(item.classNo, index)
-  }))
-);
+const normalizeTrendData = (payload: LegacySubclassSalesTrendResponse | undefined): LegacySubclassSalesTrendResponse => {
+  const source = payload || {};
+  return {
+    legend: Array.isArray(source.legend) ? source.legend.map((item) => String(item || '')) : [],
+    xdata: Array.isArray(source.xdata) ? source.xdata.map((item) => String(item || '')) : [],
+    lineDate: Array.isArray(source.lineDate)
+      ? source.lineDate.map((item) => ({
+          dataDate: item.dataDate,
+          classNo: item.classNo,
+          className: item.className,
+          sales: toNumber(item.sales, 2)
+        }))
+      : []
+  };
+};
 
-const pieRequest = useRequest(async (id: string) => await getCategoryDiagnosisSubClassPie(id), {
+const normalizeTableRows = (payload: LegacySubclassSalesListResponse | undefined): SubClassTableViewRow[] => {
+  const rows = payload?.content || payload?.list || payload?.rows || [];
+  return rows.map((item, index) => ({
+    ...item,
+    classNo: String(item.classNo || ''),
+    className: String(item.className || ''),
+    categoryKey: `${item.classNo || 'sub-class'}-${index}`
+  }));
+};
+
+const trendSeries = computed<TrendChartSeriesItem[]>(() => {
+  const lineDate = trendData.value.lineDate || [];
+  const legend = trendData.value.legend || [];
+  const classMap = new Map<string, { className: string; values: Record<string, number> }>();
+  lineDate.forEach((item) => {
+    const classNo = String(item.classNo || '');
+    if (!classMap.has(classNo)) {
+      classMap.set(classNo, { className: String(item.className || ''), values: {} });
+    }
+    classMap.get(classNo)!.values[String(item.dataDate || '')] = toNumber(item.sales, 2);
+  });
+  return Array.from(classMap.entries()).map(([classNo, row], index) => ({
+    classNo,
+    className: row.className,
+    displayName: resolveDisplayName(classNo, row.className || legend[index] || ''),
+    color: resolveColor(classNo, index),
+    values: (trendData.value.xdata || []).map((date) => row.values[date] ?? 0)
+  }));
+});
+
+const buildRequestBody = (): LegacySubclassContributionRequest => ({
+  sessionId: sessionId.value,
+  deptId: query.value.deptId,
+  retailTypeId: query.value.retailTypeId,
+  businessCircleId: query.value.businessCircleId,
+  deptGroupId: query.value.deptGroupId,
+  storeNo: query.value.storeNo,
+  classLevel: query.value.classLevel,
+  classNo: query.value.categoryId ? String(query.value.categoryId) : '',
+  currentStartDate: query.value.startDate,
+  currentEndDate: query.value.endDate,
+  compareStartDate: query.value.compareStartDate,
+  compareEndDate: query.value.compareEndDate
+});
+
+const pieRequest = useRequest(async (body: LegacySubclassContributionRequest) => await getCategoryDiagnosisSubClassPie(body), {
   onSuccess: async (res) => {
-    pieData.value = normalizePieData(res?.data);
+    pieData.value = normalizePieData(res?.result);
     await nextTick();
     renderPieChart();
   }
 });
 
-const trendRequest = useRequest(async (id: string) => await getCategoryDiagnosisSubClassTrend(id), {
+const trendRequest = useRequest(async (body: LegacySubclassContributionRequest) => await getCategoryDiagnosisSubClassTrend(body), {
   onSuccess: async (res) => {
-    trendData.value = normalizeTrendData(res?.data);
+    trendData.value = normalizeTrendData(res?.result);
     await nextTick();
     renderTrendChart();
   }
 });
 
-const tableRequest = useRequest(async (id: string) => await getCategoryDiagnosisSubClassTable(id), {
+const tableRequest = useRequest(async (body: LegacySubclassContributionListRequest) => await getCategoryDiagnosisSubClassTable(body), {
   onSuccess: (res) => {
-    tableRows.value = normalizeTableRows((res?.data || {}) as DiagnosisSubClassTableResponse);
+    tableRows.value = normalizeTableRows(res?.result);
   }
 });
 
@@ -423,6 +375,7 @@ const renderTrendChart = () => {
     color: trendSeries.value.map((item) => item.color),
     tooltip: {
       trigger: 'axis',
+      axisPointer: { type: 'line' },
       formatter: (params: any) => {
         const rows = Array.isArray(params) ? params : [params];
         const title = rows[0]?.axisValueLabel || rows[0]?.axisValue || '';
@@ -452,7 +405,7 @@ const renderTrendChart = () => {
     xAxis: {
       type: 'category',
       boundaryGap: false,
-      data: trendData.value.dates,
+      data: trendData.value.xdata || [],
       axisLine: {
         lineStyle: {
           color: '#dcdfe6'
@@ -464,12 +417,12 @@ const renderTrendChart = () => {
       axisLabel: {
         color: '#606266',
         fontSize: 12,
-        rotate: trendData.value.dates.length > 8 ? 30 : 0
+        rotate: (trendData.value.xdata || []).length > 8 ? 30 : 0
       }
     },
     yAxis: {
       type: 'value',
-      name: trendData.value.unit || '元',
+      name: '元',
       nameTextStyle: {
         color: '#909399'
       },
@@ -490,7 +443,6 @@ const renderTrendChart = () => {
       name: item.displayName,
       type: 'line',
       smooth: true,
-      stack: 'sales',
       symbol: 'circle',
       symbolSize: 6,
       showSymbol: true,
@@ -521,7 +473,8 @@ const loadPageData = async () => {
     ElMessage.error('缺少 sessionId，无法加载子类贡献详情');
     return;
   }
-  await Promise.all([pieRequest.run(sessionId.value), trendRequest.run(sessionId.value), tableRequest.run(sessionId.value)]);
+  const body = buildRequestBody();
+  await Promise.all([pieRequest.run(body), trendRequest.run(body), tableRequest.run({ ...body, page: 1, size: 999, order: 'currentSales', orderType: 'desc' })]);
 };
 
 const handleExport = () => {
