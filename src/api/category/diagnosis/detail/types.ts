@@ -462,3 +462,71 @@ export interface CustomerSalesDetailsResponse {
   current?: number;
   pages?: number;
 }
+
+export interface TagTypeItemResponse {
+  tagNo?: string;
+  tagName?: string;
+  sales?: number;
+}
+
+export interface TagTypeGroupResponse {
+  tagType?: string;
+  tagTypeName?: string;
+  tagList?: TagTypeItemResponse[];
+}
+
+export interface TagSalesSkuItemResponse {
+  tagName?: string;
+  sales?: number;
+  salesPer?: number;
+  sku?: number;
+  skuPer?: number;
+}
+
+export interface TagSalesPerResponse {
+  salesAndSkuList?: TagSalesSkuItemResponse[];
+  goodTagList?: string[];
+  badTagList?: string[];
+}
+
+export interface TagDetailItemResponse {
+  tagNo?: string;
+  tagName?: string;
+  sku?: number;
+  skuChange?: number;
+  skuInc?: number;
+  skuPer?: number;
+  saleQuantity?: number;
+  saleQuantityChange?: number;
+  saleQuantityInc?: number;
+  saleQuantityPer?: number;
+  saleQuantityPsd?: number;
+  sales?: number;
+  salesChange?: number;
+  salesInc?: number;
+  salesPer?: number;
+  salesPsd?: number;
+  gross?: number;
+  grossChange?: number;
+  grossInc?: number;
+  grossPer?: number;
+  grossPsd?: number;
+  grossRate?: number;
+  grossRateInc?: number;
+  stockQuantity?: number;
+  turnoverRate?: number;
+  turnoverDays?: number;
+  stockSalesRate?: number;
+  contributionRate?: number;
+  gmroi?: number;
+  salesRate?: number;
+  activitySku?: number;
+}
+
+export interface TagDetailPageResponse {
+  records?: TagDetailItemResponse[];
+  total?: number;
+  size?: number;
+  current?: number;
+  pages?: number;
+}

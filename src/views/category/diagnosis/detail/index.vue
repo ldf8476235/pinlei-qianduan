@@ -178,6 +178,7 @@ import SubClassView from './sub-class.vue';
 import ChannelView from './channel.vue';
 import CustomerView from './customer.vue';
 import SpecView from './spec.vue';
+import TagView from './tag.vue';
 import AbcAnalysisView from '@/views/abc/analysis.vue';
 import GrossContributionAnalysisView from '@/views/gross-contribution/analysis.vue';
 import GmroiAnalysisView from '@/views/gmroi/analysis.vue';
@@ -286,7 +287,8 @@ const embeddedSideViewMap = {
   gmroiAnalysis: markRaw(GmroiAnalysisView),
   supplierAnalysis: markRaw(SupplierAnalysisView),
   priceBandAnalysis: markRaw(PriceBandAnalysisView),
-  brandAnalysis: markRaw(BrandAnalysisView)
+  brandAnalysis: markRaw(BrandAnalysisView),
+  tagAnalysis: markRaw(TagView)
 } as const;
 
 const trendMetricTabs = [
@@ -298,6 +300,16 @@ const trendMetricTabs = [
   { key: 'customerPrice', label: '客单价', unit: '元' },
   { key: 'inventorySales', label: '库销比', unit: '比' }
 ];
+
+const trendTabTypeMap: Record<string, string> = {
+  sales: '0',
+  salesQuantity: '1',
+  gross: '2',
+  grossRate: '3',
+  customerCount: '4',
+  customerPrice: '5',
+  inventorySales: '6'
+};
 
 const summary = reactive<CategoryDiagnosisDetailSummaryVO>({
   filterInfo: {
@@ -436,14 +448,18 @@ const overviewRequest = useRequest(async (id: string) => await getCategoryDiagno
   }
 });
 
-const trendRequest = useRequest(async (params: { sessionId: string; metricCode: string }) => await getCategoryDiagnosisDetailTrend(params.sessionId, params.metricCode), {
-  onSuccess: (res) => {
-    if (res?.data) {
-      trendData.value = buildTrendView(res.data, activeTrendMetric.value);
-      renderTrendChart();
+const trendRequest = useRequest(
+  async (params: { sessionId: string; metricCode: string; tabType: string }) =>
+    await getCategoryDiagnosisDetailTrend(params.sessionId, params.metricCode, params.tabType),
+  {
+    onSuccess: (res) => {
+      if (res?.data) {
+        trendData.value = buildTrendView(res.data, activeTrendMetric.value);
+        renderTrendChart();
+      }
     }
   }
-});
+);
 
 const overviewLoading = computed(() => overviewRequest.loading.value || statusRequest.loading.value);
 const trendLoading = computed(() => trendRequest.loading.value || statusRequest.loading.value);
@@ -670,7 +686,8 @@ const loadTrend = async () => {
   if (!sessionId.value) return;
   await trendRequest.run({
     sessionId: sessionId.value,
-    metricCode: activeTrendMetric.value
+    metricCode: activeTrendMetric.value,
+    tabType: trendTabTypeMap[activeTrendMetric.value] || ''
   });
 };
 

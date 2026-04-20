@@ -15,7 +15,10 @@ import {
   CustomerAgeBucketResponse,
   CustomerSalesDetailsResponse,
   CustomerSalesRadarItemResponse,
-  DiagnosisTrendsResponse
+  DiagnosisTrendsResponse,
+  TagDetailPageResponse,
+  TagSalesPerResponse,
+  TagTypeGroupResponse
 } from './types';
 
 export const getCategoryDiagnosisDetailSummary = (
@@ -30,14 +33,16 @@ export const getCategoryDiagnosisDetailSummary = (
 
 export const getCategoryDiagnosisDetailTrend = (
   sessionId: string,
-  metricCode?: string
+  metricCode?: string,
+  tabType?: string
 ): AxiosPromise<DiagnosisApiResponse<DiagnosisTrendsResponse>> => {
   return request({
     url: '/api/v1/diagnosis/trends',
     method: 'get',
     params: {
       sessionId,
-      metricCode
+      metricCode,
+      tabType
     }
   });
 };
@@ -136,6 +141,43 @@ export const getCategoryDiagnosisCustomerDetails = (
   });
 };
 
+export const getCategoryDiagnosisTagTypes = (
+  sessionId: string
+): AxiosPromise<DiagnosisApiResponse<TagTypeGroupResponse[]>> => {
+  return request({
+    url: '/api/v1/tag-analysis/types',
+    method: 'get',
+    params: { sessionId }
+  });
+};
+
+export const getCategoryDiagnosisTagSalesShare = (
+  sessionId: string,
+  tagType: string
+): AxiosPromise<DiagnosisApiResponse<TagSalesPerResponse>> => {
+  return request({
+    url: '/api/v1/tag-analysis/sales-share',
+    method: 'get',
+    params: { sessionId, tagType }
+  });
+};
+
+export const getCategoryDiagnosisTagList = (
+  sessionId: string,
+  tagType: string,
+  tagList?: string[],
+  page?: number,
+  size?: number,
+  order?: string,
+  orderType?: string
+): AxiosPromise<DiagnosisApiResponse<TagDetailPageResponse>> => {
+  return request({
+    url: '/api/v1/tag-analysis/list',
+    method: 'get',
+    params: { sessionId, tagType, tagList, page, size, order, orderType }
+  });
+};
+
 export default {
   getCategoryDiagnosisDetailSummary,
   getCategoryDiagnosisDetailTrend,
@@ -147,5 +189,8 @@ export default {
   getCategoryDiagnosisChannelTable,
   getCategoryDiagnosisCustomerAgeBuckets,
   getCategoryDiagnosisCustomerRadar,
-  getCategoryDiagnosisCustomerDetails
+  getCategoryDiagnosisCustomerDetails,
+  getCategoryDiagnosisTagTypes,
+  getCategoryDiagnosisTagSalesShare,
+  getCategoryDiagnosisTagList
 };
