@@ -5,12 +5,11 @@
         <div class="filter-header-left">
           <div class="page-title-wrap">
             <span class="page-title-line" />
-            <span class="page-title">004洗化部（一级品类）</span>
+            <span class="page-title">{{ title }}</span>
           </div>
         </div>
         <div class="page-actions">
           <span class="unit-text">金额单位：元</span>
-          <el-button type="primary" link @click="handleExport">导出 Excel</el-button>
         </div>
       </div>
 
@@ -31,7 +30,7 @@
           </el-select>
         </el-form-item>
         <el-form-item label="本期四象限">
-          <el-select v-model="queryForm.currentQuadrant" clearable style="width: 170px" @change="handleQuery">
+          <el-select v-model="queryForm.currentGross" clearable style="width: 170px" @change="handleQuery">
             <el-option label="全部" value="" />
             <el-option label="领跑商品" value="leading" />
             <el-option label="吸客商品" value="attracting" />
@@ -39,8 +38,8 @@
             <el-option label="问题商品" value="problem" />
           </el-select>
         </el-form-item>
-        <el-form-item label="对比日期四象限">
-          <el-select v-model="queryForm.compareQuadrant" clearable style="width: 170px" @change="handleQuery">
+        <el-form-item label="对比四象限">
+          <el-select v-model="queryForm.compareGross" clearable style="width: 170px" @change="handleQuery">
             <el-option label="全部" value="" />
             <el-option label="领跑商品" value="leading" />
             <el-option label="吸客商品" value="attracting" />
@@ -63,103 +62,76 @@
       </template>
 
       <el-table v-loading="tableLoading" :data="tableRows" border stripe class="goods-table" height="560">
-        <el-table-column label="商品编码" prop="goodsCode" min-width="120" fixed="left" align="left" sortable show-overflow-tooltip />
-        <el-table-column label="商品名称" prop="goodsName" min-width="220" fixed="left" align="left" sortable show-overflow-tooltip />
-        <el-table-column label="当前状态" prop="statusLabel" min-width="100" align="left" sortable />
-        <el-table-column label="销售门店数" min-width="110" align="right" sortable :sort-method="sortNumber('storeCount')">
-          <template #header>
-            <el-tooltip content="商品在本期有销售记录的门店数量" placement="top">
-              <span>销售门店数</span>
-            </el-tooltip>
-          </template>
-          <template #default="{ row }">{{ formatNumber(row.storeCount, 0) }}</template>
+        <el-table-column label="商品编码" prop="productNo" min-width="120" fixed="left" align="left" show-overflow-tooltip />
+        <el-table-column label="商品名称" prop="productName" min-width="220" fixed="left" align="left" show-overflow-tooltip />
+        <el-table-column label="当前状态" prop="productStatus" min-width="100" align="left" />
+        <el-table-column label="门店数" min-width="100" align="right">
+          <template #default="{ row }">{{ formatNumber(row.storeNum, 0) }}</template>
         </el-table-column>
-        <el-table-column label="毛利贡献率角色(本期/对比日期)" min-width="210" align="left">
-          <template #header>
-            <el-tooltip content="展示商品本期与对比日期所处的毛利贡献率四象限角色" placement="top">
-              <span>毛利贡献率角色(本期/对比日期)</span>
-            </el-tooltip>
-          </template>
+        <el-table-column label="毛利角色(本期/对比)" min-width="200" align="left">
           <template #default="{ row }">
             <div class="role-cell">
-              <span :class="['role-text', `is-${row.currentQuadrant}`]">{{ row.currentQuadrantLabel }}</span>
+              <span :class="['role-text', `is-${resolveRoleClass(row.currentGrossRole)}`]">{{ row.currentGrossRoleName || '-' }}</span>
               <span class="role-separator">/</span>
-              <span :class="['role-text', `is-${row.compareQuadrant}`]">{{ row.compareQuadrantLabel }}</span>
+              <span :class="['role-text', `is-${resolveRoleClass(row.compareGrossRole)}`]">{{ row.compareGrossRoleName || '-' }}</span>
             </div>
           </template>
         </el-table-column>
-
-        <el-table-column label="销售量(总计)" min-width="120" align="right" sortable :sort-method="sortNumber('saleQuantityTotal')">
-          <template #default="{ row }">{{ formatNumber(row.saleQuantityTotal, 0) }}</template>
+        <el-table-column label="销售量(总计)" min-width="120" align="right">
+          <template #default="{ row }">{{ formatNumber(row.saleQuantity, 0) }}</template>
         </el-table-column>
-        <el-table-column label="销售量(PSD)" min-width="120" align="right" sortable :sort-method="sortNumber('saleQuantityPsd')">
+        <el-table-column label="销售量(PSD)" min-width="120" align="right">
           <template #default="{ row }">{{ formatNumber(row.saleQuantityPsd) }}</template>
         </el-table-column>
-        <el-table-column label="销售额(总计)" min-width="130" align="right" sortable :sort-method="sortNumber('salesAmountTotal')">
-          <template #default="{ row }">{{ formatNumber(row.salesAmountTotal) }}</template>
+        <el-table-column label="销售额(总计)" min-width="130" align="right">
+          <template #default="{ row }">{{ formatNumber(row.sales) }}</template>
         </el-table-column>
-        <el-table-column label="销售额(占比)" min-width="120" align="right" sortable :sort-method="sortNumber('salesAmountShare')">
-          <template #default="{ row }">{{ formatPercent(row.salesAmountShare) }}</template>
+        <el-table-column label="销售额(占比)" min-width="120" align="right">
+          <template #default="{ row }">{{ formatPercent(row.salesPer) }}</template>
         </el-table-column>
-        <el-table-column label="销售额(PSD)" min-width="120" align="right" sortable :sort-method="sortNumber('salesAmountPsd')">
-          <template #default="{ row }">{{ formatNumber(row.salesAmountPsd) }}</template>
+        <el-table-column label="销售额(PSD)" min-width="120" align="right">
+          <template #default="{ row }">{{ formatNumber(row.salesPsd) }}</template>
         </el-table-column>
-        <el-table-column label="毛利额(总计)" min-width="130" align="right" sortable :sort-method="sortNumber('grossAmountTotal')">
-          <template #default="{ row }">{{ formatNumber(row.grossAmountTotal) }}</template>
+        <el-table-column label="毛利额(总计)" min-width="130" align="right">
+          <template #default="{ row }">{{ formatNumber(row.gross) }}</template>
         </el-table-column>
-        <el-table-column label="毛利额(占比)" min-width="120" align="right" sortable :sort-method="sortNumber('grossAmountShare')">
-          <template #default="{ row }">{{ formatPercent(row.grossAmountShare) }}</template>
+        <el-table-column label="毛利额(占比)" min-width="120" align="right">
+          <template #default="{ row }">{{ formatPercent(row.grossPer) }}</template>
         </el-table-column>
-        <el-table-column label="毛利额(PSD)" min-width="120" align="right" sortable :sort-method="sortNumber('grossAmountPsd')">
-          <template #default="{ row }">{{ formatNumber(row.grossAmountPsd) }}</template>
+        <el-table-column label="毛利额(PSD)" min-width="120" align="right">
+          <template #default="{ row }">{{ formatNumber(row.grossPsd) }}</template>
         </el-table-column>
-        <el-table-column label="毛利率" min-width="100" align="right" sortable :sort-method="sortNumber('grossRate')">
+        <el-table-column label="毛利率" min-width="100" align="right">
           <template #default="{ row }">{{ formatPercent(row.grossRate) }}</template>
         </el-table-column>
-        <el-table-column label="当前库存数量" min-width="120" align="right" sortable :sort-method="sortNumber('inventoryQty')">
-          <template #default="{ row }">{{ formatNumber(row.inventoryQty, 0) }}</template>
+        <el-table-column label="库存数量" min-width="120" align="right">
+          <template #default="{ row }">{{ formatNumber(row.stockQuantity, 0) }}</template>
         </el-table-column>
-
-        <el-table-column label="数量" min-width="100" align="right" sortable :sort-method="sortNumber('quantity')">
-          <template #default="{ row }">{{ formatNumber(row.quantity, 0) }}</template>
-        </el-table-column>
-        <el-table-column label="库存周转率" min-width="120" align="right" sortable :sort-method="sortNumber('turnoverRate')">
+        <el-table-column label="库存周转率" min-width="120" align="right">
           <template #default="{ row }">{{ formatNumber(row.turnoverRate) }}</template>
         </el-table-column>
-        <el-table-column label="库存周转天数" min-width="130" align="right" sortable :sort-method="sortNumber('turnoverDays')">
+        <el-table-column label="库存周转天数" min-width="130" align="right">
           <template #default="{ row }">{{ formatNumber(row.turnoverDays) }}</template>
         </el-table-column>
-        <el-table-column label="库销比" min-width="100" align="right" sortable :sort-method="sortNumber('inventorySalesRatio')">
-          <template #default="{ row }">{{ formatNumber(row.inventorySalesRatio) }}</template>
+        <el-table-column label="库存销比" min-width="100" align="right">
+          <template #default="{ row }">{{ formatNumber(row.stockSalesRate) }}</template>
         </el-table-column>
-        <el-table-column label="毛利贡献率" min-width="120" align="right" sortable :sort-method="sortNumber('grossContributionRate')">
-          <template #default="{ row }">{{ formatPercent(row.grossContributionRate) }}</template>
+        <el-table-column label="毛利贡献率" min-width="120" align="right">
+          <template #default="{ row }">{{ formatPercent(row.contributionRate) }}</template>
         </el-table-column>
-        <el-table-column label="GMROI" min-width="100" align="right" sortable :sort-method="sortNumber('gmroi')">
+        <el-table-column label="GMROI" min-width="100" align="right">
           <template #default="{ row }">{{ formatNumber(row.gmroi) }}</template>
         </el-table-column>
-        <el-table-column label="销售率" min-width="100" align="right" sortable :sort-method="sortNumber('sellThroughRate')">
-          <template #default="{ row }">{{ formatPercent(row.sellThroughRate) }}</template>
+        <el-table-column label="销售率" min-width="100" align="right">
+          <template #default="{ row }">{{ formatPercent(row.salesRate) }}</template>
         </el-table-column>
-        <el-table-column label="本期促销" min-width="100" align="left">
-          <template #default="{ row }">{{ row.promotionLabel || '-' }}</template>
+        <el-table-column label="本期促销" min-width="90" align="left">
+          <template #default="{ row }">{{ row.activity || '-' }}</template>
         </el-table-column>
-        <el-table-column label="首次销售日期" min-width="130" align="left" sortable show-overflow-tooltip prop="firstSaleDate" />
-        <el-table-column label="本期新品" min-width="100" align="left">
-          <template #default="{ row }">{{ row.newProductLabel || '-' }}</template>
-        </el-table-column>
-        <el-table-column label="重点商品" min-width="100" align="left">
-          <template #default="{ row }">{{ row.keyProductLabel || '-' }}</template>
-        </el-table-column>
-        <el-table-column label="季节性商品" min-width="110" align="left">
-          <template #default="{ row }">{{ row.seasonalLabel || '-' }}</template>
-        </el-table-column>
-
-        <el-table-column label="操作" min-width="100" fixed="right" align="center">
-          <template #default="{ row }">
-            <el-button link type="primary" @click="handleProcess(row)">处理</el-button>
-          </template>
-        </el-table-column>
+        <el-table-column label="首次销售日期" min-width="130" align="left" prop="firstSaleDate" />
+        <el-table-column label="品类" min-width="120" align="left" show-overflow-tooltip prop="className" />
+        <el-table-column label="品牌" min-width="120" align="left" show-overflow-tooltip prop="brandName" />
+        <el-table-column label="供应商" min-width="160" align="left" show-overflow-tooltip prop="productVendorName" />
       </el-table>
 
       <div class="pagination-wrap">
@@ -179,308 +151,87 @@
 </template>
 
 <script setup name="GrossContributionGoodsList" lang="ts">
+import { getGrossSalesList } from '@/api/gross-contribution';
+
 interface GoodsRow {
-  goodsCode: string;
-  goodsName: string;
-  status: string;
-  statusLabel: string;
-  currentQuadrant: string;
-  currentQuadrantLabel: string;
-  compareQuadrant: string;
-  compareQuadrantLabel: string;
-  storeCount: number;
-  saleQuantityTotal: number;
-  saleQuantityPsd: number;
-  salesAmountTotal: number;
-  salesAmountShare: number;
-  salesAmountPsd: number;
-  grossAmountTotal: number;
-  grossAmountShare: number;
-  grossAmountPsd: number;
-  grossRate: number;
-  inventoryQty: number;
-  quantity: number;
-  turnoverRate: number;
-  turnoverDays: number;
-  inventorySalesRatio: number;
-  grossContributionRate: number;
-  gmroi: number;
-  sellThroughRate: number;
-  promotion: string;
-  promotionLabel: string;
-  firstSaleDate: string;
-  newProduct: string;
-  newProductLabel: string;
-  keyProduct: string;
-  keyProductLabel: string;
-  seasonal: string;
-  seasonalLabel: string;
+  productNo?: string;
+  productName?: string;
+  productStatus?: string;
+  productStatusNo?: string;
+  storeNum?: number;
+  currentGrossRole?: string;
+  currentGrossRoleName?: string;
+  compareGrossRole?: string;
+  compareGrossRoleName?: string;
+  saleQuantity?: number;
+  saleQuantityPsd?: number;
+  sales?: number;
+  salesPer?: number;
+  salesPsd?: number;
+  gross?: number;
+  grossPer?: number;
+  grossPsd?: number;
+  grossRate?: number;
+  stockQuantity?: number;
+  turnoverRate?: number;
+  turnoverDays?: number;
+  stockSalesRate?: number;
+  contributionRate?: number;
+  gmroi?: number;
+  salesRate?: number;
+  activity?: string;
+  firstSaleDate?: string;
+  className?: string;
+  brandName?: string;
+  productVendorName?: string;
 }
 
 interface QueryForm {
   status: string;
   promotion: string;
-  currentQuadrant: string;
-  compareQuadrant: string;
+  currentGross: string;
+  compareGross: string;
   pageNum: number;
   pageSize: number;
 }
 
-const initialQueryForm = (): QueryForm => ({
+const route = useRoute();
+const title = computed(() => String(route.query.categoryName || '毛利贡献率商品清单'));
+const sessionId = computed(() => String(route.query.sessionId || ''));
+
+const queryForm = reactive<QueryForm>({
   status: '',
   promotion: '',
-  currentQuadrant: '',
-  compareQuadrant: '',
+  currentGross: '',
+  compareGross: '',
   pageNum: 1,
   pageSize: 10
 });
-
-const queryForm = reactive<QueryForm>(initialQueryForm());
 const tableLoading = ref(false);
 const total = ref(0);
 const tableRows = ref<GoodsRow[]>([]);
 
-const mockRows: GoodsRow[] = [
-  {
-    goodsCode: '690123450011',
-    goodsName: '柔顺洗发露 750ml',
-    status: 'normal',
-    statusLabel: '正常',
-    currentQuadrant: 'leading',
-    currentQuadrantLabel: '领跑商品',
-    compareQuadrant: 'leading',
-    compareQuadrantLabel: '领跑商品',
-    storeCount: 58,
-    saleQuantityTotal: 1520,
-    saleQuantityPsd: 8.12,
-    salesAmountTotal: 86240,
-    salesAmountShare: 14.2,
-    salesAmountPsd: 460.11,
-    grossAmountTotal: 32771,
-    grossAmountShare: 16.85,
-    grossAmountPsd: 174.98,
-    grossRate: 38.0,
-    inventoryQty: 420,
-    quantity: 428,
-    turnoverRate: 3.62,
-    turnoverDays: 27.6,
-    inventorySalesRatio: 0.88,
-    grossContributionRate: 11.36,
-    gmroi: 2.78,
-    sellThroughRate: 82.4,
-    promotion: 'Y',
-    promotionLabel: '是',
-    firstSaleDate: '2024-01-15',
-    newProduct: 'N',
-    newProductLabel: '否',
-    keyProduct: 'Y',
-    keyProductLabel: '是',
-    seasonal: 'N',
-    seasonalLabel: '否'
-  },
-  {
-    goodsCode: '690123450022',
-    goodsName: '抑菌洗手液 300ml',
-    status: 'observe',
-    statusLabel: '观察',
-    currentQuadrant: 'attracting',
-    currentQuadrantLabel: '吸客商品',
-    compareQuadrant: 'leading',
-    compareQuadrantLabel: '领跑商品',
-    storeCount: 47,
-    saleQuantityTotal: 1096,
-    saleQuantityPsd: 5.84,
-    salesAmountTotal: 64820,
-    salesAmountShare: 11.8,
-    salesAmountPsd: 345.56,
-    grossAmountTotal: 11668,
-    grossAmountShare: 6.00,
-    grossAmountPsd: 62.18,
-    grossRate: 18.0,
-    inventoryQty: 510,
-    quantity: 536,
-    turnoverRate: 2.31,
-    turnoverDays: 43.8,
-    inventorySalesRatio: 1.24,
-    grossContributionRate: 4.05,
-    gmroi: 1.16,
-    sellThroughRate: 67.2,
-    promotion: 'N',
-    promotionLabel: '否',
-    firstSaleDate: '2023-10-08',
-    newProduct: 'N',
-    newProductLabel: '否',
-    keyProduct: 'N',
-    keyProductLabel: '否',
-    seasonal: 'N',
-    seasonalLabel: '否'
-  },
-  {
-    goodsCode: '690123450033',
-    goodsName: '香氛洗衣液 1kg',
-    status: 'normal',
-    statusLabel: '正常',
-    currentQuadrant: 'profit',
-    currentQuadrantLabel: '利润商品',
-    compareQuadrant: 'profit',
-    compareQuadrantLabel: '利润商品',
-    storeCount: 36,
-    saleQuantityTotal: 518,
-    saleQuantityPsd: 2.76,
-    salesAmountTotal: 35260,
-    salesAmountShare: 6.2,
-    salesAmountPsd: 187.71,
-    grossAmountTotal: 11283,
-    grossAmountShare: 5.80,
-    grossAmountPsd: 60.07,
-    grossRate: 32.0,
-    inventoryQty: 280,
-    quantity: 294,
-    turnoverRate: 2.95,
-    turnoverDays: 33.9,
-    inventorySalesRatio: 0.96,
-    grossContributionRate: 3.92,
-    gmroi: 1.93,
-    sellThroughRate: 74.8,
-    promotion: 'Y',
-    promotionLabel: '是',
-    firstSaleDate: '2024-03-11',
-    newProduct: 'Y',
-    newProductLabel: '是',
-    keyProduct: 'N',
-    keyProductLabel: '否',
-    seasonal: 'N',
-    seasonalLabel: '否'
-  },
-  {
-    goodsCode: '690123450044',
-    goodsName: '家用清洁喷雾 600ml',
-    status: 'optimize',
-    statusLabel: '待优化',
-    currentQuadrant: 'problem',
-    currentQuadrantLabel: '问题商品',
-    compareQuadrant: 'profit',
-    compareQuadrantLabel: '利润商品',
-    storeCount: 19,
-    saleQuantityTotal: 166,
-    saleQuantityPsd: 0.88,
-    salesAmountTotal: 9360,
-    salesAmountShare: 2.4,
-    salesAmountPsd: 49.79,
-    grossAmountTotal: 842,
-    grossAmountShare: 0.43,
-    grossAmountPsd: 4.48,
-    grossRate: 9.0,
-    inventoryQty: 680,
-    quantity: 724,
-    turnoverRate: 0.76,
-    turnoverDays: 93.1,
-    inventorySalesRatio: 2.74,
-    grossContributionRate: 0.29,
-    gmroi: 0.18,
-    sellThroughRate: 31.4,
-    promotion: 'N',
-    promotionLabel: '否',
-    firstSaleDate: '2022-08-09',
-    newProduct: 'N',
-    newProductLabel: '否',
-    keyProduct: 'N',
-    keyProductLabel: '否',
-    seasonal: 'Y',
-    seasonalLabel: '是'
-  },
-  {
-    goodsCode: '690123450055',
-    goodsName: '便携湿巾 8片装',
-    status: 'normal',
-    statusLabel: '正常',
-    currentQuadrant: 'attracting',
-    currentQuadrantLabel: '吸客商品',
-    compareQuadrant: 'attracting',
-    compareQuadrantLabel: '吸客商品',
-    storeCount: 56,
-    saleQuantityTotal: 1250,
-    saleQuantityPsd: 6.98,
-    salesAmountTotal: 31800,
-    salesAmountShare: 3.7,
-    salesAmountPsd: 177.65,
-    grossAmountTotal: 11240,
-    grossAmountShare: 5.77,
-    grossAmountPsd: 62.79,
-    grossRate: 35.35,
-    inventoryQty: 860,
-    quantity: 912,
-    turnoverRate: 1.82,
-    turnoverDays: 54.9,
-    inventorySalesRatio: 1.37,
-    grossContributionRate: 3.90,
-    gmroi: 1.41,
-    sellThroughRate: 58.5,
-    promotion: 'Y',
-    promotionLabel: '是',
-    firstSaleDate: '2023-12-01',
-    newProduct: 'N',
-    newProductLabel: '否',
-    keyProduct: 'Y',
-    keyProductLabel: '是',
-    seasonal: 'N',
-    seasonalLabel: '否'
-  },
-  {
-    goodsCode: '690123450066',
-    goodsName: '天然香皂 120g',
-    status: 'observe',
-    statusLabel: '观察',
-    currentQuadrant: 'profit',
-    currentQuadrantLabel: '利润商品',
-    compareQuadrant: 'problem',
-    compareQuadrantLabel: '问题商品',
-    storeCount: 28,
-    saleQuantityTotal: 362,
-    saleQuantityPsd: 1.93,
-    salesAmountTotal: 18620,
-    salesAmountShare: 2.9,
-    salesAmountPsd: 99.23,
-    grossAmountTotal: 7060,
-    grossAmountShare: 3.62,
-    grossAmountPsd: 37.61,
-    grossRate: 37.92,
-    inventoryQty: 340,
-    quantity: 356,
-    turnoverRate: 2.02,
-    turnoverDays: 49.5,
-    inventorySalesRatio: 1.12,
-    grossContributionRate: 2.45,
-    gmroi: 1.58,
-    sellThroughRate: 61.7,
-    promotion: 'N',
-    promotionLabel: '否',
-    firstSaleDate: '2024-02-28',
-    newProduct: 'Y',
-    newProductLabel: '是',
-    keyProduct: 'N',
-    keyProductLabel: '否',
-    seasonal: 'N',
-    seasonalLabel: '否'
+const loadTableList = async () => {
+  if (!sessionId.value) {
+    ElMessage.error('缺少 sessionId，无法加载商品清单');
+    return;
   }
-];
-
-const getTableList = async () => {
   tableLoading.value = true;
   try {
-    // TODO: replace with real backend request for gross contribution goods list.
-    await new Promise((resolve) => window.setTimeout(resolve, 180));
-    const filtered = mockRows.filter((item) => {
-      const matchStatus = !queryForm.status || item.status === queryForm.status;
-      const matchPromotion = !queryForm.promotion || item.promotion === queryForm.promotion;
-      const matchCurrent = !queryForm.currentQuadrant || item.currentQuadrant === queryForm.currentQuadrant;
-      const matchCompare = !queryForm.compareQuadrant || item.compareQuadrant === queryForm.compareQuadrant;
-      return matchStatus && matchPromotion && matchCurrent && matchCompare;
+    const res = await getGrossSalesList({
+      sessionId: sessionId.value,
+      status: queryForm.status ? [queryForm.status] : undefined,
+      promotion: queryForm.promotion || undefined,
+      currentGross: queryForm.currentGross || undefined,
+      compareGross: queryForm.compareGross || undefined,
+      page: queryForm.pageNum,
+      size: queryForm.pageSize,
+      order: 'sales',
+      orderType: 'desc'
     });
-    total.value = filtered.length;
-    const start = (queryForm.pageNum - 1) * queryForm.pageSize;
-    const end = start + queryForm.pageSize;
-    tableRows.value = filtered.slice(start, end);
+    const page = res?.result || {};
+    tableRows.value = Array.isArray(page.records) ? page.records : [];
+    total.value = Number(page.total || 0);
   } finally {
     tableLoading.value = false;
   }
@@ -488,34 +239,30 @@ const getTableList = async () => {
 
 const handleQuery = async () => {
   queryForm.pageNum = 1;
-  await getTableList();
+  await loadTableList();
 };
 
 const handleReset = async () => {
-  Object.assign(queryForm, initialQueryForm());
-  await getTableList();
+  queryForm.status = '';
+  queryForm.promotion = '';
+  queryForm.currentGross = '';
+  queryForm.compareGross = '';
+  queryForm.pageNum = 1;
+  queryForm.pageSize = 10;
+  await loadTableList();
 };
 
-const handleExport = () => {
-  // TODO: replace with RuoYi native download integration after backend API is ready.
-  ElMessage.info('导出入口已预留，后续可直接接若依原生导出逻辑');
-};
-
-const handleProcess = (row: GoodsRow) => {
-  ElMessage.info(`处理入口已预留：${row.goodsName}`);
-};
-
-const sortNumber = (field: keyof GoodsRow) => {
-  return (a: GoodsRow, b: GoodsRow) => Number(a[field] || 0) - Number(b[field] || 0);
+const resolveRoleClass = (value?: string) => {
+  if (value === '1' || value === 'leading') return 'leading';
+  if (value === '2' || value === 'attracting') return 'attracting';
+  if (value === '4' || value === 'profit') return 'profit';
+  return 'problem';
 };
 
 const formatNumber = (value: number | string | null | undefined, digits = 2) => {
   const num = Number(value);
   if (!Number.isFinite(num)) return '-';
-  return num.toLocaleString('zh-CN', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: digits
-  });
+  return num.toLocaleString('zh-CN', { minimumFractionDigits: 0, maximumFractionDigits: digits });
 };
 
 const formatPercent = (value: number | string | null | undefined) => {
@@ -525,7 +272,7 @@ const formatPercent = (value: number | string | null | undefined) => {
 };
 
 onMounted(async () => {
-  await getTableList();
+  await loadTableList();
 });
 </script>
 
@@ -550,11 +297,6 @@ onMounted(async () => {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-}
-
-.filter-header-left {
-  display: flex;
-  align-items: center;
 }
 
 .page-title-wrap {
@@ -606,10 +348,6 @@ onMounted(async () => {
 
 .goods-table :deep(.cell) {
   font-size: 13px;
-}
-
-.goods-table :deep(.el-table__body td) {
-  color: var(--el-text-color-regular);
 }
 
 .role-cell {

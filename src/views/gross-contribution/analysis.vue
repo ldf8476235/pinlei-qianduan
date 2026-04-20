@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="p-2 gross-contribution-page">
     <el-card shadow="hover" class="page-card header-card">
       <div class="page-header">
@@ -9,8 +9,9 @@
           </div>
         </div>
         <div class="page-actions">
-          <el-button link type="primary" @click="handleViewDetail">详情</el-button>
           <span class="unit-text">金额单位：元</span>
+          <el-button link type="primary" @click="handleViewDetail">详情</el-button>
+          <el-button type="primary" plain class="export-btn">导出</el-button>
         </div>
       </div>
     </el-card>
@@ -20,7 +21,7 @@
         <el-card shadow="hover" class="page-card chart-card">
           <template #header>
             <div class="card-header">
-              <span class="card-title">本期毛利贡献率四象限</span>
+              <span class="card-title">本期毛利贡献率四象限散点图</span>
             </div>
           </template>
           <div ref="scatterChartRef" class="chart-box" />
@@ -34,7 +35,10 @@
               <span class="card-title">四象限对比变化统计</span>
             </div>
           </template>
-          <div ref="barChartRef" class="chart-box" />
+          <div class="stack-chart-wrap">
+            <div ref="barChartRef" class="chart-box stack-chart" />
+            <div ref="barChartRef2" class="chart-box stack-chart" />
+          </div>
         </el-card>
       </el-col>
     </el-row>
@@ -47,16 +51,18 @@
       </template>
 
       <div class="matrix-table-wrap">
-        <el-table :data="matrixRows" border stripe class="matrix-table">
+        <el-table :data="matrixRows" border class="matrix-table">
           <el-table-column label="对比日期" min-width="130" align="center">
             <template #default="{ row }">
               <span :class="{ 'is-total': row.isTotal }">{{ row.label }}</span>
             </template>
           </el-table-column>
-          <el-table-column v-for="column in matrixColumns" :key="column.key" :label="column.label" min-width="140" align="center">
-            <template #default="{ row }">
-              <span :class="['matrix-number', { 'is-total': row.isTotal || column.isTotal }]">{{ formatCell(row[column.key]) }}</span>
-            </template>
+          <el-table-column label="本期" align="center">
+            <el-table-column v-for="column in matrixColumns" :key="column.key" :label="column.label" min-width="140" align="center">
+              <template #default="{ row }">
+                <span :class="['matrix-number', { 'is-total': row.isTotal || column.isTotal, 'is-highlight': true }]">{{ formatCell(row[column.key]) }}</span>
+              </template>
+            </el-table-column>
           </el-table-column>
         </el-table>
       </div>
@@ -70,9 +76,9 @@
       </template>
 
       <ul class="advice-list">
-        <li><strong>问题商品占比、优化淘汰建议：</strong> 问题商品占比仍处于高位，建议优先处理连续两期低销低毛SKU，结合库存和保质期制定淘汰计划。</li>
-        <li><strong>象限跳转异动商品风险提示：</strong> 从领跑/吸客象限滑落至问题象限的商品需重点跟踪，及时排查价格、陈列、促销和库存断层风险。</li>
-        <li><strong>点击查看商品策略引导文案：</strong> 进入详情页可查看具体商品清单、门店分布和处理建议，支持后续导出与策略跟进。</li>
+        <li>问题商品占比偏高，当前识别到{{ summaryStats.problemCount }}个问题商品，建议优先处理低销低毛SKU并制定淘汰计划。</li>
+        <li>跨象限降级商品当前识别到{{ summaryStats.downgradeCount }}个，需重点跟踪价格、陈列、促销和库存断层风险。</li>
+        <li>建议结合四象限角色，持续查看领跑、吸客、利润和问题商品的运营动作。</li>
       </ul>
     </el-card>
   </div>
@@ -97,13 +103,21 @@ interface MatrixRow {
   isTotal?: boolean;
 }
 
+interface MatrixColumn {
+  key: string;
+  label: string;
+  highlight?: boolean;
+}
+
 const router = useRouter();
 const route = useRoute();
 
 const scatterChartRef = ref<HTMLDivElement>();
 const barChartRef = ref<HTMLDivElement>();
+const barChartRef2 = ref<HTMLDivElement>();
 const scatterChartIns = ref<echarts.ECharts>();
 const barChartIns = ref<echarts.ECharts>();
+const barChartIns2 = ref<echarts.ECharts>();
 
 const scatterPoints: ScatterPoint[] = [
   { name: '柔顺洗发露', grossRate: 38, salesShare: 14.2 },
@@ -128,9 +142,9 @@ const compareStats = {
 };
 
 const matrixColumns = [
-  { key: 'attracting', label: '本期-吸客商品' },
-  { key: 'profit', label: '本期-利润商品' },
-  { key: 'problem', label: '本期-问题商品' }
+  { key: 'attracting', label: '本期-吸客商品', highlight: true },
+  { key: 'profit', label: '本期-利润商品', highlight: true },
+  { key: 'problem', label: '本期-问题商品', highlight: true }
 ];
 
 const matrixRows: MatrixRow[] = [
@@ -141,11 +155,19 @@ const matrixRows: MatrixRow[] = [
   { label: '总计', leading: '-', attracting: 23, profit: 27, problem: 27, isTotal: true }
 ];
 
+const summaryStats = computed(() => {
+  const problemCount = scatterPoints.filter((item) => item.grossRate < 20 && item.salesShare < 10).length;
+  const downgradeCount = Math.abs(Number(compareStats.skuShare.current.problem || 0) - Number(compareStats.skuShare.compare.problem || 0));
+  const problemRate = Number(compareStats.skuShare.current.problem || 0);
+  return { problemCount, downgradeCount, problemRate };
+});
+
 const loadAnalysisData = async () => {
   // TODO: replace with real backend request for gross contribution analysis.
   await nextTick();
   renderScatterChart();
   renderBarChart();
+  renderBarChart2();
 };
 
 const handleViewDetail = () => {
@@ -168,6 +190,13 @@ const initBarChart = () => {
   if (!barChartRef.value) return;
   if (!barChartIns.value) {
     barChartIns.value = echarts.init(barChartRef.value);
+  }
+};
+
+const initBarChart2 = () => {
+  if (!barChartRef2.value) return;
+  if (!barChartIns2.value) {
+    barChartIns2.value = echarts.init(barChartRef2.value);
   }
 };
 
@@ -241,8 +270,8 @@ const renderScatterChart = () => {
           symbol: 'none',
           label: { show: false },
           lineStyle: {
-            color: '#e53e3e',
-            type: 'dashed',
+            color: '#111827',
+            type: 'solid',
             width: 1
           },
           data: [{ xAxis: xCenter }, { yAxis: yCenter }]
@@ -408,6 +437,64 @@ const renderBarChart = () => {
   barChartIns.value.setOption(option, true);
 };
 
+const renderBarChart2 = () => {
+  initBarChart2();
+  if (!barChartIns2.value) return;
+
+  const colors = {
+    leading: '#27b0d6',
+    attracting: '#f06b4f',
+    profit: '#b69cff',
+    problem: '#e53e3e'
+  };
+
+  const option: EChartsOption = {
+    legend: {
+      orient: 'vertical',
+      right: 0,
+      top: 'middle',
+      itemWidth: 10,
+      itemHeight: 10,
+      icon: 'circle',
+      textStyle: { color: '#606266', fontSize: 13 }
+    },
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'shadow' },
+      formatter: (params: any) => {
+        const rows = Array.isArray(params) ? params : [params];
+        const title = rows[0]?.axisValueLabel || rows[0]?.axisValue || '';
+        return [title, ...rows.map((item) => `${item.marker}${item.seriesName}：${Number(item.value).toFixed(2)}%`)].join('<br/>');
+      }
+    },
+    grid: { left: 56, right: 120, top: 20, bottom: 24 },
+    xAxis: {
+      type: 'category',
+      data: ['本期', '对比日期'],
+      axisLine: { lineStyle: { color: '#dcdfe6' } },
+      axisLabel: { color: '#606266' }
+    },
+    yAxis: {
+      type: 'value',
+      min: 0,
+      max: 100,
+      interval: 20,
+      name: '销售额占比%',
+      nameTextStyle: { color: '#909399' },
+      axisLabel: { color: '#606266', formatter: (value: number) => `${value}%` },
+      splitLine: { lineStyle: { color: '#ebeef5' } }
+    },
+    series: [
+      { name: '领跑商品', type: 'bar', stack: 'sales2', itemStyle: { color: colors.leading }, data: [compareStats.salesShare.current.leading, compareStats.salesShare.compare.leading] },
+      { name: '吸客商品', type: 'bar', stack: 'sales2', itemStyle: { color: colors.attracting }, data: [compareStats.salesShare.current.attracting, compareStats.salesShare.compare.attracting] },
+      { name: '利润商品', type: 'bar', stack: 'sales2', itemStyle: { color: colors.profit }, data: [compareStats.salesShare.current.profit, compareStats.salesShare.compare.profit] },
+      { name: '问题商品', type: 'bar', stack: 'sales2', itemStyle: { color: colors.problem }, data: [compareStats.salesShare.current.problem, compareStats.salesShare.compare.problem] }
+    ]
+  };
+
+  barChartIns2.value.setOption(option, true);
+};
+
 const formatCell = (value: number | string | null | undefined) => {
   if (value === null || value === undefined || value === '') return '-';
   return value;
@@ -416,6 +503,7 @@ const formatCell = (value: number | string | null | undefined) => {
 const resizeCharts = () => {
   scatterChartIns.value?.resize();
   barChartIns.value?.resize();
+  barChartIns2.value?.resize();
 };
 
 onMounted(async () => {
@@ -427,6 +515,7 @@ onUnmounted(() => {
   window.removeEventListener('resize', resizeCharts);
   scatterChartIns.value?.dispose();
   barChartIns.value?.dispose();
+  barChartIns2.value?.dispose();
 });
 </script>
 
@@ -455,6 +544,11 @@ onUnmounted(() => {
   gap: 12px;
 }
 
+.page-header-left {
+  display: flex;
+  align-items: center;
+}
+
 .page-title-wrap {
   display: flex;
   align-items: center;
@@ -481,6 +575,10 @@ onUnmounted(() => {
   gap: 12px;
 }
 
+.export-btn {
+  border-radius: 8px;
+}
+
 .unit-text {
   font-size: 13px;
   color: var(--el-text-color-secondary);
@@ -497,12 +595,22 @@ onUnmounted(() => {
   height: 360px;
 }
 
+.stack-chart-wrap {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.stack-chart {
+  height: 360px;
+}
+
 .matrix-table-wrap {
   overflow-x: auto;
 }
 
 .matrix-table :deep(.el-table__header th) {
-  background: #f8fafc;
+  background: #f2f5f8;
   color: var(--el-text-color-primary);
   font-weight: 600;
 }
@@ -516,13 +624,19 @@ onUnmounted(() => {
   color: var(--el-text-color-primary);
 }
 
+.matrix-number.is-highlight {
+  color: #0f766e;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .matrix-number.is-total,
 .is-total {
   font-weight: 700;
 }
 
 .advice-header {
-  background: #f5f7fa;
+  background: #f3f4f6;
   margin: -18px -20px 0;
   padding: 14px 20px;
   border-bottom: 1px solid var(--el-border-color-light);
@@ -534,6 +648,11 @@ onUnmounted(() => {
   color: var(--el-text-color-regular);
   line-height: 1.9;
   font-size: 14px;
+}
+
+.advice-card :deep(.el-card__body) {
+  background: #f3f4f6;
+  border-radius: 10px;
 }
 
 .advice-list li + li {
