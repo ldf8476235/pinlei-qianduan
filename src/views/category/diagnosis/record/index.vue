@@ -333,13 +333,13 @@ const handleViewReport = async (row: DiagnosisRecordRow) => {
     triggerIfMissing: false,
     waitSeconds: 0
   });
-  const session = response?.data;
+  const session = response?.data?.data ?? response?.data;
   if (!session?.sessionId || !session.ready) {
     ElMessage.warning('报告尚未生成完成');
     return;
   }
   router.push({
-    path: '/category/diagnosis/detail',
+    name: 'CategoryDiagnosisDetail',
     query: {
       sessionId: session.sessionId,
       categoryId: row.classNo,

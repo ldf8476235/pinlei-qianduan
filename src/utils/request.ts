@@ -121,7 +121,8 @@ service.interceptors.response.use(
       }
     }
     // 未设置状态码则默认成功状态
-    const code = res.data.code || HttpStatus.SUCCESS;
+    const code = Number(res.data.code ?? HttpStatus.SUCCESS);
+    const isSuccess = code === 0 || code === HttpStatus.SUCCESS;
     // 获取错误信息
     const msg = errorCode[code] || res.data.msg || errorCode['default'];
     // 二进制数据则直接返回
@@ -157,7 +158,7 @@ service.interceptors.response.use(
     } else if (code === HttpStatus.WARN) {
       ElMessage({ message: msg, type: 'warning' });
       return Promise.reject(new Error(msg));
-    } else if (code !== HttpStatus.SUCCESS) {
+    } else if (!isSuccess) {
       ElNotification.error({ title: msg });
       return Promise.reject('error');
     } else {

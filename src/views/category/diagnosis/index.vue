@@ -319,7 +319,7 @@ const handleSubmit = async () => {
         triggerIfMissing: true,
         waitSeconds: 0
       });
-      const session = response?.data;
+      const session = response?.data?.data ?? response?.data;
       if (!session?.sessionId) {
         ElMessage.error('诊断会话创建失败');
         return;
@@ -332,7 +332,7 @@ const handleSubmit = async () => {
         return;
       }
       await router.push({
-        path: '/category/diagnosis/detail',
+        name: 'CategoryDiagnosisDetail',
         query: {
           sessionId: session.sessionId,
           categoryId,

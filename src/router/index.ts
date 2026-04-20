@@ -190,6 +190,31 @@ export const constantRoutes: RouteRecordRaw[] = [
         meta: { title: '品牌商品明细', activeMenu: '/category/diagnosis/detail' }
       }
     ]
+  },
+  {
+    path: '/category',
+    component: Layout,
+    hidden: true,
+    children: [
+      {
+        path: 'diagnosis',
+        component: () => import('@/views/category/diagnosis/index.vue'),
+        name: 'CategoryDiagnosis',
+        meta: { title: '品类诊断' }
+      },
+      {
+        path: 'diagnosis/record',
+        component: () => import('@/views/category/diagnosis/record/index.vue'),
+        name: 'CategoryDiagnosisRecord',
+        meta: { title: '品类诊断记录', activeMenu: '/category/diagnosis' }
+      },
+      {
+        path: 'diagnosis/detail',
+        component: () => import('@/views/category/diagnosis/detail/index.vue'),
+        name: 'CategoryDiagnosisDetail',
+        meta: { title: '品类诊断详情', activeMenu: '/category/diagnosis' }
+      }
+    ]
   }
 ];
 

@@ -31,33 +31,48 @@
     <el-row :gutter="12">
       <el-col :lg="5" :md="7" :sm="24" :xs="24">
         <el-card shadow="hover" class="left-nav-card">
-          <div class="left-module-title">纵观品类整体</div>
-          <div class="left-module-sub">掌握品类整体情况和发力点</div>
-          <div class="left-nav-list">
-            <div
-              v-for="item in mainNavList"
-              :key="item.key"
-              class="left-nav-item"
-              :class="{ active: !activeSideModule && activeMainNav === item.key }"
-              @click="handleMainNavClick(item.key)"
-            >
-              <span class="left-nav-icon">{{ item.icon }}</span>
-              <span>{{ item.label }}</span>
+          <div v-for="group in navGroups" :key="group.key" class="left-nav-group">
+            <div class="left-nav-group-header" @click="toggleGroup(group.key)">
+              <div class="left-nav-group-text">
+                <div class="left-nav-group-title">{{ group.title }}</div>
+                <div class="left-nav-group-sub">{{ group.subtitle }}</div>
+              </div>
+              <span class="left-nav-arrow" :class="{ expanded: isGroupExpanded(group.key) }">›</span>
             </div>
-          </div>
 
-          <div class="left-sub-modules">
-            <div
-              v-for="item in sideModules"
-              :key="item.key"
-              class="left-sub-item"
-              :class="{ clickable: true, active: activeSideModule === item.key }"
-              @click="handleSideModuleClick(item)"
-            >
-              <div class="left-sub-title">{{ item.title }}</div>
-              <div class="left-sub-desc">{{ item.desc }}</div>
-              <div v-if="item.extra" class="left-sub-extra">{{ item.extra }}</div>
-            </div>
+            <transition name="nav-fold">
+              <div v-show="isGroupExpanded(group.key)" class="left-nav-group-body">
+                <template v-if="group.type === 'main'">
+                  <div
+                    v-for="item in group.items"
+                    :key="item.key"
+                    class="left-nav-item"
+                    :class="{ active: !activeSideModule && activeMainNav === item.key }"
+                    @click="handleMainNavClick(item.key, group.key)"
+                  >
+                    <span class="left-nav-icon">{{ item.icon }}</span>
+                    <span>{{ item.label }}</span>
+                  </div>
+                </template>
+
+                <template v-else>
+                  <div
+                    v-for="item in group.items"
+                    :key="item.key"
+                    class="left-sub-item"
+                    :class="{ active: activeSideModule === item.key }"
+                    @click="handleSideModuleClick(item, group.key)"
+                  >
+                    <span class="left-sub-dot" />
+                    <div class="left-sub-content">
+                      <div class="left-sub-title">{{ item.title }}</div>
+                      <div class="left-sub-desc">{{ item.desc }}</div>
+                      <div v-if="item.extra" class="left-sub-extra">{{ item.extra }}</div>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </transition>
           </div>
         </el-card>
       </el-col>
@@ -161,29 +176,88 @@ const route = useRoute();
 const chartRef = ref<HTMLDivElement>();
 const chartIns = ref<echarts.ECharts>();
 const pollTimer = ref<number | null>(null);
+const NAV_STATE_KEY = 'category-diagnosis-detail-nav-state';
 
 const activeMainNav = ref('performance');
 const activeSideModule = ref('');
 const activeTrendMetric = ref('sales');
 const statusState = ref<DiagnosisSessionStatusResponse>();
 
-const mainNavList = [
-  { key: 'performance', label: '品类业绩', icon: '•' },
-  { key: 'subCategory', label: '子类贡献', icon: '•' },
-  { key: 'channel', label: '渠道业绩', icon: '•' },
-  { key: 'customer', label: '客户分析', icon: '•' }
+type NavGroupType = 'main' | 'side';
+
+interface NavGroupItem {
+  key: string;
+  label?: string;
+  icon?: string;
+  title?: string;
+  desc?: string;
+  extra?: string;
+}
+
+interface NavGroup {
+  key: string;
+  title: string;
+  subtitle: string;
+  type: NavGroupType;
+  defaultExpanded: boolean;
+  items: NavGroupItem[];
+}
+
+const navGroups: NavGroup[] = [
+  {
+    key: 'performanceGroup',
+    title: '纵观品类整体',
+    subtitle: '掌握品类整体情况和发力点',
+    type: 'main',
+    defaultExpanded: false,
+    items: [
+      { key: 'performance', label: '品类业绩', icon: '•' },
+      { key: 'subCategory', label: '子类贡献', icon: '•' },
+      { key: 'channel', label: '渠道业绩', icon: '•' },
+      { key: 'customer', label: '客户分析', icon: '•' }
+    ]
+  },
+  {
+    key: 'abnormalGroup',
+    title: '定位异常品项',
+    subtitle: '及时优化表现差单品',
+    type: 'side',
+    defaultExpanded: false,
+    items: [
+      { key: 'abcAnalysis', title: 'ABC结构分析', desc: '及时优化表现差的商品' },
+      { key: 'grossContribution', title: '毛利贡献率分析', desc: '聚焦高销低毛与低销高毛商品' },
+      { key: 'gmroiAnalysis', title: 'GMROI分析', desc: '识别低回报与高潜力商品结构' },
+      { key: 'supplierAnalysis', title: '供应商分析', desc: '识别供应商贡献与履约风险' }
+    ]
+  },
+  {
+    key: 'demandGroup',
+    title: '深究用户需求',
+    subtitle: '助力品项优化与补充',
+    type: 'side',
+    defaultExpanded: true,
+    items: [
+      { key: 'priceBandAnalysis', title: '价格带分析', desc: '洞察用户偏好价格区间' },
+      { key: 'brandAnalysis', title: '品牌分析', desc: '识别品牌表现与用户偏好' },
+      { key: 'specAnalysis', title: '规格分析', desc: '识别规格偏好与需求差异' },
+      { key: 'tagAnalysis', title: '标签分析', desc: '分析标签结构与用户偏好' }
+    ]
+  },
+  {
+    key: 'adjustGroup',
+    title: '整合调整方向',
+    subtitle: '指导品类优化与执行',
+    type: 'side',
+    defaultExpanded: false,
+    items: [
+      { key: 'summaryAnalysis', title: '整体情况总结', desc: '汇总诊断结果与核心结论' },
+      { key: 'removeGoods', title: '建议淘汰商品', desc: '识别优先优化与淘汰商品' },
+      { key: 'introduceDirection', title: '建议引品方向', desc: '输出引品与补充方向' }
+    ]
+  }
 ];
 
-const sideModules = [
-  { key: 'abcAnalysis', title: '定位异常品项', desc: '及时优化表现差的商品', extra: 'ABC结构分析' },
-  { key: 'grossContribution', title: '定位异常品项', desc: '聚焦高销低毛与低销高毛商品', extra: '毛利贡献率分析' },
-  { key: 'gmroiAnalysis', title: '定位异常品项', desc: '识别低回报与高潜力商品结构', extra: 'GMROI分析' },
-  { key: 'supplierAnalysis', title: '定位异常品项', desc: '识别供应商贡献与履约风险', extra: '供应商分析' },
-  { key: 'priceBandAnalysis', title: '深究用户需求', desc: '洞察用户偏好价格区间', extra: '价格带分析' },
-  { key: 'brandAnalysis', title: '深究用户需求', desc: '识别品牌表现与用户偏好', extra: '品牌分析' },
-  { key: 'customerNeed', title: '深究用户需求', desc: '助力品项优化与补充' },
-  { key: 'adjustDirection', title: '整合调整方向', desc: '指导品类优化与执行' }
-];
+const expandedGroupKeys = ref<string[]>([]);
 
 const embeddedMainViewMap = {
   subCategory: markRaw(SubClassView),
@@ -275,6 +349,55 @@ const activeEmbeddedComponent = computed(() => {
   }
   return null;
 });
+
+const getDefaultExpandedGroupKeys = () => navGroups.filter((group) => group.defaultExpanded).map((group) => group.key);
+
+const readNavState = () => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(NAV_STATE_KEY);
+    return raw ? (JSON.parse(raw) as { expandedGroupKeys?: string[]; activeMainNav?: string; activeSideModule?: string }) : null;
+  } catch {
+    return null;
+  }
+};
+
+const writeNavState = () => {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(
+    NAV_STATE_KEY,
+    JSON.stringify({
+      expandedGroupKeys: expandedGroupKeys.value,
+      activeMainNav: activeMainNav.value,
+      activeSideModule: activeSideModule.value
+    })
+  );
+};
+
+const syncNavState = () => {
+  const state = readNavState();
+  expandedGroupKeys.value = state?.expandedGroupKeys?.length ? state.expandedGroupKeys : getDefaultExpandedGroupKeys();
+  activeMainNav.value = state?.activeMainNav || 'performance';
+  activeSideModule.value = state?.activeSideModule || '';
+};
+
+const isGroupExpanded = (groupKey: string) => expandedGroupKeys.value.includes(groupKey);
+
+const toggleGroup = (groupKey: string) => {
+  if (isGroupExpanded(groupKey)) {
+    expandedGroupKeys.value = expandedGroupKeys.value.filter((key) => key !== groupKey);
+  } else {
+    expandedGroupKeys.value = [...expandedGroupKeys.value, groupKey];
+  }
+  writeNavState();
+};
+
+const ensureGroupExpanded = (groupKey: string) => {
+  if (!isGroupExpanded(groupKey)) {
+    expandedGroupKeys.value = [...expandedGroupKeys.value, groupKey];
+    writeNavState();
+  }
+};
 
 const statusRequest = useRequest(async (id: string) => await getDiagnosisSessionStatus(id), {
   onSuccess: (res) => {
@@ -522,13 +645,21 @@ const loadSessionState = async () => {
   schedulePolling();
 };
 
-const handleMainNavClick = async (navKey: string) => {
+const handleMainNavClick = async (navKey: string, groupKey?: string) => {
   activeSideModule.value = '';
   activeMainNav.value = navKey;
+  if (groupKey) {
+    ensureGroupExpanded(groupKey);
+  }
+  writeNavState();
 };
 
-const handleSideModuleClick = async (item: { key: string }) => {
+const handleSideModuleClick = async (item: { key: string }, groupKey?: string) => {
   activeSideModule.value = item.key;
+  if (groupKey) {
+    ensureGroupExpanded(groupKey);
+  }
+  writeNavState();
 };
 
 const handleTrendMetricChange = async (metricKey: string) => {
@@ -542,6 +673,7 @@ const handleTrendMetricChange = async (metricKey: string) => {
 const resizeChart = () => chartIns.value?.resize();
 
 onMounted(async () => {
+  syncNavState();
   await loadSessionState();
   window.addEventListener('resize', resizeChart);
 });
@@ -590,24 +722,62 @@ onBeforeUnmount(() => {
 }
 
 .left-nav-card {
-  background: #e8f8f5;
+  background: linear-gradient(180deg, #e9fbf7 0%, #f3fffc 100%);
   border: 1px solid #cfeee7;
 }
 
-.left-module-title {
+.left-nav-group {
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(15, 118, 110, 0.12);
+}
+
+.left-nav-group:last-child {
+  border-bottom: 0;
+}
+
+.left-nav-group-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+  padding: 4px 2px;
+}
+
+.left-nav-group-text {
+  min-width: 0;
+}
+
+.left-nav-group-title {
   font-size: 16px;
   font-weight: 700;
   color: #0f766e;
+  line-height: 1.3;
 }
 
-.left-module-sub {
-  font-size: 12px;
-  color: #0f766e;
+.left-nav-group-sub {
   margin-top: 4px;
+  font-size: 12px;
+  color: #8a94a6;
+  line-height: 1.4;
 }
 
-.left-nav-list {
-  margin-top: 12px;
+.left-nav-arrow {
+  flex: 0 0 auto;
+  color: #0f766e;
+  font-size: 22px;
+  line-height: 1;
+  transform: rotate(0deg);
+  transition: transform 0.22s ease, color 0.22s ease;
+  margin-top: 2px;
+}
+
+.left-nav-arrow.expanded {
+  transform: rotate(90deg);
+}
+
+.left-nav-group-body {
+  padding-top: 10px;
 }
 
 .left-nav-item {
@@ -615,7 +785,7 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
-  border-radius: 6px;
+  border-radius: 8px;
   color: #0f766e;
   cursor: pointer;
   margin-bottom: 8px;
@@ -627,36 +797,29 @@ onBeforeUnmount(() => {
 }
 
 .left-nav-item.active {
-  background: #0f766e;
-  color: #fff;
+  background: rgba(15, 118, 110, 0.12);
+  color: #0b6b64;
 }
 
 .left-nav-icon {
   font-size: 12px;
 }
 
-.left-sub-modules {
-  margin-top: 16px;
-  border-top: 1px solid #bde7df;
-  padding-top: 12px;
-}
-
 .left-sub-item {
-  padding: 8px 10px;
-  margin-bottom: 6px;
-  border-radius: 6px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px 10px 24px;
+  margin-bottom: 8px;
+  border-radius: 8px;
   background: rgba(255, 255, 255, 0.55);
-}
-
-.left-sub-item.clickable {
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
-.left-sub-item.clickable:hover {
-  transform: translateY(-1px);
-  background: rgba(255, 255, 255, 0.78);
-  box-shadow: 0 6px 14px rgba(15, 118, 110, 0.08);
+.left-sub-item:hover {
+  background: rgba(255, 255, 255, 0.82);
+  transform: translateX(1px);
 }
 
 .left-sub-item.active {
@@ -664,23 +827,59 @@ onBeforeUnmount(() => {
   box-shadow: inset 0 0 0 1px rgba(15, 118, 110, 0.18), 0 8px 18px rgba(15, 118, 110, 0.08);
 }
 
+.left-sub-dot {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #111827;
+  margin-top: 8px;
+}
+
+.left-sub-content {
+  min-width: 0;
+  flex: 1;
+}
+
 .left-sub-title {
   font-size: 14px;
-  font-weight: 600;
-  color: #0f766e;
+  font-weight: 500;
+  color: #111827;
+  line-height: 1.4;
 }
 
 .left-sub-desc {
   font-size: 12px;
-  color: #0f766e;
-  margin-top: 2px;
+  color: #8a94a6;
+  margin-top: 3px;
+  line-height: 1.4;
 }
 
 .left-sub-extra {
-  margin-top: 8px;
+  margin-top: 6px;
   font-size: 12px;
   font-weight: 600;
   color: #0f766e;
+}
+
+.nav-fold-enter-active,
+.nav-fold-leave-active {
+  overflow: hidden;
+  transition: all 0.22s ease;
+}
+
+.nav-fold-enter-from,
+.nav-fold-leave-to {
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
+.nav-fold-enter-to,
+.nav-fold-leave-from {
+  max-height: 520px;
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .placeholder-panel {
