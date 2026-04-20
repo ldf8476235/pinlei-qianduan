@@ -92,7 +92,13 @@
                   </el-tooltip>
                 </div>
                 <div class="metric-value">{{ item.currentValue }}</div>
-                <div class="metric-compare" :class="compareClass(item.compareValue)">
+                <div
+                  class="metric-compare"
+                  :class="[
+                    compareClass(item.compareValue),
+                    hiddenMetricCompareKeys.includes(item.metricKey) ? 'metric-compare--hidden' : ''
+                  ]"
+                >
                   <span class="metric-arrow">{{ compareArrow(item.compareValue) }}</span>
                   <span>{{ compareText(item.compareValue, item.compareType) }}</span>
                 </div>
@@ -108,7 +114,13 @@
                   </el-tooltip>
                 </div>
                 <div class="metric-value">{{ item.currentValue }}</div>
-                <div class="metric-compare" :class="compareClass(item.compareValue)">
+                <div
+                  class="metric-compare"
+                  :class="[
+                    compareClass(item.compareValue),
+                    hiddenMetricCompareKeys.includes(item.metricKey) ? 'metric-compare--hidden' : ''
+                  ]"
+                >
                   <span class="metric-arrow">{{ compareArrow(item.compareValue) }}</span>
                   <span>{{ compareText(item.compareValue, item.compareType) }}</span>
                 </div>
@@ -165,6 +177,7 @@ import type { DiagnosisSessionStatusResponse } from '@/api/category/diagnosis/ty
 import SubClassView from './sub-class.vue';
 import ChannelView from './channel.vue';
 import CustomerView from './customer.vue';
+import SpecView from './spec.vue';
 import AbcAnalysisView from '@/views/abc/analysis.vue';
 import GrossContributionAnalysisView from '@/views/gross-contribution/analysis.vue';
 import GmroiAnalysisView from '@/views/gmroi/analysis.vue';
@@ -263,7 +276,8 @@ const expandedGroupKeys = ref<string[]>([]);
 const embeddedMainViewMap = {
   subCategory: markRaw(SubClassView),
   channel: markRaw(ChannelView),
-  customer: markRaw(CustomerView)
+  customer: markRaw(CustomerView),
+  specAnalysis: markRaw(SpecView)
 } as const;
 
 const embeddedSideViewMap = {
@@ -456,6 +470,8 @@ const compareText = (value: number, type: string) => {
   }
   return `对比增长 ${abs.toFixed(2)}%`;
 };
+
+const hiddenMetricCompareKeys = ['sellRate', 'penetrateRate'];
 
 const formatNumber = (value: number | string | undefined, digits = 2) => {
   const n = Number(value ?? 0);
@@ -685,6 +701,19 @@ const loadSessionState = async () => {
   schedulePolling();
 };
 
+const refreshPerformanceView = async () => {
+  if (!sessionId.value) return;
+  const statusRes = await statusRequest.run(sessionId.value);
+  const current = statusRes?.data;
+  if (!current) return;
+  if (current.ready) {
+    clearPolling();
+    await loadReadyData();
+    return;
+  }
+  await loadSessionState();
+};
+
 const handleMainNavClick = async (navKey: string, groupKey?: string) => {
   activeSideModule.value = '';
   activeMainNav.value = navKey;
@@ -692,6 +721,9 @@ const handleMainNavClick = async (navKey: string, groupKey?: string) => {
     ensureGroupExpanded(groupKey);
   }
   writeNavState();
+  if (navKey === 'performance') {
+    await refreshPerformanceView();
+  }
 };
 
 const handleSideModuleClick = async (item: { key: string }, groupKey?: string) => {
@@ -997,6 +1029,10 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 4px;
   line-height: 1;
+}
+
+.metric-compare--hidden {
+  visibility: hidden;
 }
 
 .metric-compare.is-up {
