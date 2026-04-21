@@ -11,18 +11,12 @@
         <div class="page-actions">
           <el-select v-model="filters.group" class="header-select" size="small">
             <el-option label="全部" value="all" />
-            <el-option label="20岁及以下" value="0" />
-            <el-option label="21-30岁" value="1" />
-            <el-option label="31-40岁" value="2" />
-            <el-option label="41-50岁" value="3" />
-            <el-option label="51-60岁" value="4" />
-            <el-option label="61岁及以上" value="5" />
+            <el-option v-for="item in ageGroups" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
           <el-select v-model="filters.gender" class="header-select" size="small">
-            <el-option label="选择性别" value="" />
-            <el-option label="全部" value="ALL" />
-            <el-option label="男性" value="1" />
-            <el-option label="女性" value="2" />
+            <el-option label="全部性别" value="ALL" />
+            <el-option label="男" value="1" />
+            <el-option label="女" value="2" />
             <el-option label="未知" value="3" />
           </el-select>
           <span class="unit-text">金额单位：元</span>
@@ -148,6 +142,33 @@ interface RadarSeriesItem {
   value: number[];
 }
 
+const metricLabels = ['购物次数', '消费金额', '平均客单价', '平均商品单价', '平均购买件数'];
+const ageGroups = [
+  { label: '20岁及以下', value: '0' },
+  { label: '21-30岁', value: '1' },
+  { label: '31-40岁', value: '2' },
+  { label: '41-50岁', value: '3' },
+  { label: '51-60岁', value: '4' },
+  { label: '61岁及以上', value: '5' }
+];
+const ageGroupOrder = ageGroups.map((item) => item.label);
+const ageColorMap: Record<string, string> = {
+  '20岁及以下': '#3b82f6',
+  '21-30岁': '#22c55e',
+  '31-40岁': '#f59e0b',
+  '41-50岁': '#ef4444',
+  '51-60岁': '#8b5cf6',
+  '61岁及以上': '#14b8a6'
+};
+const ageLabelAliasMap: Record<string, string[]> = {
+  '20岁及以下': ['20岁及以下', '20岁以下', '20宀佸強浠ヤ笅'],
+  '21-30岁': ['21-30岁', '21-30宀?'],
+  '31-40岁': ['31-40岁', '31-40宀?'],
+  '41-50岁': ['41-50岁', '41-50宀?'],
+  '51-60岁': ['51-60岁', '51-60宀?'],
+  '61岁及以上': ['61岁及以上', '61岁以上', '61宀佸強浠ヤ笂']
+};
+
 const route = useRoute();
 const radarChartRef = ref<HTMLDivElement>();
 const radarChartIns = ref<echarts.ECharts>();
@@ -212,22 +233,25 @@ const ageRequest = useRequest(async (id: string) => await getCategoryDiagnosisCu
 });
 
 const radarRequest = useRequest(async (id: string) => await getCategoryDiagnosisCustomerRadar(id), {
-  onSuccess: (res) => {
+  onSuccess: async (res) => {
     radarRows.value = normalizeRadarRows(res?.data);
-    nextTick(renderRadarChart);
+    await nextTick();
+    renderRadarChart();
   }
 });
 
-const tableRequest = useRequest(async (id: string, page = 1, size = 10) => await getCategoryDiagnosisCustomerDetails(id, page, size, 'ageOrder', 'asc'), {
-  onSuccess: (res) => {
-    tableRows.value = normalizeTableRows(res?.data);
+const tableRequest = useRequest(
+  async (params: { id: string; page: number; size: number }) =>
+    await getCategoryDiagnosisCustomerDetails(params.id, params.page, params.size, 'ageOrder', 'asc'),
+  {
+    onSuccess: (res) => {
+      tableRows.value = normalizeTableRows(res?.data);
+    }
   }
-});
+);
 
 const radarLoading = computed(() => radarRequest.loading.value);
 const tableLoading = computed(() => tableRequest.loading.value);
-
-const metricLabels = ['购物次数', '消费金额', '平均客单价', '平均商品单价', '平均购买件数'];
 
 const getRadarDimensionValue = (item: CustomerSalesRadarItemResponse | undefined, index: number) => {
   if (!item) return 0;
@@ -241,63 +265,81 @@ const getRadarDimensionValue = (item: CustomerSalesRadarItemResponse | undefined
   return toNumber(values[index], 2);
 };
 
+const matchesGender = (item: CustomerSalesRadarItemResponse) => {
+  if (filters.gender === 'ALL') return true;
+  return String(item.gender ?? '') === String(filters.gender);
+};
+
+const matchesGroup = (ageName: string) => {
+  if (filters.group === 'all') return true;
+  const groupIndex = ageGroupOrder.indexOf(ageName);
+  return String(groupIndex) === String(filters.group);
+};
+
+const findRadarRowByAge = (ageName: string) => {
+  const aliases = ageLabelAliasMap[ageName] || [ageName];
+  return radarRows.value.find((item) => matchesGender(item) && aliases.includes(String(item.ageName || '')));
+};
+
 const renderRadarChart = () => {
   if (!radarChartRef.value) return;
-  if (!radarChartIns.value) radarChartIns.value = echarts.init(radarChartRef.value);
+  if (!radarChartIns.value) {
+    radarChartIns.value = echarts.init(radarChartRef.value);
+  }
 
-  const ageGroupOrder = ['20岁及以下', '21-30岁', '31-40岁', '41-50岁', '51-60岁', '61岁及以上'];
-  const ageColorMap: Record<string, string> = {
-    '20岁及以下': '#3b82f6',
-    '21-30岁': '#22c55e',
-    '31-40岁': '#f59e0b',
-    '41-50岁': '#ef4444',
-    '51-60岁': '#8b5cf6',
-    '61岁及以上': '#14b8a6'
-  };
-  const allRows = radarRows.value.filter((item) => item.ageCode === 'ALL' || item.ageName === '全部');
-  const chartSeries: RadarSeriesItem[] = ageGroupOrder.map((ageName) => {
-    const row = allRows.find((item) => item.ageName === ageName);
+  const chartSeries: RadarSeriesItem[] = ageGroupOrder.filter(matchesGroup).map((ageName) => {
+    const row = findRadarRowByAge(ageName);
     return {
       name: ageName,
       value: metricLabels.map((_, index) => getRadarDimensionValue(row, index))
     };
   });
 
-  radarChartIns.value.setOption({
-    tooltip: {
-      trigger: 'item',
-      formatter: (params: any) => {
-        const values = params?.value || [];
-        return `${params.name}<br/>${metricLabels.map((label: string, index: number) => `${label}：${formatAmount(values[index])}`).join('<br/>')}`;
-      }
-    },
-    legend: {
-      orient: 'vertical',
-      right: 6,
-      top: 'middle',
-      itemGap: 14,
-      icon: 'roundRect'
-    },
-    radar: {
-      center: ['40%', '55%'],
-      radius: '62%',
-      indicator: metricLabels.map((name) => ({ name, max: 100000 }))
-    },
-    series: [
-      {
-        type: 'radar',
-        symbol: 'circle',
-        symbolSize: 5,
-        data: chartSeries.map((item) => ({
-          name: item.name,
-          value: item.value,
-          lineStyle: { width: 2, color: ageColorMap[item.name] },
-          itemStyle: { color: ageColorMap[item.name] },
-          areaStyle: { opacity: 0.08, color: ageColorMap[item.name] }
-        }))
-      }
-    ]
-  } as EChartsOption);
+  const values = chartSeries.flatMap((item) => item.value);
+  const radarMax = Math.max(1, ...values);
+  const indicatorMax = Number((radarMax * 1.2).toFixed(2));
+
+  radarChartIns.value.setOption(
+    {
+      tooltip: {
+        trigger: 'item',
+        formatter: (params: any) => {
+          const currentValues = Array.isArray(params?.value) ? params.value : [];
+          return [
+            params.name,
+            ...metricLabels.map((label, index) => `${label}：${formatAmount(currentValues[index])}`)
+          ].join('<br/>');
+        }
+      },
+      legend: {
+        orient: 'vertical',
+        right: 6,
+        top: 'middle',
+        itemGap: 14,
+        icon: 'roundRect'
+      },
+      radar: {
+        center: ['40%', '55%'],
+        radius: '62%',
+        indicator: metricLabels.map((name) => ({ name, max: indicatorMax }))
+      },
+      series: [
+        {
+          type: 'radar',
+          symbol: 'circle',
+          symbolSize: 5,
+          data: chartSeries.map((item) => ({
+            name: item.name,
+            value: item.value,
+            lineStyle: { width: 2, color: ageColorMap[item.name] },
+            itemStyle: { color: ageColorMap[item.name] },
+            areaStyle: { opacity: 0.08, color: ageColorMap[item.name] }
+          }))
+        }
+      ]
+    } as EChartsOption,
+    true
+  );
 };
 
 const displayRows = computed(() => {
@@ -315,12 +357,13 @@ const loadPageData = async () => {
   await Promise.all([
     ageRequest.run(sessionId.value),
     radarRequest.run(sessionId.value),
-    tableRequest.run(sessionId.value, pageState.page, pageState.size)
+    tableRequest.run({ id: sessionId.value, page: pageState.page, size: pageState.size })
   ]);
 };
 
 const handlePageChange = async () => {
-  await tableRequest.run(sessionId.value, pageState.page, pageState.size);
+  if (!sessionId.value) return;
+  await tableRequest.run({ id: sessionId.value, page: pageState.page, size: pageState.size });
 };
 
 const handleExport = () => {
@@ -335,6 +378,13 @@ onMounted(async () => {
   await loadPageData();
   window.addEventListener('resize', resizeCharts);
 });
+
+watch(
+  () => [filters.group, filters.gender],
+  () => {
+    renderRadarChart();
+  }
+);
 
 watch(
   () => route.query.sessionId,

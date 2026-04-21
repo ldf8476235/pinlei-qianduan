@@ -20,10 +20,16 @@ import {
   TagSalesPerResponse,
   TagTypeGroupResponse
 } from './types';
+import type {
+  AllClassCheckListRequest,
+  AllClassCheckRequest as LegacyAllClassCheckRequest,
+  AllClassCheckSalesChangeResponse as LegacyAllClassCheckSalesChangeResponse,
+  AllClassCheckScatterResponse as LegacyAllClassCheckScatterResponse,
+  AllClassCheckSkuDifferResponse as LegacyAllClassCheckSkuDifferResponse,
+  AllClassCheckSkuResponse as LegacyAllClassCheckSkuResponse
+} from './all-class-check-types';
 
-export const getCategoryDiagnosisDetailSummary = (
-  sessionId: string
-): AxiosPromise<DiagnosisApiResponse<DiagnosisOverviewResponse>> => {
+export const getCategoryDiagnosisDetailSummary = (sessionId: string): AxiosPromise<DiagnosisApiResponse<DiagnosisOverviewResponse>> => {
   return request({
     url: '/api/v1/diagnosis/overview',
     method: 'get',
@@ -77,9 +83,7 @@ export const getCategoryDiagnosisSubClassTable = (
   });
 };
 
-export const getCategoryDiagnosisChannelPie = (
-  sessionId: string
-): AxiosPromise<DiagnosisApiResponse<ChannelSalesPieItemResponse[]>> => {
+export const getCategoryDiagnosisChannelPie = (sessionId: string): AxiosPromise<DiagnosisApiResponse<ChannelSalesPieItemResponse[]>> => {
   return request({
     url: '/api/v1/channel-performance/pie',
     method: 'get',
@@ -87,9 +91,7 @@ export const getCategoryDiagnosisChannelPie = (
   });
 };
 
-export const getCategoryDiagnosisChannelTrend = (
-  sessionId: string
-): AxiosPromise<DiagnosisApiResponse<ChannelSalesTrendResponse>> => {
+export const getCategoryDiagnosisChannelTrend = (sessionId: string): AxiosPromise<DiagnosisApiResponse<ChannelSalesTrendResponse>> => {
   return request({
     url: '/api/v1/channel-performance/trend',
     method: 'get',
@@ -97,9 +99,7 @@ export const getCategoryDiagnosisChannelTrend = (
   });
 };
 
-export const getCategoryDiagnosisChannelTable = (
-  sessionId: string
-): AxiosPromise<DiagnosisApiResponse<ChannelSalesDetailsResponse>> => {
+export const getCategoryDiagnosisChannelTable = (sessionId: string): AxiosPromise<DiagnosisApiResponse<ChannelSalesDetailsResponse>> => {
   return request({
     url: '/api/v1/channel-performance/details',
     method: 'get',
@@ -107,9 +107,7 @@ export const getCategoryDiagnosisChannelTable = (
   });
 };
 
-export const getCategoryDiagnosisCustomerAgeBuckets = (
-  sessionId: string
-): AxiosPromise<DiagnosisApiResponse<CustomerAgeBucketResponse[]>> => {
+export const getCategoryDiagnosisCustomerAgeBuckets = (sessionId: string): AxiosPromise<DiagnosisApiResponse<CustomerAgeBucketResponse[]>> => {
   return request({
     url: '/api/v1/customer-analysis/ages',
     method: 'get',
@@ -117,9 +115,7 @@ export const getCategoryDiagnosisCustomerAgeBuckets = (
   });
 };
 
-export const getCategoryDiagnosisCustomerRadar = (
-  sessionId: string
-): AxiosPromise<DiagnosisApiResponse<CustomerSalesRadarItemResponse[]>> => {
+export const getCategoryDiagnosisCustomerRadar = (sessionId: string): AxiosPromise<DiagnosisApiResponse<CustomerSalesRadarItemResponse[]>> => {
   return request({
     url: '/api/v1/customer-analysis/radar',
     method: 'get',
@@ -141,9 +137,7 @@ export const getCategoryDiagnosisCustomerDetails = (
   });
 };
 
-export const getCategoryDiagnosisTagTypes = (
-  sessionId: string
-): AxiosPromise<DiagnosisApiResponse<TagTypeGroupResponse[]>> => {
+export const getCategoryDiagnosisTagTypes = (sessionId: string): AxiosPromise<DiagnosisApiResponse<TagTypeGroupResponse[]>> => {
   return request({
     url: '/api/v1/tag-analysis/types',
     method: 'get',
@@ -151,10 +145,7 @@ export const getCategoryDiagnosisTagTypes = (
   });
 };
 
-export const getCategoryDiagnosisTagSalesShare = (
-  sessionId: string,
-  tagType: string
-): AxiosPromise<DiagnosisApiResponse<TagSalesPerResponse>> => {
+export const getCategoryDiagnosisTagSalesShare = (sessionId: string, tagType: string): AxiosPromise<DiagnosisApiResponse<TagSalesPerResponse>> => {
   return request({
     url: '/api/v1/tag-analysis/sales-share',
     method: 'get',
@@ -178,6 +169,49 @@ export const getCategoryDiagnosisTagList = (
   });
 };
 
+export const getAllClassCheckSalesChange = (
+  data: AllClassCheckListRequest
+): AxiosPromise<DiagnosisApiResponse<LegacyAllClassCheckSalesChangeResponse>> => {
+  return request({
+    url: '/salesStoreClass/classSalesChange',
+    method: 'post',
+    data
+  });
+};
+
+export const getAllClassCheckScatter = (data: LegacyAllClassCheckRequest): AxiosPromise<DiagnosisApiResponse<LegacyAllClassCheckScatterResponse>> => {
+  return request({
+    url: '/salesStoreClass/allClassCheck',
+    method: 'post',
+    data
+  });
+};
+
+export const getAllClassCheckSku = (data: LegacyAllClassCheckRequest): AxiosPromise<DiagnosisApiResponse<LegacyAllClassCheckSkuResponse>> => {
+  return request({
+    url: '/salesStoreClass/findClassSku',
+    method: 'post',
+    data
+  });
+};
+
+export const getAllClassCheckSkuDiffer = (
+  data: LegacyAllClassCheckRequest
+): AxiosPromise<DiagnosisApiResponse<LegacyAllClassCheckSkuDifferResponse>> => {
+  return request({
+    url: '/salesStoreClass/findClassSkuDiffer',
+    method: 'post',
+    data
+  });
+};
+
+export const getAllClassCheckRoleTypes = (): AxiosPromise<DiagnosisApiResponse<any>> => {
+  return request({
+    url: '/api/dict/findClassTreeRoleType',
+    method: 'get'
+  });
+};
+
 export default {
   getCategoryDiagnosisDetailSummary,
   getCategoryDiagnosisDetailTrend,
@@ -192,5 +226,10 @@ export default {
   getCategoryDiagnosisCustomerDetails,
   getCategoryDiagnosisTagTypes,
   getCategoryDiagnosisTagSalesShare,
-  getCategoryDiagnosisTagList
+  getCategoryDiagnosisTagList,
+  getAllClassCheckSalesChange,
+  getAllClassCheckScatter,
+  getAllClassCheckSku,
+  getAllClassCheckSkuDiffer,
+  getAllClassCheckRoleTypes
 };

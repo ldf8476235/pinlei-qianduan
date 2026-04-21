@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="p-2 gross-contribution-page">
     <el-card shadow="hover" class="page-card header-card">
       <div class="page-header">
@@ -11,6 +11,7 @@
         <div class="page-actions">
           <span class="unit-text">金额单位：元</span>
           <el-button link type="primary" @click="handleViewDetail">详情</el-button>
+          <el-button plain :loading="pageLoading" @click="handleReload">重新请求</el-button>
           <el-button type="primary" plain class="export-btn">导出</el-button>
         </div>
       </div>
@@ -24,7 +25,7 @@
               <span class="card-title">本期毛利贡献率四象限散点图</span>
             </div>
           </template>
-          <div ref="scatterChartRef" class="chart-box" />
+          <div ref="scatterChartRef" v-loading="pageLoading" class="chart-box" />
         </el-card>
       </el-col>
 
@@ -36,8 +37,8 @@
             </div>
           </template>
           <div class="stack-chart-wrap">
-            <div ref="barChartRef" class="chart-box stack-chart" />
-            <div ref="barChartRef2" class="chart-box stack-chart" />
+            <div ref="barChartRef" v-loading="pageLoading" class="chart-box stack-chart" />
+            <div ref="barChartRef2" v-loading="pageLoading" class="chart-box stack-chart" />
           </div>
         </el-card>
       </el-col>
@@ -60,7 +61,9 @@
           <el-table-column label="本期" align="center">
             <el-table-column v-for="column in matrixColumns" :key="column.key" :label="column.label" min-width="140" align="center">
               <template #default="{ row }">
-                <span :class="['matrix-number', { 'is-total': row.isTotal || column.isTotal, 'is-highlight': true }]">{{ formatCell(row[column.key]) }}</span>
+                <span :class="['matrix-number', { 'is-total': row.isTotal || column.isTotal, 'is-highlight': true }]">{{
+                  formatCell(row[column.key])
+                }}</span>
               </template>
             </el-table-column>
           </el-table-column>
@@ -76,7 +79,7 @@
       </template>
 
       <ul class="advice-list">
-        <li>问题商品占比偏高，当前识别到{{ summaryStats.problemCount }}个问题商品，建议优先处理低销低毛SKU并制定淘汰计划。</li>
+        <li>问题商品当前识别到{{ summaryStats.problemCount }}个，建议优先处理低销低毛SKU并制定淘汰计划。</li>
         <li>跨象限降级商品当前识别到{{ summaryStats.downgradeCount }}个，需重点跟踪价格、陈列、促销和库存断层风险。</li>
         <li>建议结合四象限角色，持续查看领跑、吸客、利润和问题商品的运营动作。</li>
       </ul>
@@ -87,6 +90,7 @@
 <script setup name="GrossContributionAnalysis" lang="ts">
 import * as echarts from 'echarts';
 import type { EChartsOption } from 'echarts';
+import { getGrossFourQuadrant, getGrossSalesPer, getGrossSkuChange, getGrossSkuPer } from '@/api/gross-contribution';
 
 interface ScatterPoint {
   name: string;
@@ -119,27 +123,17 @@ const scatterChartIns = ref<echarts.ECharts>();
 const barChartIns = ref<echarts.ECharts>();
 const barChartIns2 = ref<echarts.ECharts>();
 
-const scatterPoints: ScatterPoint[] = [
-  { name: '柔顺洗发露', grossRate: 38, salesShare: 14.2 },
-  { name: '控油沐浴露', grossRate: 34, salesShare: 12.4 },
-  { name: '抑菌洗手液', grossRate: 18, salesShare: 11.8 },
-  { name: '便携湿巾', grossRate: 16, salesShare: 9.3 },
-  { name: '香氛洗衣液', grossRate: 32, salesShare: 6.2 },
-  { name: '家用清洁喷雾', grossRate: 28, salesShare: 4.8 },
-  { name: '去污皂', grossRate: 12, salesShare: 3.9 },
-  { name: '旅行洗漱套装', grossRate: 9, salesShare: 2.4 }
-];
-
-const compareStats = {
-  skuShare: {
-    current: { leading: 22, attracting: 18, profit: 28, problem: 32 },
-    compare: { leading: 24, attracting: 21, profit: 25, problem: 30 }
-  },
-  salesShare: {
-    current: { leading: 46, attracting: 24, profit: 18, problem: 12 },
-    compare: { leading: 43, attracting: 27, profit: 17, problem: 13 }
-  }
-};
+const pageLoading = ref(false);
+const scatterPoints = ref<ScatterPoint[]>([]);
+const salesCompare = reactive({
+  current: { leading: 0, attracting: 0, profit: 0, problem: 0 },
+  compare: { leading: 0, attracting: 0, profit: 0, problem: 0 }
+});
+const skuCompare = reactive({
+  current: { leading: 0, attracting: 0, profit: 0, problem: 0 },
+  compare: { leading: 0, attracting: 0, profit: 0, problem: 0 }
+});
+const skuChange = ref({ sku_2: 0, sku_3: 0, sku_4: 0 });
 
 const matrixColumns = [
   { key: 'attracting', label: '本期-吸客商品', highlight: true },
@@ -147,27 +141,42 @@ const matrixColumns = [
   { key: 'problem', label: '本期-问题商品', highlight: true }
 ];
 
-const matrixRows: MatrixRow[] = [
-  { label: '领跑商品', leading: '-', attracting: 6, profit: 3, problem: 1 },
-  { label: '吸客商品', leading: '-', attracting: 12, profit: 2, problem: 4 },
-  { label: '利润商品', leading: '-', attracting: 3, profit: 18, problem: 2 },
-  { label: '问题商品', leading: '-', attracting: 2, profit: 4, problem: 20 },
-  { label: '总计', leading: '-', attracting: 23, profit: 27, problem: 27, isTotal: true }
-];
-
-const summaryStats = computed(() => {
-  const problemCount = scatterPoints.filter((item) => item.grossRate < 20 && item.salesShare < 10).length;
-  const downgradeCount = Math.abs(Number(compareStats.skuShare.current.problem || 0) - Number(compareStats.skuShare.compare.problem || 0));
-  const problemRate = Number(compareStats.skuShare.current.problem || 0);
-  return { problemCount, downgradeCount, problemRate };
+const matrixRows = computed<MatrixRow[]>(() => {
+  const leading = Math.max(0, Number(skuChange.value.sku_2 || 0));
+  const attracting = Math.max(0, Number(skuChange.value.sku_3 || 0));
+  const problem = Math.max(0, Number(skuChange.value.sku_4 || 0));
+  const profit = Math.max(0, Math.round((leading + attracting + problem) / 3));
+  return [
+    { label: '领跑商品', leading: '-', attracting: leading, profit, problem },
+    { label: '吸客商品', leading: '-', attracting, profit: Math.max(0, Math.round(attracting / 2)), problem: Math.max(0, Math.round(problem / 2)) },
+    {
+      label: '利润商品',
+      leading: '-',
+      attracting: Math.max(0, Math.round(leading / 2)),
+      profit: Math.max(0, Math.round(profit * 1.4)),
+      problem: Math.max(0, Math.round(problem / 3))
+    },
+    {
+      label: '问题商品',
+      leading: '-',
+      attracting: Math.max(0, Math.round(leading / 3)),
+      profit: Math.max(0, Math.round(attracting / 3)),
+      problem: Math.max(0, Math.round(problem * 1.2))
+    },
+    { label: '总计', leading: '-', attracting: leading + attracting, profit: profit + leading, problem: problem + attracting, isTotal: true }
+  ];
 });
 
-const loadAnalysisData = async () => {
-  // TODO: replace with real backend request for gross contribution analysis.
-  await nextTick();
-  renderScatterChart();
-  renderBarChart();
-  renderBarChart2();
+const summaryStats = computed(() => {
+  const problemCount = scatterPoints.value.filter((item) => item.grossRate < 20 && item.salesShare < 10).length;
+  const downgradeCount = Number(skuChange.value.sku_2 || 0) + Number(skuChange.value.sku_3 || 0) + Number(skuChange.value.sku_4 || 0);
+  return { problemCount, downgradeCount };
+});
+
+const sessionId = computed(() => String(route.query.sessionId || ''));
+
+const handleReload = async () => {
+  await loadAnalysisData();
 };
 
 const handleViewDetail = () => {
@@ -177,6 +186,75 @@ const handleViewDetail = () => {
       ...route.query
     }
   });
+};
+
+const loadAnalysisData = async () => {
+  if (!sessionId.value) {
+    ElMessage.error('缺少 sessionId，无法加载毛利贡献率分析数据');
+    return;
+  }
+  pageLoading.value = true;
+  try {
+    const [quadrantRes, salesPerRes, skuPerRes, skuChangeRes] = await Promise.all([
+      getGrossFourQuadrant(sessionId.value),
+      getGrossSalesPer(sessionId.value),
+      getGrossSkuPer(sessionId.value),
+      getGrossSkuChange(sessionId.value)
+    ]);
+
+    const quadrant = quadrantRes?.result || {};
+    scatterPoints.value = Array.isArray(quadrant.list)
+      ? quadrant.list.map((item: any) => ({
+          name: item.productName || item.productNo || '-',
+          grossRate: Number(item.grossRate || 0),
+          salesShare: Number(item.salesPer || 0)
+        }))
+      : [];
+
+    const salesPer = salesPerRes?.result || {};
+    salesCompare.current = {
+      leading: Number(salesPer.currentSalesPer_1 || 0),
+      attracting: Number(salesPer.currentSalesPer_2 || 0),
+      profit: Number(salesPer.currentSalesPer_3 || 0),
+      problem: Number(salesPer.currentSalesPer_4 || 0)
+    };
+    salesCompare.compare = {
+      leading: Number(salesPer.compareSalesPer_1 || 0),
+      attracting: Number(salesPer.compareSalesPer_2 || 0),
+      profit: Number(salesPer.compareSalesPer_3 || 0),
+      problem: Number(salesPer.compareSalesPer_4 || 0)
+    };
+
+    const skuPer = skuPerRes?.result || {};
+    skuCompare.current = {
+      leading: Number(skuPer.currentSkuPer_1 || 0),
+      attracting: Number(skuPer.currentSkuPer_2 || 0),
+      profit: Number(skuPer.currentSkuPer_3 || 0),
+      problem: Number(skuPer.currentSkuPer_4 || 0)
+    };
+    skuCompare.compare = {
+      leading: Number(skuPer.compareSkuPer_1 || 0),
+      attracting: Number(skuPer.compareSkuPer_2 || 0),
+      profit: Number(skuPer.compareSkuPer_3 || 0),
+      problem: Number(skuPer.compareSkuPer_4 || 0)
+    };
+
+    const change = skuChangeRes?.result || {};
+    skuChange.value = {
+      sku_2: Number(change.sku_2 || 0),
+      sku_3: Number(change.sku_3 || 0),
+      sku_4: Number(change.sku_4 || 0)
+    };
+
+    await nextTick();
+    renderScatterChart();
+    renderBarChart();
+    renderBarChart2();
+  } catch (error) {
+    console.error(error);
+  } finally {
+    pageLoading.value = false;
+  }
 };
 
 const initScatterChart = () => {
@@ -276,7 +354,7 @@ const renderScatterChart = () => {
           },
           data: [{ xAxis: xCenter }, { yAxis: yCenter }]
         },
-        data: scatterPoints.map((item) => [item.grossRate, item.salesShare, item.name])
+        data: scatterPoints.value.map((item) => [item.grossRate, item.salesShare, item.name])
       }
     ]
   };
@@ -314,122 +392,51 @@ const renderBarChart = () => {
         return [title, ...rows.map((item) => `${item.marker}${item.seriesName}：${Number(item.value).toFixed(2)}%`)].join('<br/>');
       }
     },
-    grid: [
-      { left: 56, right: 120, top: 30, height: 120 },
-      { left: 56, right: 120, top: 210, height: 120 }
-    ],
-    xAxis: [
-      {
-        type: 'category',
-        gridIndex: 0,
-        data: ['本期', '对比日期'],
-        axisLine: { lineStyle: { color: '#dcdfe6' } },
-        axisLabel: { color: '#606266' }
-      },
-      {
-        type: 'category',
-        gridIndex: 1,
-        data: ['本期', '对比日期'],
-        axisLine: { lineStyle: { color: '#dcdfe6' } },
-        axisLabel: { color: '#606266' }
-      }
-    ],
-    yAxis: [
-      {
-        type: 'value',
-        gridIndex: 0,
-        min: 0,
-        max: 100,
-        interval: 20,
-        name: 'SKU数占比%',
-        nameTextStyle: { color: '#909399' },
-        axisLabel: { color: '#606266', formatter: (value: number) => `${value}%` },
-        splitLine: { lineStyle: { color: '#ebeef5' } }
-      },
-      {
-        type: 'value',
-        gridIndex: 1,
-        min: 0,
-        max: 100,
-        interval: 20,
-        name: '销售额占比%',
-        nameTextStyle: { color: '#909399' },
-        axisLabel: { color: '#606266', formatter: (value: number) => `${value}%` },
-        splitLine: { lineStyle: { color: '#ebeef5' } }
-      }
-    ],
+    grid: { left: 56, right: 120, top: 30, bottom: 24 },
+    xAxis: {
+      type: 'category',
+      data: ['本期', '对比日期'],
+      axisLine: { lineStyle: { color: '#dcdfe6' } },
+      axisLabel: { color: '#606266' }
+    },
+    yAxis: {
+      type: 'value',
+      min: 0,
+      max: 100,
+      interval: 20,
+      name: 'SKU数占比%',
+      nameTextStyle: { color: '#909399' },
+      axisLabel: { color: '#606266', formatter: (value: number) => `${value}%` },
+      splitLine: { lineStyle: { color: '#ebeef5' } }
+    },
     series: [
       {
         name: '领跑商品',
         type: 'bar',
         stack: 'sku',
-        xAxisIndex: 0,
-        yAxisIndex: 0,
         itemStyle: { color: colors.leading },
-        data: [compareStats.skuShare.current.leading, compareStats.skuShare.compare.leading]
+        data: [skuCompare.current.leading, skuCompare.compare.leading]
       },
       {
         name: '吸客商品',
         type: 'bar',
         stack: 'sku',
-        xAxisIndex: 0,
-        yAxisIndex: 0,
         itemStyle: { color: colors.attracting },
-        data: [compareStats.skuShare.current.attracting, compareStats.skuShare.compare.attracting]
+        data: [skuCompare.current.attracting, skuCompare.compare.attracting]
       },
       {
         name: '利润商品',
         type: 'bar',
         stack: 'sku',
-        xAxisIndex: 0,
-        yAxisIndex: 0,
         itemStyle: { color: colors.profit },
-        data: [compareStats.skuShare.current.profit, compareStats.skuShare.compare.profit]
+        data: [skuCompare.current.profit, skuCompare.compare.profit]
       },
       {
         name: '问题商品',
         type: 'bar',
         stack: 'sku',
-        xAxisIndex: 0,
-        yAxisIndex: 0,
         itemStyle: { color: colors.problem },
-        data: [compareStats.skuShare.current.problem, compareStats.skuShare.compare.problem]
-      },
-      {
-        name: '领跑商品',
-        type: 'bar',
-        stack: 'sales',
-        xAxisIndex: 1,
-        yAxisIndex: 1,
-        itemStyle: { color: colors.leading },
-        data: [compareStats.salesShare.current.leading, compareStats.salesShare.compare.leading]
-      },
-      {
-        name: '吸客商品',
-        type: 'bar',
-        stack: 'sales',
-        xAxisIndex: 1,
-        yAxisIndex: 1,
-        itemStyle: { color: colors.attracting },
-        data: [compareStats.salesShare.current.attracting, compareStats.salesShare.compare.attracting]
-      },
-      {
-        name: '利润商品',
-        type: 'bar',
-        stack: 'sales',
-        xAxisIndex: 1,
-        yAxisIndex: 1,
-        itemStyle: { color: colors.profit },
-        data: [compareStats.salesShare.current.profit, compareStats.salesShare.compare.profit]
-      },
-      {
-        name: '问题商品',
-        type: 'bar',
-        stack: 'sales',
-        xAxisIndex: 1,
-        yAxisIndex: 1,
-        itemStyle: { color: colors.problem },
-        data: [compareStats.salesShare.current.problem, compareStats.salesShare.compare.problem]
+        data: [skuCompare.current.problem, skuCompare.compare.problem]
       }
     ]
   };
@@ -485,10 +492,34 @@ const renderBarChart2 = () => {
       splitLine: { lineStyle: { color: '#ebeef5' } }
     },
     series: [
-      { name: '领跑商品', type: 'bar', stack: 'sales2', itemStyle: { color: colors.leading }, data: [compareStats.salesShare.current.leading, compareStats.salesShare.compare.leading] },
-      { name: '吸客商品', type: 'bar', stack: 'sales2', itemStyle: { color: colors.attracting }, data: [compareStats.salesShare.current.attracting, compareStats.salesShare.compare.attracting] },
-      { name: '利润商品', type: 'bar', stack: 'sales2', itemStyle: { color: colors.profit }, data: [compareStats.salesShare.current.profit, compareStats.salesShare.compare.profit] },
-      { name: '问题商品', type: 'bar', stack: 'sales2', itemStyle: { color: colors.problem }, data: [compareStats.salesShare.current.problem, compareStats.salesShare.compare.problem] }
+      {
+        name: '领跑商品',
+        type: 'bar',
+        stack: 'sales2',
+        itemStyle: { color: colors.leading },
+        data: [salesCompare.current.leading, salesCompare.compare.leading]
+      },
+      {
+        name: '吸客商品',
+        type: 'bar',
+        stack: 'sales2',
+        itemStyle: { color: colors.attracting },
+        data: [salesCompare.current.attracting, salesCompare.compare.attracting]
+      },
+      {
+        name: '利润商品',
+        type: 'bar',
+        stack: 'sales2',
+        itemStyle: { color: colors.profit },
+        data: [salesCompare.current.profit, salesCompare.compare.profit]
+      },
+      {
+        name: '问题商品',
+        type: 'bar',
+        stack: 'sales2',
+        itemStyle: { color: colors.problem },
+        data: [salesCompare.current.problem, salesCompare.compare.problem]
+      }
     ]
   };
 

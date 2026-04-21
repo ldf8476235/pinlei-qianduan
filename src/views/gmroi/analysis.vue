@@ -230,9 +230,9 @@ const loadData = async () => {
       getGmroiSkuChange(sessionId.value)
     ]);
     statusState.value = statusRes.data;
-    quadrantState.value = quadrantRes.data.result || { list: [] };
-    skuNumState.value = skuNumRes.data.result || {};
-    skuPerState.value = skuPerRes.data.result || {};
+    quadrantState.value = quadrantRes.result || { list: [] };
+    skuNumState.value = skuNumRes.result || {};
+    skuPerState.value = skuPerRes.result || {};
     void skuChangeRes;
     await nextTick();
     renderScatter();

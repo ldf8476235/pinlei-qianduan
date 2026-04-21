@@ -5,472 +5,398 @@
         <div class="page-title-wrap">
           <span class="page-title-line" />
           <span class="page-title">价格带分析</span>
+          <el-button link type="primary" class="detail-link" @click="handleViewDetail">详情 &gt;</el-button>
         </div>
         <div class="page-actions">
-          <el-button link type="primary" @click="handleViewDetail">详情</el-button>
           <span class="unit-text">金额单位：元</span>
-          <el-button link type="primary" @click="settingVisible = true">价格区间设置</el-button>
+          <el-button type="primary" plain class="setting-btn" @click="handlePriceSetting">价格区间设置</el-button>
         </div>
       </div>
     </el-card>
 
-    <el-row :gutter="12" class="chart-row">
-      <el-col :lg="18" :md="24" :sm="24" :xs="24">
-        <el-card shadow="hover" class="page-card chart-card" v-loading="pageLoading">
-          <template #header>
-            <div class="card-header">
-              <span class="card-title">价格带分布图</span>
-            </div>
-          </template>
-          <div ref="chartRef" class="chart-box large-chart" />
-        </el-card>
-      </el-col>
-      <el-col :lg="6" :md="24" :sm="24" :xs="24">
-        <el-card shadow="hover" class="page-card stat-card" v-loading="pageLoading">
-          <template #header>
-            <div class="card-header">
-              <span class="card-title">统计概览</span>
-            </div>
-          </template>
-          <div class="stat-list">
-            <div class="stat-item">
-              <div class="stat-label">价格带(PZ)区间范围</div>
-              <div class="stat-value">{{ statisticsInfo.pzRanges }}</div>
-            </div>
-            <div class="stat-item">
-              <div class="stat-label">价格线(PL)总数</div>
-              <div class="stat-value">{{ formatNumber(statisticsInfo.plTotal, 0) }}</div>
-            </div>
-            <div class="stat-item">
-              <div class="stat-label">价格点(PP)明细</div>
-              <div class="stat-value">{{ statisticsInfo.ppDetails }}</div>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-    </el-row>
-
-    <el-card shadow="hover" class="page-card table-card" v-loading="pageLoading">
+    <el-card shadow="hover" class="page-card chart-card" v-loading="loading">
       <template #header>
         <div class="card-header">
-          <span class="card-title">价格区间明细</span>
+          <span class="card-title">价格带分布图</span>
         </div>
       </template>
 
-      <el-table :data="tableRows" border stripe class="price-table">
-        <el-table-column label="价格区间" prop="priceRange" min-width="120" fixed="left" align="left" sortable show-overflow-tooltip />
-        <el-table-column label="SKU数量" min-width="110" align="right" sortable :sort-method="sortNumber('skuCount')">
-          <template #default="{ row }"><span :class="{ 'is-total': row.isTotal }">{{ formatNumber(row.skuCount, 0) }}</span></template>
-        </el-table-column>
-        <el-table-column label="SKU占比" min-width="110" align="right" sortable :sort-method="sortNumber('skuShare')">
-          <template #default="{ row }"><span :class="{ 'is-total': row.isTotal }">{{ formatPercent(row.skuShare) }}</span></template>
-        </el-table-column>
-        <el-table-column label="销售量" min-width="110" align="right" sortable :sort-method="sortNumber('saleQty')">
-          <template #default="{ row }"><span :class="{ 'is-total': row.isTotal }">{{ formatNumber(row.saleQty, 0) }}</span></template>
-        </el-table-column>
-        <el-table-column label="销售量占比" min-width="120" align="right" sortable :sort-method="sortNumber('saleQtyShare')">
-          <template #default="{ row }"><span :class="{ 'is-total': row.isTotal }">{{ formatPercent(row.saleQtyShare) }}</span></template>
-        </el-table-column>
-        <el-table-column label="单品平均" min-width="110" align="right" sortable :sort-method="sortNumber('avgSaleQty')">
-          <template #default="{ row }"><span :class="{ 'is-total': row.isTotal }">{{ formatNumber(row.avgSaleQty) }}</span></template>
-        </el-table-column>
-        <el-table-column label="销售额" min-width="130" align="right" sortable :sort-method="sortNumber('saleAmount')">
-          <template #default="{ row }"><span :class="{ 'is-total': row.isTotal }">{{ formatAmount(row.saleAmount) }}</span></template>
-        </el-table-column>
-        <el-table-column label="销售额占比" min-width="120" align="right" sortable :sort-method="sortNumber('saleAmountShare')">
-          <template #default="{ row }"><span :class="{ 'is-total': row.isTotal }">{{ formatPercent(row.saleAmountShare) }}</span></template>
-        </el-table-column>
-        <el-table-column label="促销SKU" min-width="110" align="right" sortable :sort-method="sortNumber('promotionSku')">
-          <template #default="{ row }"><span :class="{ 'is-total': row.isTotal }">{{ formatNumber(row.promotionSku, 0) }}</span></template>
-        </el-table-column>
-        <el-table-column label="建议SKU" min-width="110" align="right" sortable :sort-method="sortNumber('suggestSku')">
-          <template #default="{ row }"><span :class="{ 'is-total': row.isTotal }">{{ formatNumber(row.suggestSku, 0) }}</span></template>
-        </el-table-column>
-        <el-table-column label="建议SKU占比" min-width="120" align="right" sortable :sort-method="sortNumber('suggestSkuShare')">
-          <template #default="{ row }"><span :class="{ 'is-total': row.isTotal }">{{ formatPercent(row.suggestSkuShare) }}</span></template>
-        </el-table-column>
-      </el-table>
-    </el-card>
-
-    <el-card shadow="hover" class="page-card advice-card">
-      <template #header>
-        <div class="advice-header">
-          <span class="card-title">总结与建议</span>
-        </div>
-      </template>
-      <ul class="advice-list">
-        <li><strong>价格点偏好建议：</strong> 10-29.9 元价格带是当前用户偏好最明显的成交区间，建议优先保障核心价格点不断货并提升主推权重。</li>
-        <li><strong>区间铺货建议：</strong> 对高销量高销售额但 SKU 覆盖不足的中价位带，可适度补充相邻价格点商品，完善区间梯度。</li>
-        <li><strong>SKU优化建议：</strong> 对高价带和低价带中销售贡献较低且 SKU 占比偏高的区间，建议压缩冗余 SKU，优化结构效率。</li>
-        <li><strong>陈列调整建议：</strong> 陈列资源建议向核心价格带倾斜，系统建议 SKU 配置可作为门店优化和品项调整的参考依据。</li>
-      </ul>
-    </el-card>
-
-    <el-dialog v-model="settingVisible" title="价格区间设置" width="760px" destroy-on-close>
-      <el-form :model="generatorForm" inline class="generator-form">
-        <el-form-item label="起始价格">
-          <el-input-number v-model="generatorForm.startPrice" :min="0" :precision="2" :step="1" controls-position="right" />
-        </el-form-item>
-        <el-form-item label="结束价格">
-          <el-input-number v-model="generatorForm.endPrice" :min="0" :precision="2" :step="1" controls-position="right" />
-        </el-form-item>
-        <el-form-item label="步长">
-          <el-input-number v-model="generatorForm.step" :min="0.01" :precision="2" :step="1" controls-position="right" />
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" @click="handleGenerateRanges">生成区间</el-button>
-        </el-form-item>
-      </el-form>
-
-      <el-table :data="rangeList" border stripe class="range-table">
-        <el-table-column label="区间开始值(不包含)" min-width="220" align="center">
-          <template #default="{ row }">
-            <el-input-number v-model="row.start" :min="0" :precision="2" :step="1" controls-position="right" class="range-input" />
-          </template>
-        </el-table-column>
-        <el-table-column label="区间结束值(包含)" min-width="220" align="center">
-          <template #default="{ row }">
-            <el-input-number v-model="row.end" :min="0" :precision="2" :step="1" controls-position="right" class="range-input" />
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="120" align="center">
-          <template #default="{ $index }">
-            <el-button link type="danger" @click="handleDeleteRange($index)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <template #footer>
-        <div class="dialog-footer">
-          <el-button @click="handleAddRange">+新增区间</el-button>
-          <div class="dialog-footer-right">
-            <el-button @click="settingVisible = false">取消</el-button>
-            <el-button type="primary" @click="handleSaveSetting">确定</el-button>
+      <div class="chart-panel">
+        <div ref="chartRef" class="chart-box large-chart" />
+        <div class="chart-side-info">
+          <div class="info-block">
+            <div class="info-label">价格带(PZ)</div>
+            <div class="info-value">{{ priceRangeText }}</div>
+          </div>
+          <div class="info-block">
+            <div class="info-label">价格线(PL)</div>
+            <div class="info-value">{{ priceLineNum }}</div>
+          </div>
+          <div class="info-block">
+            <div class="info-label">价格点(PP)</div>
+            <div class="info-value info-points">
+              <span v-for="item in pricePointTexts" :key="item" class="point-chip">{{ item }}</span>
+            </div>
           </div>
         </div>
+      </div>
+    </el-card>
+
+    <el-card shadow="hover" class="page-card table-card" v-loading="loading">
+      <template #header>
+        <div class="card-header">
+          <span class="card-title">价格带明细</span>
+        </div>
       </template>
-    </el-dialog>
+
+      <el-table :data="sortedTableRows" border stripe class="price-table" header-cell-class-name="price-table-header">
+        <el-table-column label="价格区间" prop="label" min-width="160" fixed="left" align="center" sortable :sort-method="sortText('label')">
+          <template #default="{ row }">
+            <span class="range-text">{{ row.label }}</span>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="本期" align="center">
+          <el-table-column label="SKU" min-width="100" align="center" sortable :sort-method="sortNumber('sku')">
+            <template #default="{ row }"><span class="key-number">{{ formatInteger(row.sku) }}</span></template>
+          </el-table-column>
+          <el-table-column label="占比" min-width="100" align="center" sortable :sort-method="sortNumber('skuPer')">
+            <template #default="{ row }">{{ formatPercent(row.skuPer) }}</template>
+          </el-table-column>
+          <el-table-column label="销售量" min-width="110" align="center" sortable :sort-method="sortNumber('saleQuantity')">
+            <template #default="{ row }">{{ formatInteger(row.saleQuantity) }}</template>
+          </el-table-column>
+          <el-table-column label="占比" min-width="100" align="center" sortable :sort-method="sortNumber('saleQuantityPer')">
+            <template #default="{ row }">{{ formatPercent(row.saleQuantityPer) }}</template>
+          </el-table-column>
+          <el-table-column label="单品平均" min-width="110" align="center" sortable :sort-method="sortNumber('salePrice')">
+            <template #default="{ row }">{{ formatNumber(row.salePrice) }}</template>
+          </el-table-column>
+          <el-table-column label="销售额" min-width="130" align="center" sortable :sort-method="sortNumber('sales')">
+            <template #default="{ row }"><span class="key-number">{{ formatNumber(row.sales) }}</span></template>
+          </el-table-column>
+          <el-table-column label="占比" min-width="100" align="center" sortable :sort-method="sortNumber('salesPer')">
+            <template #default="{ row }">{{ formatPercent(row.salesPer) }}</template>
+          </el-table-column>
+          <el-table-column label="促销SKU" min-width="110" align="center" sortable :sort-method="sortNumber('promotionSku')">
+            <template #default="{ row }">{{ formatInteger(row.promotionSku) }}</template>
+          </el-table-column>
+        </el-table-column>
+
+        <el-table-column label="建议SKU" align="center">
+          <el-table-column label="建议SKU" min-width="110" align="center" sortable :sort-method="sortNumber('suggestSku')">
+            <template #default="{ row }">{{ formatInteger(row.suggestSku) }}</template>
+          </el-table-column>
+          <el-table-column label="占比" min-width="100" align="center" sortable :sort-method="sortNumber('suggestSkuPer')">
+            <template #default="{ row }">{{ formatPercent(row.suggestSkuPer) }}</template>
+          </el-table-column>
+        </el-table-column>
+      </el-table>
+    </el-card>
   </div>
 </template>
 
-<script setup name="PriceBandAnalysis" lang="ts">
+<script setup lang="ts">
 import * as echarts from 'echarts';
 import type { EChartsOption } from 'echarts';
+import { getPriceBandDiagram, getPriceBandRangeSummary } from '@/api/category/diagnosis/analysis';
 
-interface PriceBandRow {
-  priceRange: string;
-  skuCount: number;
-  skuShare: number;
-  saleQty: number;
-  saleQtyShare: number;
-  avgSaleQty: number;
-  saleAmount: number;
-  saleAmountShare: number;
+interface PriceBandTableRow {
+  label: string;
+  sortValue: number;
+  raw: any;
+  sku: number;
+  skuPer: number | string;
+  saleQuantity: number;
+  saleQuantityPer: number | string;
+  salePrice: number;
+  sales: number;
+  salesPer: number | string;
   promotionSku: number;
   suggestSku: number;
-  suggestSkuShare: number;
-  isTotal?: boolean;
+  suggestSkuPer: number | string;
+  xLabel: string;
+  skuLineValue: number;
+  salesLineValue: number;
+  quantityLineValue: number;
+  priceLineSkuValue: number;
+  priceLineSalesValue: number;
 }
 
-interface PriceRangeItem {
-  start: number;
-  end: number;
-}
-
-const router = useRouter();
 const route = useRoute();
-
+const router = useRouter();
 const chartRef = ref<HTMLDivElement>();
 const chartIns = ref<echarts.ECharts>();
-const settingVisible = ref(false);
-const pageLoading = ref(false);
-const tableRows = ref<PriceBandRow[]>([]);
-const rangeList = ref<PriceRangeItem[]>([
-  { start: 0, end: 9.9 },
-  { start: 10, end: 19.9 },
-  { start: 20, end: 29.9 },
-  { start: 30, end: 39.9 },
-  { start: 40, end: 59.9 }
-]);
+const loading = ref(false);
+const priceLineNum = ref('--');
+const priceRangeText = ref('--');
+const pricePointTexts = ref<string[]>([]);
+const tableRows = ref<PriceBandTableRow[]>([]);
 
-const generatorForm = reactive({
-  startPrice: 0,
-  endPrice: 49.9,
-  step: 10
-});
+const sessionId = computed(() => String(route.query.sessionId || ''));
 
-const statisticsInfo = reactive({
-  pzRanges: '',
-  plTotal: 0,
-  ppDetails: ''
-});
+const numericFields = {
+  sku: ['sku', 'skuNum', 'currentSku', 'skuCount'],
+  skuPer: ['skuPer', 'skuRatio', 'skuShare', 'skuPercent'],
+  saleQuantity: ['saleQuantity', 'salesQuantity', 'quantity', 'salesVolume'],
+  saleQuantityPer: ['saleQuantityPer', 'saleQuantityRatio', 'salesQuantityPer', 'quantityPer'],
+  salePrice: ['salePrice', 'avgPrice', 'unitPrice', 'itemAvgPrice'],
+  sales: ['sales', 'salesAmount', 'saleAmount', 'amount'],
+  salesPer: ['salesPer', 'salesRatio', 'salesShare', 'amountPer'],
+  promotionSku: ['promotionSku', 'promotionSkuCount', 'promotionCount', 'promoSku'],
+  suggestSku: ['suggestSku', 'adviceSku', 'recommendedSku', 'proposalSku'],
+  suggestSkuPer: ['suggestSkuPer', 'adviceSkuPer', 'recommendedSkuPer', 'proposalSkuPer'],
+  priceLineSkuValue: ['priceLineSku', 'priceLineSkuCount', 'lineSku', 'plSku'],
+  priceLineSalesValue: ['priceLineSales', 'priceLineSalesAmount', 'lineSales', 'plSales']
+} as const;
 
-const chartSource = reactive({
-  xAxisData: [] as string[],
-  skuLineData: [] as number[],
-  saleAmountLineData: [] as number[],
-  saleQtyLineData: [] as number[],
-  priceLineSkuBarData: [] as number[],
-  priceLineSaleAmountBarData: [] as number[]
-});
-
-const buildMockRows = (): PriceBandRow[] => {
-  const presets = [
-    { skuCount: 26, saleQty: 2180, avgSaleQty: 83.85, saleAmount: 28600, promotionSku: 6, suggestSku: 8 },
-    { skuCount: 54, saleQty: 6350, avgSaleQty: 117.59, saleAmount: 125800, promotionSku: 10, suggestSku: 15 },
-    { skuCount: 42, saleQty: 4830, avgSaleQty: 115.0, saleAmount: 102600, promotionSku: 8, suggestSku: 12 },
-    { skuCount: 23, saleQty: 2610, avgSaleQty: 113.48, saleAmount: 64820, promotionSku: 4, suggestSku: 7 },
-    { skuCount: 12, saleQty: 840, avgSaleQty: 70.0, saleAmount: 34160, promotionSku: 2, suggestSku: 4 },
-    { skuCount: 8, saleQty: 420, avgSaleQty: 52.5, saleAmount: 18880, promotionSku: 1, suggestSku: 2 }
-  ];
-
-  const rows = rangeList.value.map((item, index) => {
-    const preset = presets[index] || presets[presets.length - 1];
-    return {
-      priceRange: formatRangeLabel(item),
-      skuCount: preset.skuCount,
-      skuShare: 0,
-      saleQty: preset.saleQty,
-      saleQtyShare: 0,
-      avgSaleQty: preset.avgSaleQty,
-      saleAmount: preset.saleAmount,
-      saleAmountShare: 0,
-      promotionSku: preset.promotionSku,
-      suggestSku: preset.suggestSku,
-      suggestSkuShare: 0
-    };
-  });
-
-  const totalSku = rows.reduce((sum, item) => sum + item.skuCount, 0);
-  const totalSaleQty = rows.reduce((sum, item) => sum + item.saleQty, 0);
-  const totalSaleAmount = rows.reduce((sum, item) => sum + item.saleAmount, 0);
-  const totalPromotionSku = rows.reduce((sum, item) => sum + item.promotionSku, 0);
-  const totalSuggestSku = rows.reduce((sum, item) => sum + item.suggestSku, 0);
-
-  rows.forEach((item) => {
-    item.skuShare = totalSku ? (item.skuCount / totalSku) * 100 : 0;
-    item.saleQtyShare = totalSaleQty ? (item.saleQty / totalSaleQty) * 100 : 0;
-    item.saleAmountShare = totalSaleAmount ? (item.saleAmount / totalSaleAmount) * 100 : 0;
-    item.suggestSkuShare = totalSuggestSku ? (item.suggestSku / totalSuggestSku) * 100 : 0;
-  });
-
-  rows.push({
-    priceRange: '总计',
-    skuCount: totalSku,
-    skuShare: 100,
-    saleQty: totalSaleQty,
-    saleQtyShare: 100,
-    avgSaleQty: totalSku ? totalSaleQty / totalSku : 0,
-    saleAmount: totalSaleAmount,
-    saleAmountShare: 100,
-    promotionSku: totalPromotionSku,
-    suggestSku: totalSuggestSku,
-    suggestSkuShare: 100,
-    isTotal: true
-  });
-
-  return rows;
-};
-
-const syncStatistics = () => {
-  statisticsInfo.pzRanges = rangeList.value.map((item) => formatRangeLabel(item)).join(' / ');
-  statisticsInfo.plTotal = rangeList.value.length * 3 + 3;
-  statisticsInfo.ppDetails = rangeList.value
-    .map((item) => Number(item.end).toFixed(1).replace(/\.0$/, ''))
-    .slice(0, 6)
-    .join('、');
-};
-
-const syncChartSource = (rows: PriceBandRow[]) => {
-  const effectiveRows = rows.filter((item) => !item.isTotal);
-  chartSource.xAxisData = effectiveRows.map((item) => item.priceRange);
-  chartSource.skuLineData = effectiveRows.map((item) => item.skuCount);
-  chartSource.saleAmountLineData = effectiveRows.map((item) => item.saleAmount);
-  chartSource.saleQtyLineData = effectiveRows.map((item) => item.saleQty);
-  chartSource.priceLineSkuBarData = effectiveRows.map((item) => Math.max(1, Math.round(item.promotionSku)));
-  chartSource.priceLineSaleAmountBarData = effectiveRows.map((item) => Math.round(item.saleAmount * 0.18));
-};
-
-const initChart = () => {
-  if (!chartRef.value) return;
-  if (!chartIns.value) {
-    chartIns.value = echarts.init(chartRef.value);
-  }
-};
-
-const renderChart = () => {
-  initChart();
-  if (!chartIns.value) return;
-
-  const option: EChartsOption = {
-    tooltip: {
-      trigger: 'axis',
-      axisPointer: { type: 'cross' }
-    },
-    legend: {
-      top: 6,
-      itemWidth: 10,
-      itemHeight: 10,
-      icon: 'circle',
-      textStyle: { color: '#606266', fontSize: 13 },
-      data: ['SKU数', '销售额', '销售量', '价格线SKU数', '价格线销售额']
-    },
-    grid: {
-      left: 56,
-      right: 56,
-      top: 48,
-      bottom: 32
-    },
-    xAxis: {
-      type: 'category',
-      data: chartSource.xAxisData,
-      axisLine: { lineStyle: { color: '#dcdfe6' } },
-      axisLabel: { color: '#606266' }
-    },
-    yAxis: [
-      {
-        type: 'value',
-        name: '销售额',
-        axisLine: { show: false },
-        axisLabel: { color: '#606266' },
-        splitLine: { lineStyle: { color: '#ebeef5' } }
-      },
-      {
-        type: 'value',
-        name: 'SKU数量',
-        axisLine: { show: false },
-        axisLabel: { color: '#606266' },
-        splitLine: { show: false }
-      }
-    ],
-    series: [
-      { name: 'SKU数', type: 'line', smooth: true, yAxisIndex: 1, data: chartSource.skuLineData, itemStyle: { color: '#f59e0b' }, lineStyle: { color: '#f59e0b', width: 2 } },
-      { name: '销售额', type: 'line', smooth: true, data: chartSource.saleAmountLineData, itemStyle: { color: '#3b82f6' }, lineStyle: { color: '#3b82f6', width: 2 } },
-      { name: '销售量', type: 'line', smooth: true, yAxisIndex: 1, data: chartSource.saleQtyLineData, itemStyle: { color: '#14b8a6' }, lineStyle: { color: '#14b8a6', width: 2 } },
-      { name: '价格线SKU数', type: 'bar', barWidth: 10, yAxisIndex: 1, data: chartSource.priceLineSkuBarData, itemStyle: { color: '#e53e3e', borderRadius: [4, 4, 0, 0] } },
-      { name: '价格线销售额', type: 'bar', barWidth: 10, data: chartSource.priceLineSaleAmountBarData, itemStyle: { color: '#60a5fa', borderRadius: [4, 4, 0, 0] } }
-    ]
-  };
-
-  chartIns.value.setOption(option, true);
-};
-
-const loadPriceBandData = async () => {
-  pageLoading.value = true;
-  try {
-    // TODO: replace with real backend request for price band analysis.
-    await new Promise((resolve) => window.setTimeout(resolve, 180));
-    const rows = buildMockRows();
-    tableRows.value = rows;
-    syncStatistics();
-    syncChartSource(rows);
-    await nextTick();
-    renderChart();
-  } finally {
-    pageLoading.value = false;
-  }
-};
-
-const formatRangeLabel = (item: PriceRangeItem) => `${formatRangeNumber(item.start)}-${formatRangeNumber(item.end)}`;
-
-const formatRangeNumber = (value: number) => Number(value).toFixed(1).replace(/\.0$/, '');
-
-const validateRangeList = () => {
-  if (!rangeList.value.length) {
-    ElMessage.warning('请至少保留一个价格区间');
-    return false;
-  }
-  const sorted = [...rangeList.value].sort((a, b) => a.start - b.start);
-  const invalid = sorted.some((item) => item.end <= item.start || item.start < 0);
-  if (invalid) {
-    ElMessage.warning('价格区间设置不合法，请检查开始值和结束值');
-    return false;
-  }
-  return true;
-};
-
-const handleGenerateRanges = () => {
-  const { startPrice, endPrice, step } = generatorForm;
-  if (endPrice <= startPrice || step <= 0) {
-    ElMessage.warning('请检查起始价格、结束价格和步长');
-    return;
-  }
-  const ranges: PriceRangeItem[] = [];
-  let currentStart = startPrice;
-  while (currentStart < endPrice) {
-    const currentEnd = Math.min(currentStart + step - 0.1, endPrice);
-    ranges.push({
-      start: Number(currentStart.toFixed(2)),
-      end: Number(currentEnd.toFixed(2))
-    });
-    currentStart = Number((currentStart + step).toFixed(2));
-  }
-  rangeList.value = ranges;
-};
-
-const handleAddRange = () => {
-  const lastItem = rangeList.value[rangeList.value.length - 1];
-  const nextStart = lastItem ? Number((lastItem.end + 0.1).toFixed(2)) : 0;
-  rangeList.value.push({
-    start: nextStart,
-    end: Number((nextStart + 9.9).toFixed(2))
-  });
-};
-
-const handleDeleteRange = (index: number) => {
-  if (rangeList.value.length === 1) {
-    ElMessage.warning('请至少保留一个价格区间');
-    return;
-  }
-  rangeList.value.splice(index, 1);
-};
-
-const handleSaveSetting = async () => {
-  if (!validateRangeList()) return;
-  settingVisible.value = false;
-  ElMessage.success('价格区间设置已保存');
-  await loadPriceBandData();
-};
-
-const handleViewDetail = () => {
-  router.push({
-    path: '/price-band/analysis/detail',
-    query: {
-      ...route.query,
-      ranges: JSON.stringify(rangeList.value)
+const readNumber = (source: any, keys: readonly string[]) => {
+  for (const key of keys) {
+    const value = source?.[key];
+    const num = Number(value);
+    if (value !== undefined && value !== null && value !== '' && Number.isFinite(num)) {
+      return num;
     }
-  });
+  }
+  return 0;
 };
 
-const sortNumber = (field: keyof PriceBandRow) => (a: PriceBandRow, b: PriceBandRow) => Number(a[field] || 0) - Number(b[field] || 0);
+const readText = (source: any, keys: string[]) => {
+  for (const key of keys) {
+    const value = source?.[key];
+    if (value !== undefined && value !== null && String(value).trim()) {
+      return String(value).trim();
+    }
+  }
+  return '';
+};
 
-const formatNumber = (value: number | string | null | undefined, digits = 2) => {
-  const num = Number(value);
-  if (!Number.isFinite(num)) return '-';
+const formatNumber = (value: unknown, digits = 0) => {
+  const num = Number(value ?? 0);
+  if (!Number.isFinite(num)) return '--';
   return num.toLocaleString('zh-CN', {
-    minimumFractionDigits: 0,
+    minimumFractionDigits: digits,
     maximumFractionDigits: digits
   });
 };
 
-const formatAmount = (value: number | string | null | undefined) => formatNumber(value);
+const formatInteger = (value: unknown) => formatNumber(value, 0);
 
-const formatPercent = (value: number | string | null | undefined) => {
-  const num = Number(value);
-  if (!Number.isFinite(num)) return '-';
-  return `${num.toFixed(2)}%`;
+const formatPercent = (value: unknown) => {
+  const num = Number(value ?? 0);
+  if (!Number.isFinite(num)) return '--';
+  const percent = Math.abs(num) <= 1 ? num * 100 : num;
+  return `${percent.toFixed(2)}%`;
+};
+
+const sortNumber = (field: keyof PriceBandTableRow) => (a: PriceBandTableRow, b: PriceBandTableRow) => Number(a[field] || 0) - Number(b[field] || 0);
+const sortText = (field: keyof PriceBandTableRow) => (a: PriceBandTableRow, b: PriceBandTableRow) => String(a[field] || '').localeCompare(String(b[field] || ''));
+
+const sortedTableRows = computed(() => [...tableRows.value].sort((a, b) => a.sortValue - b.sortValue));
+
+const renderChart = (rows: PriceBandTableRow[]) => {
+  if (!chartRef.value) return;
+  chartIns.value ||= echarts.init(chartRef.value);
+
+  const xAxisData = rows.map((item) => item.xLabel);
+  const skuLineData = rows.map((item) => item.skuLineValue);
+  const salesLineData = rows.map((item) => item.salesLineValue);
+  const quantityLineData = rows.map((item) => item.quantityLineValue);
+  const priceLineSkuData = rows.map((item) => item.priceLineSkuValue);
+  const priceLineSalesData = rows.map((item) => item.priceLineSalesValue);
+  const maxSales = Math.max(1, ...salesLineData.map((item) => Math.abs(Number(item || 0))), ...priceLineSalesData.map((item) => Math.abs(Number(item || 0))));
+  const maxQuantity = Math.max(1, ...quantityLineData.map((item) => Math.abs(Number(item || 0))));
+  const maxSku = Math.max(1, ...skuLineData.map((item) => Math.abs(Number(item || 0))), ...priceLineSkuData.map((item) => Math.abs(Number(item || 0))));
+
+  chartIns.value.setOption(
+    {
+      color: ['#f59e0b', '#2563eb', '#14b8a6', '#ef4444', '#3b82f6'],
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'cross' }
+      },
+      legend: {
+        top: 8,
+        itemWidth: 12,
+        itemHeight: 10,
+        data: ['SKU数', '销售额', '销售量', '价格线SKU数', '价格线销售额']
+      },
+      grid: {
+        left: 70,
+        right: 140,
+        top: 54,
+        bottom: 48
+      },
+      xAxis: {
+        type: 'category',
+        data: xAxisData,
+        axisTick: { alignWithLabel: true },
+        axisLine: { lineStyle: { color: '#d1d5db' } },
+        axisLabel: { color: '#64748b', rotate: xAxisData.length > 8 ? 30 : 0 }
+      },
+      yAxis: [
+        {
+          type: 'value',
+          name: '销售额(元)',
+          position: 'left',
+          min: -maxSales,
+          max: maxSales,
+          axisLabel: { color: '#64748b', formatter: (value: number) => formatInteger(value) },
+          splitLine: { lineStyle: { color: '#eef2f7' } }
+        },
+        {
+          type: 'value',
+          name: '销售量',
+          position: 'right',
+          offset: 0,
+          min: -maxQuantity,
+          max: maxQuantity,
+          axisLabel: { color: '#64748b', formatter: (value: number) => formatInteger(value) },
+          splitLine: { show: false }
+        },
+        {
+          type: 'value',
+          name: 'SKU数',
+          position: 'right',
+          offset: 62,
+          min: 0,
+          max: maxSku,
+          axisLabel: { color: '#64748b', formatter: (value: number) => formatInteger(value) },
+          splitLine: { show: false }
+        }
+      ],
+      series: [
+        {
+          name: '价格线SKU数',
+          type: 'bar',
+          yAxisIndex: 2,
+          barWidth: 10,
+          data: priceLineSkuData,
+          itemStyle: { color: '#ef4444', borderRadius: [4, 4, 0, 0] }
+        },
+        {
+          name: '价格线销售额',
+          type: 'bar',
+          yAxisIndex: 0,
+          barWidth: 10,
+          barGap: '40%',
+          data: priceLineSalesData,
+          itemStyle: { color: '#3b82f6', borderRadius: [4, 4, 0, 0] }
+        },
+        {
+          name: 'SKU数',
+          type: 'line',
+          yAxisIndex: 2,
+          smooth: true,
+          symbol: 'emptyCircle',
+          symbolSize: 8,
+          lineStyle: { width: 2, color: '#f59e0b' },
+          itemStyle: { color: '#f59e0b', borderColor: '#f59e0b', borderWidth: 2 },
+          data: skuLineData
+        },
+        {
+          name: '销售额',
+          type: 'line',
+          yAxisIndex: 0,
+          smooth: true,
+          symbol: 'circle',
+          symbolSize: 7,
+          lineStyle: { width: 3, color: '#2563eb' },
+          itemStyle: { color: '#2563eb' },
+          data: salesLineData
+        },
+        {
+          name: '销售量',
+          type: 'line',
+          yAxisIndex: 1,
+          smooth: true,
+          symbol: 'circle',
+          symbolSize: 7,
+          lineStyle: { width: 3, color: '#14b8a6' },
+          itemStyle: { color: '#14b8a6' },
+          data: quantityLineData
+        }
+      ]
+    } as EChartsOption,
+    true
+  );
+};
+
+const reload = async () => {
+  if (!sessionId.value) return;
+  loading.value = true;
+  try {
+    const [diagramRes, summaryRes] = await Promise.all([getPriceBandDiagram(sessionId.value), getPriceBandRangeSummary(sessionId.value)]);
+    const diagram: any = diagramRes.data || {};
+    const summary: any = summaryRes.data || {};
+    const sourceRows = Array.isArray(diagram.rangePerformanceList) ? diagram.rangePerformanceList : [];
+
+    tableRows.value = sourceRows.map((item: any, index: number) => {
+      const priceBandMin = Number(item.priceBandMin ?? item.minPrice ?? 0);
+      const priceBandMax = Number(item.priceBandMax ?? item.maxPrice ?? 0);
+      return {
+        label: `${item.priceBandMin ?? '--'} - ${item.priceBandMax ?? '--'}`,
+        sortValue: Number.isFinite(priceBandMin) ? priceBandMin : index,
+        raw: item,
+        sku: readNumber(item, numericFields.sku),
+        skuPer: readNumber(item, numericFields.skuPer),
+        saleQuantity: readNumber(item, numericFields.saleQuantity),
+        saleQuantityPer: readNumber(item, numericFields.saleQuantityPer),
+        salePrice: readNumber(item, numericFields.salePrice),
+        sales: readNumber(item, numericFields.sales),
+        salesPer: readNumber(item, numericFields.salesPer),
+        promotionSku: readNumber(item, numericFields.promotionSku),
+        suggestSku: readNumber(item, numericFields.suggestSku),
+        suggestSkuPer: readNumber(item, numericFields.suggestSkuPer),
+        xLabel: String(item.pricePoint ?? item.priceBandMin ?? item.priceBandMax ?? index + 1),
+        skuLineValue: readNumber(item, numericFields.sku),
+        salesLineValue: readNumber(item, numericFields.sales),
+        quantityLineValue: readNumber(item, numericFields.saleQuantity),
+        priceLineSkuValue: readNumber(item, numericFields.priceLineSkuValue),
+        priceLineSalesValue: readNumber(item, numericFields.priceLineSalesValue)
+      } satisfies PriceBandTableRow;
+    });
+
+    priceLineNum.value = String(diagram.priceLineNum ?? 0);
+    priceRangeText.value = readText(diagram, ['priceRangeText']) || `${diagram.priceBandMin ?? '--'} - ${diagram.priceBandMax ?? '--'}`;
+    pricePointTexts.value = Array.isArray(diagram.pricePointList)
+      ? diagram.pricePointList.map((item: any) => String(item.pricePoint ?? item.pointPrice ?? item.priceBandMin ?? item.priceBandMax ?? '--'))
+      : [];
+
+    if (!priceRangeText.value || priceRangeText.value === '-- - --') {
+      priceRangeText.value =
+        (summary.list || []).map((item: any) => `${item.priceBandMin ?? '--'}-${item.priceBandMax ?? '--'}`).join(' / ') ||
+        `${sourceRows[0]?.priceBandMin ?? '--'} - ${sourceRows[sourceRows.length - 1]?.priceBandMax ?? '--'}`;
+    }
+
+    if (!pricePointTexts.value.length) {
+      pricePointTexts.value = sourceRows.map((item: any) => String(item.pricePoint ?? item.priceBandMin ?? '--'));
+    }
+
+    renderChart(sortedTableRows.value);
+  } finally {
+    loading.value = false;
+  }
+};
+
+const handleViewDetail = () => {
+  router.push({ path: '/price-band/analysis/detail', query: { ...route.query } });
+};
+
+const handlePriceSetting = () => {
+  ElMessage.info('价格区间设置功能待接入');
 };
 
 const resizeChart = () => chartIns.value?.resize();
 
-onMounted(async () => {
-  await loadPriceBandData();
+onMounted(reload);
+watch(() => route.query.sessionId, reload);
+onBeforeUnmount(() => chartIns.value?.dispose());
+onMounted(() => {
   window.addEventListener('resize', resizeChart);
 });
-
 onBeforeUnmount(() => {
   window.removeEventListener('resize', resizeChart);
-  chartIns.value?.dispose();
 });
 </script>
 
@@ -486,32 +412,23 @@ onBeforeUnmount(() => {
 }
 
 .header-card,
-.chart-row,
+.chart-card,
 .table-card {
   margin-bottom: 12px;
 }
 
 .page-header,
-.page-title-wrap,
-.page-actions,
-.card-header,
-.advice-header,
-.dialog-footer,
-.dialog-footer-right {
+.card-header {
   display: flex;
   align-items: center;
-}
-
-.page-header,
-.card-header,
-.advice-header,
-.dialog-footer {
   justify-content: space-between;
-  gap: 12px;
+  gap: 16px;
 }
 
 .page-title-wrap {
-  gap: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .page-title-line {
@@ -524,24 +441,40 @@ onBeforeUnmount(() => {
 .page-title {
   font-size: 20px;
   font-weight: 700;
-  color: var(--el-text-color-primary);
-  line-height: 1;
+  color: #0f172a;
+}
+
+.detail-link {
+  padding-left: 0;
+  font-size: 14px;
+}
+
+.page-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .unit-text {
+  color: #64748b;
   font-size: 13px;
-  color: var(--el-text-color-secondary);
 }
 
-.page-actions,
-.dialog-footer-right {
-  gap: 12px;
+.setting-btn {
+  border-radius: 999px;
 }
 
 .card-title {
   font-size: 15px;
   font-weight: 600;
-  color: var(--el-text-color-primary);
+  color: #0f172a;
+}
+
+.chart-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 250px;
+  gap: 12px;
 }
 
 .chart-box {
@@ -549,77 +482,106 @@ onBeforeUnmount(() => {
 }
 
 .large-chart {
-  height: 360px;
+  height: 440px;
 }
 
-.stat-list {
+.chart-side-info {
+  border-left: 1px solid #e5e7eb;
+  padding-left: 12px;
   display: flex;
   flex-direction: column;
   gap: 14px;
+  justify-content: center;
 }
 
-.stat-item {
-  padding: 14px 12px;
-  border-radius: 8px;
-  background: #f8fafc;
+.info-block {
+  padding: 14px 14px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
 }
 
-.stat-label {
-  font-size: 13px;
-  color: var(--el-text-color-secondary);
+.info-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748b;
+  margin-bottom: 8px;
 }
 
-.stat-value {
-  margin-top: 8px;
+.info-value {
   font-size: 14px;
   font-weight: 600;
-  color: var(--el-text-color-primary);
+  color: #0f172a;
   line-height: 1.7;
   word-break: break-word;
 }
 
-.price-table :deep(.el-table__header th),
-.range-table :deep(.el-table__header th) {
-  background: #f8fafc;
-  color: var(--el-text-color-primary);
+.info-points {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.point-chip {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #2563eb;
+  font-size: 12px;
   font-weight: 600;
 }
 
-.is-total {
+.range-text,
+.key-number {
+  color: #0f766e;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  font-weight: 600;
+}
+
+.price-table :deep(.el-table__header th),
+.price-table :deep(.price-table-header) {
+  background: #f2f7fb;
+  color: #334155;
   font-weight: 700;
-  color: var(--el-text-color-primary);
+  text-align: center;
 }
 
-.advice-list {
-  margin: 0;
-  padding-left: 18px;
-  color: var(--el-text-color-regular);
-  line-height: 1.8;
+.price-table :deep(.cell) {
+  text-align: center;
+  font-size: 13px;
 }
 
-.advice-list li + li {
-  margin-top: 10px;
+.price-table :deep(.el-table__body td) {
+  color: #334155;
 }
 
-.generator-form {
-  margin-bottom: 16px;
-}
+@media (max-width: 1200px) {
+  .chart-panel {
+    grid-template-columns: 1fr;
+  }
 
-.range-input {
-  width: 180px;
+  .chart-side-info {
+    border-left: 0;
+    border-top: 1px solid #e5e7eb;
+    padding-left: 0;
+    padding-top: 12px;
+  }
 }
 
 @media (max-width: 992px) {
-  .page-header,
-  .dialog-footer {
+  .page-header {
     flex-direction: column;
     align-items: flex-start;
   }
 
-  .page-actions,
-  .dialog-footer-right {
+  .page-actions {
     width: 100%;
     justify-content: space-between;
+  }
+
+  .large-chart {
+    height: 360px;
   }
 }
 </style>

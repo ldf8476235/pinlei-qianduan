@@ -2,11 +2,15 @@
   <div class="p-2 category-diagnosis-detail-page">
     <el-card shadow="hover" class="mb-[12px]">
       <div class="filter-line">本期日期: {{ summary.filterInfo.currentDateRangeText }}；对比日期: {{ summary.filterInfo.compareDateRangeText }}</div>
-      <div class="filter-line">组织: {{ summary.filterInfo.orgName }}；业态: {{ summary.filterInfo.retailTypeName }}；商圈: {{ summary.filterInfo.circleName }}</div>
+      <div class="filter-line">
+        组织: {{ summary.filterInfo.orgName }}；业态: {{ summary.filterInfo.retailTypeName }}；商圈: {{ summary.filterInfo.circleName }}
+      </div>
       <div class="filter-line">门店: {{ summary.filterInfo.storeRangeName }}</div>
 
       <div class="core-line mt-[10px]">
-        <div class="core-left">{{ summary.coreInfo.categoryCode }} {{ summary.coreInfo.categoryName }}（{{ summary.coreInfo.categoryLevelName }}）</div>
+        <div class="core-left">
+          {{ summary.coreInfo.categoryCode }} {{ summary.coreInfo.categoryName }}（{{ summary.coreInfo.categoryLevelName }}）
+        </div>
         <div class="core-center">
           诊断状态:
           <el-tag :type="statusTagType" effect="dark" class="ml-1">{{ statusText }}</el-tag>
@@ -94,10 +98,7 @@
                 <div class="metric-value">{{ item.currentValue }}</div>
                 <div
                   class="metric-compare"
-                  :class="[
-                    compareClass(item.compareValue),
-                    hiddenMetricCompareKeys.includes(item.metricKey) ? 'metric-compare--hidden' : ''
-                  ]"
+                  :class="[compareClass(item.compareValue), hiddenMetricCompareKeys.includes(item.metricKey) ? 'metric-compare--hidden' : '']"
                 >
                   <span class="metric-arrow">{{ compareArrow(item.compareValue) }}</span>
                   <span>{{ compareText(item.compareValue, item.compareType) }}</span>
@@ -116,10 +117,7 @@
                 <div class="metric-value">{{ item.currentValue }}</div>
                 <div
                   class="metric-compare"
-                  :class="[
-                    compareClass(item.compareValue),
-                    hiddenMetricCompareKeys.includes(item.metricKey) ? 'metric-compare--hidden' : ''
-                  ]"
+                  :class="[compareClass(item.compareValue), hiddenMetricCompareKeys.includes(item.metricKey) ? 'metric-compare--hidden' : '']"
                 >
                   <span class="metric-arrow">{{ compareArrow(item.compareValue) }}</span>
                   <span>{{ compareText(item.compareValue, item.compareType) }}</span>
@@ -277,8 +275,7 @@ const expandedGroupKeys = ref<string[]>([]);
 const embeddedMainViewMap = {
   subCategory: markRaw(SubClassView),
   channel: markRaw(ChannelView),
-  customer: markRaw(CustomerView),
-  specAnalysis: markRaw(SpecView)
+  customer: markRaw(CustomerView)
 } as const;
 
 const embeddedSideViewMap = {
@@ -288,6 +285,7 @@ const embeddedSideViewMap = {
   supplierAnalysis: markRaw(SupplierAnalysisView),
   priceBandAnalysis: markRaw(PriceBandAnalysisView),
   brandAnalysis: markRaw(BrandAnalysisView),
+  specAnalysis: markRaw(SpecView),
   tagAnalysis: markRaw(TagView)
 } as const;
 
@@ -530,7 +528,14 @@ const buildMetrics = (overview: DiagnosisOverviewResponse): CategoryDiagnosisMet
     buildMetric('grossRate', '毛利率', overview.currentGrossRate, overview.comparativeGrossRate, 'diff', '毛利率', '%'),
     buildMetric('customerCount', '客数', overview.currentCustomerCount, overview.comparativeCustomerCount, 'growth', '当前品类客数'),
     buildMetric('customerPrice', '客单价', overview.currentCustomerPrice, overview.comparativeCustomerPrice, 'growth', '当前品类客单价'),
-    buildMetric('customerAvgQuantity', '客均件数', overview.currentCustomerAvgQuantity, overview.comparativeCustomerAvgQuantity, 'growth', '客均件数'),
+    buildMetric(
+      'customerAvgQuantity',
+      '客均件数',
+      overview.currentCustomerAvgQuantity,
+      overview.comparativeCustomerAvgQuantity,
+      'growth',
+      '客均件数'
+    ),
     buildMetric('pieceAvgPrice', '件均价', overview.currentPieceAvgPrice, overview.comparativePieceAvgPrice, 'growth', '件均价')
   ]
 });
@@ -604,7 +609,9 @@ const renderTrendChart = () => {
         const title = rows[0]?.axisValueLabel || rows[0]?.axisValue || '--';
         const current = rows.find((item: any) => item.seriesName === '本期')?.value ?? 0;
         const compare = rows.find((item: any) => item.seriesName === '对比日期')?.value ?? 0;
-        return [title, `${rows[0]?.marker || ''}本期：${formatNumber(current)}`, `${rows[1]?.marker || ''}对比日期：${formatNumber(compare)}`].join('<br/>');
+        return [title, `${rows[0]?.marker || ''}本期：${formatNumber(current)}`, `${rows[1]?.marker || ''}对比日期：${formatNumber(compare)}`].join(
+          '<br/>'
+        );
       }
     },
     legend: {
@@ -857,7 +864,9 @@ onBeforeUnmount(() => {
   font-size: 22px;
   line-height: 1;
   transform: rotate(0deg);
-  transition: transform 0.22s ease, color 0.22s ease;
+  transition:
+    transform 0.22s ease,
+    color 0.22s ease;
   margin-top: 2px;
 }
 
@@ -913,7 +922,9 @@ onBeforeUnmount(() => {
 
 .left-sub-item.active {
   background: #ffffff;
-  box-shadow: inset 0 0 0 1px rgba(15, 118, 110, 0.18), 0 8px 18px rgba(15, 118, 110, 0.08);
+  box-shadow:
+    inset 0 0 0 1px rgba(15, 118, 110, 0.18),
+    0 8px 18px rgba(15, 118, 110, 0.08);
 }
 
 .left-sub-dot {

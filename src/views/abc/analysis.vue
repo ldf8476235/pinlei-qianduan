@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="p-2 abc-analysis-page">
     <el-card shadow="hover" class="page-card header-card">
       <div class="page-header">

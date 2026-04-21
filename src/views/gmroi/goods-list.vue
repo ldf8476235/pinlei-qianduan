@@ -170,7 +170,7 @@ const loadTable = async () => {
     order: 'sales',
     orderType: 'desc'
   });
-  const page = res.data.result;
+  const page = res.result;
   tableRows.value = page.records || [];
   total.value = Number(page.total || 0);
 };

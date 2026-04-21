@@ -134,7 +134,7 @@ const renderBar = () => {
 const loadRanking = async () => {
   if (!sessionId.value) return;
   const res = await getVendorRanking(sessionId.value, activeMetric.value, 1, 10, 'desc');
-  ranking.value = res.data.data?.list || [];
+  ranking.value = res.data?.data?.list || [];
   await nextTick();
   renderBar();
 };
@@ -149,8 +149,8 @@ const loadData = async () => {
       getVendorSummary(sessionId.value)
     ]);
     statusState.value = statusRes.data;
-    salesShare.value = shareRes.data.data || [];
-    summary.value = summaryRes.data.data || {};
+    salesShare.value = shareRes.data?.data || [];
+    summary.value = summaryRes.data?.data || {};
     await loadRanking();
     await nextTick();
     renderPie();

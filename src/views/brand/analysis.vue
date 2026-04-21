@@ -2,64 +2,69 @@
   <div class="p-2 brand-analysis-page">
     <el-card shadow="hover" class="page-card header-card">
       <div class="page-header">
-        <div class="page-header-left">
-          <div class="page-title-wrap">
-            <span class="page-title-line" />
-            <span class="page-title">品牌分析</span>
-          </div>
-          <div class="title-row">
-            <span class="category-title">004洗化部（一级品类）</span>
-            <el-tag effect="plain" type="success" class="role-tag">本期角色：结构品类</el-tag>
-          </div>
+        <div class="page-title-wrap">
+          <span class="page-title-line" />
+          <span class="page-title">品牌分析</span>
+          <el-button link type="primary" class="detail-link" @click="handleViewDetail">详情 &gt;</el-button>
         </div>
-        <div class="page-header-right">
-          <div class="hint-text">该门店范围下品类的预设角色为“结构品类”，预设SKU总数为126</div>
-          <div class="page-actions">
-            <el-button link type="primary" @click="handleViewDetail">详情</el-button>
-            <span class="unit-text">金额单位：元</span>
-          </div>
+        <div class="page-actions">
+          <span class="unit-text">金额单位：元</span>
         </div>
       </div>
     </el-card>
 
     <div class="metric-row">
-      <el-card v-for="item in metricCards" :key="item.label" shadow="hover" class="page-card metric-card">
+      <el-card v-for="item in metrics" :key="item.label" shadow="hover" class="page-card metric-card">
         <div class="metric-label">{{ item.label }}</div>
-        <div class="metric-value">{{ item.value }}</div>
+        <div class="metric-value" :class="{ emphasis: item.emphasis }">{{ item.value }}</div>
       </el-card>
     </div>
 
     <el-row :gutter="12" class="chart-row">
       <el-col :lg="12" :md="24" :sm="24" :xs="24">
-        <el-card shadow="hover" class="page-card chart-card">
+        <el-card shadow="hover" class="page-card chart-card" v-loading="loading">
           <template #header>
             <div class="card-header">
               <span class="card-title">本期各品牌销售占比</span>
-              <div class="page-switcher">
-                <el-button text :disabled="piePage === 1" @click="changePiePage(piePage - 1)">‹</el-button>
-                <el-button v-for="page in piePageCount" :key="page" text :type="page === piePage ? 'primary' : undefined" @click="changePiePage(page)">{{ page }}</el-button>
-                <el-button text :disabled="piePage === piePageCount" @click="changePiePage(piePage + 1)">›</el-button>
-              </div>
             </div>
           </template>
-          <div ref="pieChartRef" class="chart-box medium-chart" />
+          <div class="pie-wrap">
+            <div ref="pieChartRef" class="chart-box medium-chart" />
+            <div class="pie-legend">
+              <div v-for="item in buildPieLegendItems" :key="item.name" class="pie-legend-item">
+                <span class="pie-legend-dot" :style="{ background: item.color }" />
+                <span class="pie-legend-name">{{ item.name }}</span>
+                <span class="pie-legend-value">{{ item.percentText }}</span>
+                <span class="pie-legend-arrow" :class="item.arrowClass">{{ item.arrow }}</span>
+              </div>
+            </div>
+          </div>
         </el-card>
       </el-col>
 
       <el-col :lg="12" :md="24" :sm="24" :xs="24">
-        <el-card shadow="hover" class="page-card chart-card">
+        <el-card shadow="hover" class="page-card chart-card" v-loading="loading">
           <template #header>
             <div class="card-header">
-              <span class="card-title">本期品牌业绩排名</span>
-              <div class="toolbar-wrap">
-                <el-select v-model="activeRankMetric" class="metric-select" @change="changeRankPage(1)">
-                  <el-option v-for="item in rankMetricOptions" :key="item.value" :label="item.label" :value="item.value" />
+              <div class="card-title-wrap">
+                <span class="card-title">本期品牌业绩排名</span>
+                <el-button link type="primary" class="desc-toggle" @click="rankDesc = !rankDesc">{{ rankDesc ? '降序' : '升序' }}</el-button>
+              </div>
+              <div class="rank-toolbar">
+                <el-select v-model="rankMetric" class="rank-select" size="small">
+                  <el-option label="销售额" value="salesAmount" />
+                  <el-option label="销售量" value="salesQuantity" />
                 </el-select>
-                <div class="page-switcher">
-                  <el-button text :disabled="rankPage === 1" @click="changeRankPage(rankPage - 1)">‹</el-button>
-                  <el-button v-for="page in rankPageCount" :key="page" text :type="page === rankPage ? 'primary' : undefined" @click="changeRankPage(page)">{{ page }}</el-button>
-                  <el-button text :disabled="rankPage === rankPageCount" @click="changeRankPage(rankPage + 1)">›</el-button>
-                </div>
+                <el-pagination
+                  v-model:current-page="rankPage.page"
+                  :page-size="rankPage.pageSize"
+                  :total="rankPage.total"
+                  layout="prev, pager, next"
+                  :pager-count="5"
+                  background
+                  small
+                  @current-change="handleRankPageChange"
+                />
               </div>
             </div>
           </template>
@@ -68,51 +73,52 @@
       </el-col>
     </el-row>
 
-    <el-card shadow="hover" class="page-card chart-card combo-card">
+    <el-row :gutter="12" class="chart-row">
+      <el-col :span="24">
+        <el-card shadow="hover" class="page-card chart-card" v-loading="loading">
+          <template #header>
+            <div class="card-header">
+              <span class="card-title">品牌SKU数及销售对比变化</span>
+            </div>
+          </template>
+          <div ref="comboChartRef" class="chart-box large-chart" />
+        </el-card>
+      </el-col>
+    </el-row>
+
+    <el-card shadow="hover" class="page-card summary-card">
       <template #header>
         <div class="card-header">
-          <span class="card-title">品牌SKU数及销售对比变化</span>
-        </div>
-      </template>
-      <div ref="comboChartRef" class="chart-box combo-chart" />
-    </el-card>
-
-    <el-card shadow="hover" class="page-card advice-card">
-      <template #header>
-        <div class="advice-header">
           <span class="card-title">总结与建议</span>
         </div>
       </template>
-      <ul class="advice-list">
-        <li><strong>优质品牌维护建议：</strong> 清扬、滴露、蓝月亮销售额表现优异且客户购买意向较高，建议继续保障头部陈列与促销资源稳定投放。</li>
-        <li><strong>弱势品牌优化建议：</strong> 销售额偏弱且客户意向较低的长尾品牌，建议结合门店定位与替代品牌逐步精简。</li>
-        <li><strong>增长品牌经营解读：</strong> 舒肤佳、威露士销售额同比上涨且意向提升，说明品牌势能和复购表现正在增强，可适度扩大覆盖。</li>
-        <li><strong>下滑品牌风险预警：</strong> 部分高库存低动销品牌出现销售额与购买意向同步下滑，建议及时复盘价格带、促销节奏和陈列位置。</li>
-      </ul>
+      <div class="summary-box">
+        <ul class="summary-list">
+          <li>{{ summaryLines[0] }}</li>
+          <li>{{ summaryLines[1] }}</li>
+          <li>{{ summaryLines[2] }}</li>
+          <li>{{ summaryLines[3] }}</li>
+        </ul>
+      </div>
     </el-card>
   </div>
 </template>
 
-<script setup name="BrandAnalysis" lang="ts">
+<script setup lang="ts">
 import * as echarts from 'echarts';
 import type { EChartsOption } from 'echarts';
+import { getBrandDetails, getBrandOverview, getBrandRanking, getBrandSalesShare } from '@/api/category/diagnosis/analysis';
 
-interface BrandSaleItem {
-  name: string;
-  value: number;
-  color: string;
-}
-
-interface BrandRankItem {
-  name: string;
-  salesAmount: number;
-  grossAmount: number;
-  saleQty: number;
-}
-
-const router = useRouter();
 const route = useRoute();
-
+const router = useRouter();
+const sessionId = computed(() => String(route.query.sessionId || ''));
+const loading = ref(false);
+const metrics = ref([
+  { label: '品牌总数', value: '--', emphasis: true },
+  { label: '新销品牌', value: '--', emphasis: true },
+  { label: '自有品牌', value: '--', emphasis: false }
+]);
+const tableRows = ref<any[]>([]);
 const pieChartRef = ref<HTMLDivElement>();
 const rankChartRef = ref<HTMLDivElement>();
 const comboChartRef = ref<HTMLDivElement>();
@@ -120,253 +126,245 @@ const pieChartIns = ref<echarts.ECharts>();
 const rankChartIns = ref<echarts.ECharts>();
 const comboChartIns = ref<echarts.ECharts>();
 
-const metricCards = [
-  { label: '品牌总数', value: '18' },
-  { label: '新销品牌', value: '4' },
-  { label: '自有品牌', value: '3' }
-];
+const rankMetric = ref('salesAmount');
+const rankDesc = ref(true);
+const rankPage = reactive({
+  page: 1,
+  pageSize: 10,
+  total: 0
+});
 
-const piePage = ref(1);
-const rankPage = ref(1);
-const pageSize = 6;
-const activeRankMetric = ref('salesAmount');
+const pieItems = ref<any[]>([]);
+const rankItems = ref<any[]>([]);
+const overviewData = ref<any>({});
 
-const rankMetricOptions = [
-  { label: '销售额', value: 'salesAmount' },
-  { label: '毛利额', value: 'grossAmount' },
-  { label: '销售量', value: 'saleQty' }
-];
-
-const brandSales: BrandSaleItem[] = [
-  { name: '清扬', value: 128600, color: '#27b0d6' },
-  { name: '滴露', value: 116400, color: '#f06b4f' },
-  { name: '蓝月亮', value: 102800, color: '#b69cff' },
-  { name: '舒肤佳', value: 96500, color: '#34c38f' },
-  { name: '威露士', value: 84200, color: '#f59e0b' },
-  { name: '立白', value: 76500, color: '#60a5fa' },
-  { name: '六神', value: 62100, color: '#ef4444' },
-  { name: '超能', value: 55800, color: '#14b8a6' },
-  { name: '纳爱斯', value: 48600, color: '#8b5cf6' },
-  { name: '雕牌', value: 43200, color: '#f97316' }
-];
-
-const brandRanks: BrandRankItem[] = [
-  { name: '清扬', salesAmount: 128600, grossAmount: 46280, saleQty: 6520 },
-  { name: '滴露', salesAmount: 116400, grossAmount: 41360, saleQty: 5930 },
-  { name: '蓝月亮', salesAmount: 102800, grossAmount: 36850, saleQty: 5210 },
-  { name: '舒肤佳', salesAmount: 96500, grossAmount: 34120, saleQty: 4880 },
-  { name: '威露士', salesAmount: 84200, grossAmount: 30240, saleQty: 4310 },
-  { name: '立白', salesAmount: 76500, grossAmount: 28620, saleQty: 3960 },
-  { name: '六神', salesAmount: 62100, grossAmount: 23120, saleQty: 3210 },
-  { name: '超能', salesAmount: 55800, grossAmount: 20450, saleQty: 2860 },
-  { name: '纳爱斯', salesAmount: 48600, grossAmount: 17980, saleQty: 2520 },
-  { name: '雕牌', salesAmount: 43200, grossAmount: 15360, saleQty: 2250 }
-];
-
-const comboBrands = ['清扬', '滴露', '蓝月亮', '舒肤佳', '威露士', '立白', '六神', '超能'];
-const comboSkuChange = [6, 4, -2, 5, 3, -1, -3, 2];
-const comboSalesGrowth = [18.6, 12.4, -4.2, 16.8, 9.3, -2.1, -6.8, 4.5];
-
-const piePageCount = computed(() => Math.max(1, Math.ceil(brandSales.length / pageSize)));
-const rankPageCount = computed(() => Math.max(1, Math.ceil(brandRanks.length / pageSize)));
-const currentPieRows = computed(() => brandSales.slice((piePage.value - 1) * pageSize, piePage.value * pageSize));
-const currentRankRows = computed(() => brandRanks.slice((rankPage.value - 1) * pageSize, rankPage.value * pageSize));
-
-const initPieChart = () => {
-  if (!pieChartRef.value) return;
-  if (!pieChartIns.value) pieChartIns.value = echarts.init(pieChartRef.value);
+const formatAmount = (value: unknown, digits = 0) => {
+  const num = Number(value ?? 0);
+  if (!Number.isFinite(num)) return '--';
+  return num.toLocaleString('zh-CN', { minimumFractionDigits: 0, maximumFractionDigits: digits });
 };
 
-const initRankChart = () => {
-  if (!rankChartRef.value) return;
-  if (!rankChartIns.value) rankChartIns.value = echarts.init(rankChartRef.value);
+const formatPercent = (value: unknown) => {
+  const num = Number(value ?? 0);
+  if (!Number.isFinite(num)) return '--';
+  return `${num.toFixed(2)}%`;
 };
 
-const initComboChart = () => {
-  if (!comboChartRef.value) return;
-  if (!comboChartIns.value) comboChartIns.value = echarts.init(comboChartRef.value);
+const resolveRankValue = (item: any, metric: string) => Number(item?.[metric] ?? item?.data ?? item?.sales ?? 0);
+
+const buildPieLegendItems = computed(() =>
+  pieItems.value.map((item, index) => {
+    const compare = Number(item.comparePer ?? item.perCompare ?? item.perDiff ?? 0);
+    return {
+      name: item.name || item.productBrand || '--',
+      color: item.color || ['#2A9D8F', '#3b82f6', '#f59e0b', '#8b5cf6', '#ef4444', '#14b8a6'][index % 6],
+      percentText: formatPercent(item.per ?? item.salesPer ?? item.value ?? 0),
+      arrow: compare > 0 ? '▲' : compare < 0 ? '▼' : '•',
+      arrowClass: compare > 0 ? 'is-up' : compare < 0 ? 'is-down' : 'is-flat'
+    };
+  })
+);
+
+const summaryLines = computed(() => {
+  const top = rankItems.value[0];
+  const low = rankItems.value[rankItems.value.length - 1];
+  const up = [...rankItems.value].sort((a, b) => Number(b.growthRate ?? 0) - Number(a.growthRate ?? 0))[0];
+  const down = [...rankItems.value].sort((a, b) => Number(a.growthRate ?? 0) - Number(b.growthRate ?? 0))[0];
+  return [
+    `高销售额品牌 ${top?.productBrand || top?.name || '--'} 表现领先，建议持续保持当前运营节奏并强化资源投放。`,
+    `表现较弱品牌 ${low?.productBrand || low?.name || '--'} 需重点关注曝光、转化与补货节奏。`,
+    `环比涨幅较高品牌 ${up?.productBrand || up?.name || '--'} 体现购买意向提升，可继续放大优势。`,
+    `环比下滑品牌 ${down?.productBrand || down?.name || '--'} 需要及时复盘客群变化与竞品冲击。`
+  ];
+});
+
+const reload = async () => {
+  if (!sessionId.value) return;
+  loading.value = true;
+  try {
+    const [overviewRes, shareRes, rankRes, listRes] = await Promise.all([
+      getBrandOverview(sessionId.value),
+      getBrandSalesShare(sessionId.value),
+      getBrandRanking({ sessionId: sessionId.value, page: rankPage.page, size: rankPage.pageSize, type: rankMetric.value, order: rankDesc.value ? 'desc' : 'asc' }),
+      getBrandDetails({ sessionId: sessionId.value, page: 1, size: 10 })
+    ]);
+    const overview: any = overviewRes.data || {};
+    overviewData.value = overview;
+    metrics.value = [
+      { label: '品牌总数', value: overview.totalNum ?? 0, emphasis: true },
+      { label: '新销品牌', value: overview.newNum ?? 0, emphasis: true },
+      { label: '自有品牌', value: overview.ownNum ?? 0, emphasis: false }
+    ];
+    pieItems.value = Array.isArray((shareRes.data as any)?.data) ? (shareRes.data as any).data : Array.isArray(shareRes.data) ? (shareRes.data as any) : [];
+    rankItems.value = Array.isArray((rankRes.data as any)?.data?.list)
+      ? (rankRes.data as any).data.list
+      : Array.isArray((rankRes.data as any)?.data)
+        ? (rankRes.data as any).data
+        : [];
+    tableRows.value = Array.isArray((listRes.data as any)?.data?.records) ? (listRes.data as any).data.records : [];
+    rankPage.total = Number((rankRes.data as any)?.data?.total || rankItems.value.length || 0);
+    await nextTick();
+    renderPieChart();
+    renderRankChart();
+    renderComboChart();
+  } finally {
+    loading.value = false;
+  }
 };
 
 const renderPieChart = () => {
-  initPieChart();
-  if (!pieChartIns.value) return;
-  const option: EChartsOption = {
-    color: currentPieRows.value.map((item) => item.color),
-    tooltip: {
-      trigger: 'item',
-      formatter: (params: any) => `${params.name}<br/>销售额：${Number(params.value).toLocaleString('zh-CN')}<br/>占比：${Number(params.percent).toFixed(2)}%`
-    },
-    legend: {
-      orient: 'vertical',
-      right: 8,
-      top: 'middle',
-      icon: 'circle',
-      itemWidth: 10,
-      itemHeight: 10,
-      textStyle: { color: '#606266', fontSize: 13 }
-    },
-    series: [
-      {
-        type: 'pie',
-        radius: ['52%', '72%'],
-        center: ['34%', '50%'],
-        label: { show: false },
-        labelLine: { show: false },
-        data: currentPieRows.value.map((item) => ({ name: item.name, value: item.value, itemStyle: { color: item.color } }))
-      }
-    ]
-  };
-  pieChartIns.value.setOption(option, true);
+  if (!pieChartRef.value) return;
+  pieChartIns.value ||= echarts.init(pieChartRef.value);
+  pieChartIns.value.setOption(
+    {
+      tooltip: { trigger: 'item' },
+      legend: { show: false },
+      series: [
+        {
+          type: 'pie',
+          radius: ['56%', '76%'],
+          center: ['40%', '50%'],
+          avoidLabelOverlap: true,
+          label: { show: false },
+          labelLine: { show: false },
+          data: pieItems.value.map((item, index) => ({
+            name: item.name || item.productBrand || `品牌${index + 1}`,
+            value: Number(item.value ?? item.sales ?? 0),
+            itemStyle: { color: item.color || ['#2A9D8F', '#3b82f6', '#f59e0b', '#8b5cf6', '#ef4444'][index % 5] }
+          }))
+        }
+      ]
+    } as EChartsOption,
+    true
+  );
 };
 
 const renderRankChart = () => {
-  initRankChart();
-  if (!rankChartIns.value) return;
-  const rows = currentRankRows.value;
-  const metricLabel = rankMetricOptions.find((item) => item.value === activeRankMetric.value)?.label || '销售额';
-  const values = rows.map((item) => Number(item[activeRankMetric.value as keyof BrandRankItem] || 0));
-  const option: EChartsOption = {
-    tooltip: {
-      trigger: 'axis',
-      axisPointer: { type: 'shadow' },
-      formatter: (params: any) => {
-        const row = Array.isArray(params) ? params[0] : params;
-        return `${row.axisValue}<br/>${metricLabel}：${Number(row.value).toLocaleString('zh-CN')}`;
-      }
-    },
-    grid: { left: 76, right: 26, top: 24, bottom: 24 },
-    xAxis: {
-      type: 'value',
-      axisLine: { lineStyle: { color: '#dcdfe6' } },
-      axisLabel: { color: '#606266' },
-      splitLine: { lineStyle: { color: '#ebeef5' } }
-    },
-    yAxis: {
-      type: 'category',
-      inverse: true,
-      data: rows.map((item) => item.name),
-      axisTick: { show: false },
-      axisLine: { show: false },
-      axisLabel: { color: '#606266' }
-    },
-    series: [
-      {
-        type: 'bar',
-        barWidth: 16,
-        data: values,
-        itemStyle: { color: '#27b0d6', borderRadius: [0, 8, 8, 0] },
-        label: {
-          show: true,
-          position: 'right',
-          color: '#606266',
-          formatter: ({ value }: { value: number }) => Number(value).toLocaleString('zh-CN')
-        },
-        markPoint: rows.length
-          ? {
-              symbol: 'triangle',
-              symbolSize: 16,
-              itemStyle: { color: '#e53e3e' },
-              data: [{ coord: [values[0], rows[0].name] }]
-            }
-          : undefined
-      }
-    ]
-  };
-  rankChartIns.value.setOption(option, true);
+  if (!rankChartRef.value) return;
+  rankChartIns.value ||= echarts.init(rankChartRef.value);
+  const sorted = [...rankItems.value].sort((a, b) => {
+    const diff = resolveRankValue(a, rankMetric.value) - resolveRankValue(b, rankMetric.value);
+    return rankDesc.value ? -diff : diff;
+  });
+  const data = sorted.slice(0, rankPage.pageSize);
+  rankChartIns.value.setOption(
+    {
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+      grid: { left: 110, right: 30, top: 24, bottom: 20 },
+      xAxis: {
+        type: 'value',
+        axisLabel: { formatter: (value: number) => formatAmount(value) },
+        splitLine: { lineStyle: { color: '#edf2f7' } }
+      },
+      yAxis: {
+        type: 'category',
+        inverse: true,
+        data: data.map((item) => item.productBrand || item.brandNo || item.name || '--'),
+        axisTick: { show: false },
+        axisLine: { show: false }
+      },
+      graphic: [
+        {
+          type: 'line',
+          left: 110,
+          top: 24,
+          shape: { x1: 0, y1: 0, x2: 0, y2: 260 },
+          style: { stroke: '#ef4444', lineWidth: 1.2 }
+        }
+      ],
+      series: [
+        {
+          type: 'bar',
+          data: data.map((item) => ({
+            value: resolveRankValue(item, rankMetric.value),
+            itemStyle: { color: '#0f766e', borderRadius: [0, 8, 8, 0] }
+          })),
+          barWidth: 16
+        }
+      ]
+    } as EChartsOption,
+    true
+  );
 };
 
 const renderComboChart = () => {
-  initComboChart();
-  if (!comboChartIns.value) return;
-  const option: EChartsOption = {
-    tooltip: {
-      trigger: 'axis',
-      axisPointer: { type: 'cross' },
-      formatter: (params: any) => {
-        const rows = Array.isArray(params) ? params : [params];
-        return [rows[0]?.axisValue || '', ...rows.map((item) => `${item.marker}${item.seriesName}：${Number(item.value).toFixed(2)}${item.seriesName.includes('增长率') ? '%' : ''}`)].join('<br/>');
-      }
-    },
-    legend: {
-      top: 6,
-      icon: 'circle',
-      itemWidth: 10,
-      itemHeight: 10,
-      textStyle: { color: '#606266', fontSize: 13 },
-      data: ['SKU变动数', '销售额增长率']
-    },
-    grid: { left: 52, right: 52, top: 46, bottom: 30 },
-    xAxis: {
-      type: 'category',
-      data: comboBrands,
-      axisLine: { lineStyle: { color: '#dcdfe6' } },
-      axisLabel: { color: '#606266' }
-    },
-    yAxis: [
-      {
-        type: 'value',
-        name: '销售额增长率',
-        axisLabel: { color: '#606266', formatter: (value: number) => `${value}%` },
-        splitLine: { lineStyle: { color: '#ebeef5' } }
+  if (!comboChartRef.value) return;
+  comboChartIns.value ||= echarts.init(comboChartRef.value);
+  const names = rankItems.value.map((item) => item.productBrand || item.brandNo || item.name || '--');
+  const skuDiff = rankItems.value.map((item) => Number(item.skuChange ?? item.skuDiff ?? 0));
+  const salesRate = rankItems.value.map((item) => Number(item.growthRate ?? item.salesGrowthRate ?? 0));
+  const maxSku = Math.max(1, ...skuDiff.map((v) => Math.abs(v)));
+  const maxRate = Math.max(1, ...salesRate.map((v) => Math.abs(v)));
+  comboChartIns.value.setOption(
+    {
+      tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
+      legend: { top: 8, data: ['SKU变动数', '销售额增长率'] },
+      grid: { left: 56, right: 56, top: 48, bottom: 30 },
+      xAxis: {
+        type: 'category',
+        data: names,
+        axisLabel: { interval: 0, rotate: names.length > 8 ? 30 : 0 }
       },
-      {
-        type: 'value',
-        name: 'SKU变动数',
-        axisLabel: { color: '#606266' },
-        splitLine: { show: false }
-      }
-    ],
-    series: [
-      {
-        name: 'SKU变动数',
-        type: 'bar',
-        yAxisIndex: 1,
-        barWidth: 18,
-        data: comboSkuChange,
-        itemStyle: { color: '#f59e0b', borderRadius: [4, 4, 0, 0] }
-      },
-      {
-        name: '销售额增长率',
-        type: 'line',
-        smooth: true,
-        data: comboSalesGrowth,
-        itemStyle: { color: '#9ca3af' },
-        lineStyle: { color: '#9ca3af', width: 2 }
-      }
-    ]
-  };
-  comboChartIns.value.setOption(option, true);
+      yAxis: [
+        {
+          type: 'value',
+          name: '销售额百分比',
+          axisLabel: { formatter: '{value}%' },
+          min: -maxRate,
+          max: maxRate,
+          splitLine: { lineStyle: { color: '#eef2f7' } }
+        },
+        {
+          type: 'value',
+          name: 'SKU数量差值',
+          min: -maxSku,
+          max: maxSku,
+          splitLine: { show: false }
+        }
+      ],
+      series: [
+        {
+          name: 'SKU变动数',
+          type: 'bar',
+          yAxisIndex: 1,
+          data: skuDiff,
+          itemStyle: { color: '#f59e0b' },
+          barWidth: 14
+        },
+        {
+          name: '销售额增长率',
+          type: 'line',
+          yAxisIndex: 0,
+          data: salesRate,
+          symbol: 'circle',
+          symbolSize: 8,
+          itemStyle: { color: '#3b82f6' },
+          lineStyle: { color: '#3b82f6', width: 3 },
+          areaStyle: {
+            color: 'rgba(59, 130, 246, 0.08)'
+          }
+        }
+      ]
+    } as EChartsOption,
+    true
+  );
 };
 
-const loadBrandAnalysis = async () => {
-  // TODO: replace with real backend request for brand analysis.
-  await nextTick();
-  renderPieChart();
-  renderRankChart();
-  renderComboChart();
+const handleRankPageChange = async (page: number) => {
+  rankPage.page = page;
+  await reload();
 };
 
-const changePiePage = async (page: number) => {
-  if (page < 1 || page > piePageCount.value || page === piePage.value) return;
-  piePage.value = page;
-  await nextTick();
-  renderPieChart();
-};
-
-const changeRankPage = async (page: number) => {
-  if (page < 1 || page > rankPageCount.value || page === rankPage.value) return;
-  rankPage.value = page;
-  await nextTick();
-  renderRankChart();
-};
+watch([rankMetric, rankDesc], async () => {
+  await reload();
+});
 
 const handleViewDetail = () => {
-  router.push({
-    path: '/brand/analysis/detail',
-    query: {
-      ...route.query
-    }
-  });
+  router.push({ path: '/brand/analysis/detail', query: { ...route.query } });
+};
+
+const handlePriceSetting = () => {
+  ElMessage.info('此处为前端占位按钮');
 };
 
 const resizeCharts = () => {
@@ -376,9 +374,16 @@ const resizeCharts = () => {
 };
 
 onMounted(async () => {
-  await loadBrandAnalysis();
+  await reload();
   window.addEventListener('resize', resizeCharts);
 });
+
+watch(
+  () => route.query.sessionId,
+  async () => {
+    await reload();
+  }
+);
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', resizeCharts);
@@ -400,33 +405,23 @@ onBeforeUnmount(() => {
 }
 
 .header-card,
-.metric-row,
 .chart-row,
-.combo-card {
+.metric-row,
+.summary-card {
   margin-bottom: 12px;
 }
 
-.page-header,
-.page-title-wrap,
-.title-row,
-.page-actions,
-.card-header,
-.toolbar-wrap,
-.page-switcher,
-.advice-header {
+.page-header {
   display: flex;
-  align-items: center;
-}
-
-.page-header,
-.card-header,
-.advice-header {
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
+  gap: 16px;
 }
 
 .page-title-wrap {
-  gap: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .page-title-line {
@@ -439,37 +434,22 @@ onBeforeUnmount(() => {
 .page-title {
   font-size: 20px;
   font-weight: 700;
-  color: var(--el-text-color-primary);
+  color: #0f172a;
 }
 
-.title-row {
-  gap: 10px;
-  margin-top: 10px;
+.detail-link {
+  padding-left: 0;
 }
 
-.category-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-}
-
-.page-header-right {
+.page-actions {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 10px;
-}
-
-.hint-text,
-.unit-text {
-  font-size: 13px;
-  color: var(--el-text-color-secondary);
-}
-
-.page-actions,
-.toolbar-wrap,
-.page-switcher {
+  align-items: center;
   gap: 12px;
+}
+
+.unit-text {
+  color: #64748b;
+  font-size: 13px;
 }
 
 .metric-row {
@@ -479,29 +459,59 @@ onBeforeUnmount(() => {
 }
 
 .metric-card {
-  padding: 18px 20px;
+  min-height: 104px;
+  border-radius: 12px;
+  padding: 12px;
 }
 
 .metric-label {
+  color: #64748b;
   font-size: 13px;
-  color: var(--el-text-color-secondary);
 }
 
 .metric-value {
-  margin-top: 10px;
-  font-size: 28px;
+  margin-top: 14px;
+  font-size: 24px;
   font-weight: 700;
-  color: var(--el-text-color-primary);
+  color: #0f172a;
 }
 
-.card-title {
+.metric-value.emphasis {
+  color: #0f766e;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.card-title,
+.card-title-wrap {
   font-size: 15px;
   font-weight: 600;
-  color: var(--el-text-color-primary);
+  color: #0f172a;
 }
 
-.metric-select {
-  width: 120px;
+.card-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.desc-toggle {
+  padding-left: 0;
+}
+
+.rank-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.rank-select {
+  width: 110px;
 }
 
 .chart-box {
@@ -509,42 +519,122 @@ onBeforeUnmount(() => {
 }
 
 .medium-chart {
-  height: 340px;
+  height: 360px;
 }
 
-.combo-chart {
-  height: 320px;
+.large-chart {
+  height: 420px;
 }
 
-.advice-list {
+.pie-wrap {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: 12px;
+}
+
+.pie-legend {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+  border-left: 1px solid #e5e7eb;
+  padding-left: 12px;
+}
+
+.pie-legend-item {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.pie-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.pie-legend-name {
+  color: #334155;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.pie-legend-value {
+  color: #64748b;
+}
+
+.pie-legend-arrow {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.pie-legend-arrow.is-up {
+  color: #16a34a;
+}
+
+.pie-legend-arrow.is-down {
+  color: #dc2626;
+}
+
+.pie-legend-arrow.is-flat {
+  color: #64748b;
+}
+
+.summary-card {
+  background: #f3f4f6;
+  border-radius: 14px;
+}
+
+.summary-box {
+  background: #f3f4f6;
+  padding: 16px 18px;
+  border-radius: 14px;
+}
+
+.summary-list {
   margin: 0;
-  padding-left: 18px;
-  color: var(--el-text-color-regular);
-  line-height: 1.8;
+  padding-left: 20px;
+  color: #4b5563;
+  line-height: 1.9;
 }
 
-.advice-list li + li {
-  margin-top: 10px;
+.summary-list li + li {
+  margin-top: 6px;
+}
+
+@media (max-width: 1200px) {
+  .pie-wrap {
+    grid-template-columns: 1fr;
+  }
+
+  .pie-legend {
+    border-left: 0;
+    border-top: 1px solid #e5e7eb;
+    padding-left: 0;
+    padding-top: 12px;
+  }
 }
 
 @media (max-width: 992px) {
-  .page-header,
-  .card-header {
+  .page-header {
     flex-direction: column;
     align-items: flex-start;
   }
 
-  .page-header-right {
-    align-items: flex-start;
+  .page-actions {
+    width: 100%;
+    justify-content: space-between;
   }
 
   .metric-row {
     grid-template-columns: 1fr;
   }
 
-  .toolbar-wrap {
-    width: 100%;
-    flex-wrap: wrap;
+  .medium-chart {
+    height: 320px;
   }
 }
 </style>

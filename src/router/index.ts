@@ -197,6 +197,12 @@ export const constantRoutes: RouteRecordRaw[] = [
     hidden: true,
     children: [
       {
+        path: 'analysis',
+        component: () => import('@/views/category/analysis/index.vue'),
+        name: 'CategoryAnalysis',
+        meta: { title: '品类分析', activeMenu: '/category/analysis' }
+      },
+      {
         path: 'diagnosis',
         component: () => import('@/views/category/diagnosis/index.vue'),
         name: 'CategoryDiagnosis',
