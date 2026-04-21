@@ -281,6 +281,20 @@ const findRadarRowByAge = (ageName: string) => {
   return radarRows.value.find((item) => matchesGender(item) && aliases.includes(String(item.ageName || '')));
 };
 
+const buildRadarSourceRows = () => {
+  const ageGroupOrder = ['20岁及以下', '21-30岁', '31-40岁', '41-50岁', '51-60岁', '61岁及以上'];
+  const genderValue = filters.gender;
+  const rows = radarRows.value.filter((item) => item.ageCode !== 'ALL' && item.ageName !== '全部');
+  return ageGroupOrder.map((ageName) => {
+    const matched = rows.filter((item) => {
+      const sameAge = item.ageName === ageName;
+      const sameGender = genderValue === 'ALL' || String(item.gender ?? '') === genderValue;
+      return sameAge && sameGender;
+    });
+    return matched[0];
+  });
+};
+
 const renderRadarChart = () => {
   if (!radarChartRef.value) return;
   if (!radarChartIns.value) {
@@ -294,6 +308,20 @@ const renderRadarChart = () => {
       value: metricLabels.map((_, index) => getRadarDimensionValue(row, index))
     };
   });
+  const ageGroupOrder = ['20岁及以下', '21-30岁', '31-40岁', '41-50岁', '51-60岁', '61岁及以上'];
+  const ageColorMap: Record<string, string> = {
+    '20岁及以下': '#3b82f6',
+    '21-30岁': '#22c55e',
+    '31-40岁': '#f59e0b',
+    '41-50岁': '#ef4444',
+    '51-60岁': '#8b5cf6',
+    '61岁及以上': '#14b8a6'
+  };
+  const sourceRows = buildRadarSourceRows();
+  const chartSeries: RadarSeriesItem[] = ageGroupOrder.map((ageName, index) => ({
+    name: ageName,
+    value: metricLabels.map((_, metricIndex) => getRadarDimensionValue(sourceRows[index], metricIndex))
+  }));
 
   const values = chartSeries.flatMap((item) => item.value);
   const radarMax = Math.max(1, ...values);
@@ -390,6 +418,14 @@ watch(
   () => route.query.sessionId,
   async () => {
     await loadPageData();
+  }
+);
+
+watch(
+  () => [filters.gender, filters.group],
+  async () => {
+    if (!sessionId.value) return;
+    await radarRequest.run(sessionId.value);
   }
 );
 

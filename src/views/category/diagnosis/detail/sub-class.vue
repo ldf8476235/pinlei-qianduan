@@ -46,15 +46,8 @@
         </div>
       </template>
 
-      <el-table
-        :data="tableRows"
-        border
-        stripe
-        row-key="categoryKey"
-        class="sub-class-table"
-        header-cell-class-name="sub-class-table-header"
-      >
-        <el-table-column label="品类" fixed="left" min-width="200" align="center">
+      <el-table :data="tableRows" border stripe row-key="categoryKey" class="sub-class-table">
+        <el-table-column label="品类" fixed="left" min-width="220" align="center">
           <template #default="{ row }">
             <div class="category-cell">
               <span class="category-code">{{ row.classNo }}</span>
@@ -62,110 +55,88 @@
             </div>
           </template>
         </el-table-column>
-
         <el-table-column label="本期" align="center">
-          <el-table-column label="销售额" min-width="128" align="center" sortable :sort-method="sortByField('currentSales')">
+          <el-table-column label="销售额" min-width="130" align="center" sortable="custom">
             <template #default="{ row }">{{ formatAmount(row.currentSales) }}</template>
           </el-table-column>
-          <el-table-column label="占比" min-width="164" align="center" sortable :sort-method="sortByField('currentSalesPer')">
+          <el-table-column label="占比" min-width="130" align="center" sortable="custom">
             <template #default="{ row }">
-              <div class="share-cell">
-                <span class="share-value">{{ formatPercent(row.currentSalesPer) }}</span>
-                <div class="share-track">
-                  <span class="share-fill" :style="{ width: `${getShareBarWidth(row.currentSalesPer)}%` }" />
+              <div class="percent-cell">
+                <div class="percent-track">
+                  <div class="percent-fill" :style="{ width: `${clampPercent(row.currentSalesPer)}%` }" />
                 </div>
+                <span class="percent-text">{{ formatPercent(row.currentSalesPer) }}</span>
               </div>
             </template>
           </el-table-column>
-          <el-table-column label="毛利额" min-width="128" align="center" sortable :sort-method="sortByField('currentGross')">
+          <el-table-column label="毛利额" min-width="130" align="center" sortable="custom">
             <template #default="{ row }">{{ formatAmount(row.currentGross) }}</template>
           </el-table-column>
-          <el-table-column label="占比" min-width="164" align="center" sortable :sort-method="sortByField('currentGrossPer')">
+          <el-table-column label="占比" min-width="130" align="center" sortable="custom">
             <template #default="{ row }">
-              <div class="share-cell">
-                <span class="share-value">{{ formatPercent(row.currentGrossPer) }}</span>
-                <div class="share-track">
-                  <span class="share-fill" :style="{ width: `${getShareBarWidth(row.currentGrossPer)}%` }" />
+              <div class="percent-cell">
+                <div class="percent-track">
+                  <div class="percent-fill" :style="{ width: `${clampPercent(row.currentGrossPer)}%` }" />
                 </div>
+                <span class="percent-text">{{ formatPercent(row.currentGrossPer) }}</span>
               </div>
             </template>
           </el-table-column>
-          <el-table-column label="毛利率" min-width="112" align="center" sortable :sort-method="sortByField('currentGrossRate')">
+          <el-table-column label="毛利率" min-width="110" align="center" sortable="custom">
             <template #default="{ row }">{{ formatPercent(row.currentGrossRate) }}</template>
           </el-table-column>
-          <el-table-column label="客数" min-width="112" align="center" sortable :sort-method="sortByField('currentCustomerCount')">
+          <el-table-column label="客数" min-width="110" align="center" sortable="custom">
             <template #default="{ row }">{{ formatInteger(row.currentCustomerCount) }}</template>
           </el-table-column>
-          <el-table-column label="客单价" min-width="112" align="center" sortable :sort-method="sortByField('currentCustomerPrice')">
+          <el-table-column label="客单价" min-width="120" align="center" sortable="custom">
             <template #default="{ row }">{{ formatAmount(row.currentCustomerPrice) }}</template>
           </el-table-column>
         </el-table-column>
-
         <el-table-column label="对比日期" align="center">
-          <el-table-column label="销售额" min-width="128" align="center" sortable :sort-method="sortByField('compareSales')">
+          <el-table-column label="销售额" min-width="130" align="center" sortable="custom">
             <template #default="{ row }">{{ formatAmount(row.compareSales) }}</template>
           </el-table-column>
-          <el-table-column label="占比" min-width="164" align="center" sortable :sort-method="sortByField('compareSalesPer')">
+          <el-table-column label="占比" min-width="130" align="center" sortable="custom">
             <template #default="{ row }">
-              <div class="share-cell">
-                <span class="share-value">{{ formatPercent(row.compareSalesPer) }}</span>
-                <div class="share-track">
-                  <span class="share-fill" :style="{ width: `${getShareBarWidth(row.compareSalesPer)}%` }" />
+              <div class="percent-cell">
+                <div class="percent-track">
+                  <div class="percent-fill" :style="{ width: `${clampPercent(row.compareSalesPer)}%` }" />
                 </div>
+                <span class="percent-text">{{ formatPercent(row.compareSalesPer) }}</span>
               </div>
             </template>
           </el-table-column>
-          <el-table-column label="对比增长" min-width="118" align="center" sortable :sort-method="sortByField('compareSalesAddRate')">
+          <el-table-column label="对比增长" min-width="120" align="center" sortable="custom">
             <template #default="{ row }">
               <span :class="growthClass(row.compareSalesAddRate)">{{ formatGrowth(row.compareSalesAddRate) }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="毛利额" min-width="128" align="center" sortable :sort-method="sortByField('compareGross')">
+          <el-table-column label="毛利额" min-width="130" align="center" sortable="custom">
             <template #default="{ row }">{{ formatAmount(row.compareGross) }}</template>
           </el-table-column>
-          <el-table-column label="占比" min-width="164" align="center" sortable :sort-method="sortByField('compareGrossPer')">
+          <el-table-column label="占比" min-width="130" align="center" sortable="custom">
             <template #default="{ row }">
-              <div class="share-cell">
-                <span class="share-value">{{ formatPercent(row.compareGrossPer) }}</span>
-                <div class="share-track">
-                  <span class="share-fill" :style="{ width: `${getShareBarWidth(row.compareGrossPer)}%` }" />
+              <div class="percent-cell">
+                <div class="percent-track">
+                  <div class="percent-fill" :style="{ width: `${clampPercent(row.compareGrossPer)}%` }" />
                 </div>
+                <span class="percent-text">{{ formatPercent(row.compareGrossPer) }}</span>
               </div>
             </template>
           </el-table-column>
-          <el-table-column label="对比增长" min-width="118" align="center" sortable :sort-method="sortByField('compareGrossAddRate')">
+          <el-table-column label="对比增长" min-width="120" align="center" sortable="custom">
             <template #default="{ row }">
               <span :class="growthClass(row.compareGrossAddRate)">{{ formatGrowth(row.compareGrossAddRate) }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="毛利率" min-width="112" align="center" sortable :sort-method="sortByField('compareGrossRate')">
+          <el-table-column label="毛利率" min-width="110" align="center" sortable="custom">
             <template #default="{ row }">{{ formatPercent(row.compareGrossRate) }}</template>
           </el-table-column>
-          <el-table-column label="客数" min-width="112" align="center" sortable :sort-method="sortByField('compareCustomerCount')">
+          <el-table-column label="客数" min-width="110" align="center" sortable="custom">
             <template #default="{ row }">{{ formatInteger(row.compareCustomerCount) }}</template>
           </el-table-column>
-          <el-table-column label="对比增长" min-width="118" align="center">
-            <template #default>--</template>
-          </el-table-column>
-          <el-table-column label="客单价" min-width="112" align="center" sortable :sort-method="sortByField('compareCustomerPrice')">
+          <el-table-column label="客单价" min-width="120" align="center" sortable="custom">
             <template #default="{ row }">{{ formatAmount(row.compareCustomerPrice) }}</template>
-          </el-table-column>
-          <el-table-column label="对比增长" min-width="118" align="center" sortable :sort-method="sortByField('compareCustomerPriceAddRate')">
-            <template #default="{ row }">
-              <span :class="growthClass(row.compareCustomerPriceAddRate)">{{ formatGrowth(row.compareCustomerPriceAddRate) }}</span>
-            </template>
-          </el-table-column>
-        </el-table-column>
-
-        <el-table-column label="本期" align="center">
-          <el-table-column label="库存周转率" min-width="124" align="center" sortable :sort-method="sortByField('currentTurnoverRate')">
-            <template #default="{ row }">{{ formatPercent(row.currentTurnoverRate) }}</template>
-          </el-table-column>
-          <el-table-column label="库存周转天数" min-width="132" align="center" sortable :sort-method="sortByField('currentTurnoverDays')">
-            <template #default="{ row }">{{ formatAmount(row.currentTurnoverDays) }}</template>
-          </el-table-column>
-          <el-table-column label="GMROI" min-width="112" align="center" sortable :sort-method="sortByField('gmroi')">
-            <template #default="{ row }">{{ formatAmount(row.gmroi) }}</template>
           </el-table-column>
         </el-table-column>
       </el-table>
@@ -190,7 +161,7 @@ import type {
   LegacySubclassSalesListItem,
   LegacySubclassSalesListResponse,
   LegacySubclassSalesPerItem,
-  LegacySubclassSalesTrendResponse
+  LegacySubclassSalesTrendResponse,
 } from '@/api/category/diagnosis/detail/types';
 
 interface SubClassTableViewRow extends LegacySubclassSalesListItem {
@@ -265,7 +236,9 @@ const resolveColor = (classNo: string, index: number) => {
   return colorMap[classNo] || colors[index % colors.length] || '#27b0d6';
 };
 
-const resolveDisplayName = (classNo: string, className: string) => `${classNo} ${className}`.trim();
+const resolveDisplayName = (classNo: string, className: string) => {
+  return `${classNo} ${className}`.trim();
+};
 
 const normalizePieData = (payload: LegacySubclassSalesPerItem[] | undefined): PieChartItem[] => {
   const rows = Array.isArray(payload) ? payload : [];
@@ -314,7 +287,6 @@ const trendSeries = computed<TrendChartSeriesItem[]>(() => {
   const lineDate = trendData.value.lineDate || [];
   const legend = trendData.value.legend || [];
   const classMap = new Map<string, { className: string; values: Record<string, number> }>();
-
   lineDate.forEach((item) => {
     const classNo = String(item.classNo || '');
     if (!classMap.has(classNo)) {
@@ -322,7 +294,6 @@ const trendSeries = computed<TrendChartSeriesItem[]>(() => {
     }
     classMap.get(classNo)!.values[String(item.dataDate || '')] = toNumber(item.sales, 2);
   });
-
   return Array.from(classMap.entries()).map(([classNo, row], index) => ({
     classNo,
     className: row.className,
@@ -415,8 +386,12 @@ const renderPieChart = () => {
         radius: ['52%', '72%'],
         center: ['34%', '50%'],
         avoidLabelOverlap: true,
-        label: { show: false },
-        labelLine: { show: false },
+        label: {
+          show: false
+        },
+        labelLine: {
+          show: false
+        },
         emphasis: {
           scale: true,
           scaleSize: 6
@@ -445,7 +420,9 @@ const renderTrendChart = () => {
       formatter: (params: any) => {
         const rows = Array.isArray(params) ? params : [params];
         const title = rows[0]?.axisValueLabel || rows[0]?.axisValue || '';
-        const lines = rows.map((item) => `${item.marker}${item.seriesName}：${formatAmount(item.value)}`);
+        const lines = rows.map((item) => {
+          return `${item.marker}${item.seriesName}：${formatAmount(item.value)}`;
+        });
         return [title, ...lines].join('<br/>');
       }
     },
@@ -471,9 +448,13 @@ const renderTrendChart = () => {
       boundaryGap: false,
       data: trendData.value.xdata || [],
       axisLine: {
-        lineStyle: { color: '#dcdfe6' }
+        lineStyle: {
+          color: '#dcdfe6'
+        }
       },
-      axisTick: { show: false },
+      axisTick: {
+        show: false
+      },
       axisLabel: {
         color: '#606266',
         fontSize: 12,
@@ -483,14 +464,20 @@ const renderTrendChart = () => {
     yAxis: {
       type: 'value',
       name: '元',
-      nameTextStyle: { color: '#909399' },
-      axisLine: { show: false },
+      nameTextStyle: {
+        color: '#909399'
+      },
+      axisLine: {
+        show: false
+      },
       axisLabel: {
         color: '#606266',
         formatter: (value: number) => formatAmount(value, 0)
       },
       splitLine: {
-        lineStyle: { color: '#ebeef5' }
+        lineStyle: {
+          color: '#ebeef5'
+        }
       }
     },
     series: trendSeries.value.map((item) => ({
@@ -527,13 +514,8 @@ const loadPageData = async () => {
     ElMessage.error('缺少 sessionId，无法加载子类贡献详情');
     return;
   }
-
   const body = buildRequestBody();
-  await Promise.all([
-    pieRequest.run(body),
-    trendRequest.run(body),
-    tableRequest.run({ ...body, page: 1, size: 999, order: 'currentSales', orderType: 'desc' })
-  ]);
+  await Promise.all([pieRequest.run(body), trendRequest.run(body), tableRequest.run({ ...body, page: 1, size: 999, order: 'currentSales', orderType: 'desc' })]);
 };
 
 const handleExport = () => {
@@ -557,16 +539,14 @@ const formatInteger = (value: unknown) => formatAmount(value, 0);
 
 const formatPercent = (value: unknown) => `${toNumber(value, 2).toFixed(2)}%`;
 
-const getShareBarWidth = (value: unknown) => {
-  const num = Math.abs(toNumber(value));
-  const percent = num <= 1 ? num * 100 : num;
-  return Math.min(percent, 100);
-};
-
 const formatGrowth = (value: unknown) => {
   const num = toNumber(value, 2);
   const prefix = num > 0 ? '+' : '';
   return `${prefix}${num.toFixed(2)}%`;
+};
+
+const clampPercent = (value: unknown) => {
+  return Math.max(0, Math.min(100, toNumber(value, 2)));
 };
 
 const growthClass = (value: unknown) => {
@@ -575,10 +555,6 @@ const growthClass = (value: unknown) => {
   if (num < 0) return 'growth-text is-down';
   return 'growth-text is-flat';
 };
-
-const sortByField =
-  (field: keyof SubClassTableViewRow) => (a: SubClassTableViewRow, b: SubClassTableViewRow) =>
-    toNumber(a[field]) - toNumber(b[field]);
 
 const resizeCharts = () => {
   pieChartIns.value?.resize();
@@ -702,9 +678,10 @@ onUnmounted(() => {
 .category-cell {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 6px;
   min-width: 0;
+  justify-content: center;
+  width: 100%;
   text-align: center;
 }
 
@@ -721,33 +698,32 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 
-.share-cell {
+.percent-cell {
   display: flex;
   align-items: center;
+  gap: 8px;
   justify-content: center;
-  gap: 10px;
+  width: 100%;
 }
 
-.share-value {
-  min-width: 56px;
-  color: #0f766e;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-
-.share-track {
+.percent-track {
   width: 72px;
   height: 8px;
   border-radius: 999px;
-  background: #d9f2ef;
+  background: #e5f6f3;
   overflow: hidden;
+  flex: 0 0 auto;
 }
 
-.share-fill {
-  display: block;
+.percent-fill {
   height: 100%;
-  border-radius: 999px;
-  background: linear-gradient(90deg, #16c2a3 0%, #0ea5a4 100%);
+  border-radius: inherit;
+  background: linear-gradient(90deg, #21b7a8 0%, #28d0c2 100%);
+}
+
+.percent-text {
+  min-width: 72px;
+  text-align: center;
 }
 
 .growth-text {
@@ -770,15 +746,6 @@ onUnmounted(() => {
   background: #f8fafc;
   color: var(--el-text-color-primary);
   font-weight: 600;
-}
-
-.sub-class-table :deep(.sub-class-table-header) {
-  text-align: center;
-}
-
-.sub-class-table :deep(.el-table__header .cell) {
-  white-space: normal;
-  line-height: 1.4;
 }
 
 .sub-class-table :deep(.cell) {
