@@ -47,7 +47,7 @@
       </template>
 
       <el-table :data="tableRows" border stripe row-key="categoryKey" class="sub-class-table">
-        <el-table-column label="品类" fixed="left" min-width="200" align="left">
+        <el-table-column label="品类" fixed="left" min-width="220" align="center">
           <template #default="{ row }">
             <div class="category-cell">
               <span class="category-code">{{ row.classNo }}</span>
@@ -55,48 +55,89 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="本期销售额" min-width="130" align="right">
-          <template #default="{ row }">{{ formatAmount(row.currentSales) }}</template>
+        <el-table-column label="本期" align="center">
+          <el-table-column label="销售额" min-width="130" align="center" sortable="custom">
+            <template #default="{ row }">{{ formatAmount(row.currentSales) }}</template>
+          </el-table-column>
+          <el-table-column label="占比" min-width="130" align="center" sortable="custom">
+            <template #default="{ row }">
+              <div class="percent-cell">
+                <div class="percent-track">
+                  <div class="percent-fill" :style="{ width: `${clampPercent(row.currentSalesPer)}%` }" />
+                </div>
+                <span class="percent-text">{{ formatPercent(row.currentSalesPer) }}</span>
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column label="毛利额" min-width="130" align="center" sortable="custom">
+            <template #default="{ row }">{{ formatAmount(row.currentGross) }}</template>
+          </el-table-column>
+          <el-table-column label="占比" min-width="130" align="center" sortable="custom">
+            <template #default="{ row }">
+              <div class="percent-cell">
+                <div class="percent-track">
+                  <div class="percent-fill" :style="{ width: `${clampPercent(row.currentGrossPer)}%` }" />
+                </div>
+                <span class="percent-text">{{ formatPercent(row.currentGrossPer) }}</span>
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column label="毛利率" min-width="110" align="center" sortable="custom">
+            <template #default="{ row }">{{ formatPercent(row.currentGrossRate) }}</template>
+          </el-table-column>
+          <el-table-column label="客数" min-width="110" align="center" sortable="custom">
+            <template #default="{ row }">{{ formatInteger(row.currentCustomerCount) }}</template>
+          </el-table-column>
+          <el-table-column label="客单价" min-width="120" align="center" sortable="custom">
+            <template #default="{ row }">{{ formatAmount(row.currentCustomerPrice) }}</template>
+          </el-table-column>
         </el-table-column>
-        <el-table-column label="本期销售额占比" min-width="130" align="right">
-          <template #default="{ row }">{{ formatPercent(row.currentSalesPer) }}</template>
-        </el-table-column>
-        <el-table-column label="本期毛利额" min-width="130" align="right">
-          <template #default="{ row }">{{ formatAmount(row.currentGross) }}</template>
-        </el-table-column>
-        <el-table-column label="本期毛利额占比" min-width="130" align="right">
-          <template #default="{ row }">{{ formatPercent(row.currentGrossPer) }}</template>
-        </el-table-column>
-        <el-table-column label="毛利率" min-width="110" align="right">
-          <template #default="{ row }">{{ formatPercent(row.currentGrossRate) }}</template>
-        </el-table-column>
-        <el-table-column label="客数" min-width="100" align="right">
-          <template #default="{ row }">{{ formatInteger(row.currentCustomerCount) }}</template>
-        </el-table-column>
-        <el-table-column label="客单价" min-width="110" align="right">
-          <template #default="{ row }">{{ formatAmount(row.currentCustomerPrice) }}</template>
-        </el-table-column>
-        <el-table-column label="对比期销售额" min-width="130" align="right">
-          <template #default="{ row }">{{ formatAmount(row.compareSales) }}</template>
-        </el-table-column>
-        <el-table-column label="对比期销售额占比" min-width="140" align="right">
-          <template #default="{ row }">{{ formatPercent(row.compareSalesPer) }}</template>
-        </el-table-column>
-        <el-table-column label="销售额对比增长" min-width="130" align="right">
-          <template #default="{ row }">
-            <span :class="growthClass(row.compareSalesAddRate)">{{ formatGrowth(row.compareSalesAddRate) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="对比期毛利额" min-width="130" align="right">
-          <template #default="{ row }">{{ formatAmount(row.compareGross) }}</template>
-        </el-table-column>
-        <el-table-column label="对比期毛利额占比" min-width="140" align="right">
-          <template #default="{ row }">{{ formatPercent(row.compareGrossPer) }}</template>
-        </el-table-column>
-        <el-table-column label="毛利额对比增长" min-width="130" align="right">
-          <template #default="{ row }">
-            <span :class="growthClass(row.compareGrossAddRate)">{{ formatGrowth(row.compareGrossAddRate) }}</span>
-          </template>
+        <el-table-column label="对比日期" align="center">
+          <el-table-column label="销售额" min-width="130" align="center" sortable="custom">
+            <template #default="{ row }">{{ formatAmount(row.compareSales) }}</template>
+          </el-table-column>
+          <el-table-column label="占比" min-width="130" align="center" sortable="custom">
+            <template #default="{ row }">
+              <div class="percent-cell">
+                <div class="percent-track">
+                  <div class="percent-fill" :style="{ width: `${clampPercent(row.compareSalesPer)}%` }" />
+                </div>
+                <span class="percent-text">{{ formatPercent(row.compareSalesPer) }}</span>
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column label="对比增长" min-width="120" align="center" sortable="custom">
+            <template #default="{ row }">
+              <span :class="growthClass(row.compareSalesAddRate)">{{ formatGrowth(row.compareSalesAddRate) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="毛利额" min-width="130" align="center" sortable="custom">
+            <template #default="{ row }">{{ formatAmount(row.compareGross) }}</template>
+          </el-table-column>
+          <el-table-column label="占比" min-width="130" align="center" sortable="custom">
+            <template #default="{ row }">
+              <div class="percent-cell">
+                <div class="percent-track">
+                  <div class="percent-fill" :style="{ width: `${clampPercent(row.compareGrossPer)}%` }" />
+                </div>
+                <span class="percent-text">{{ formatPercent(row.compareGrossPer) }}</span>
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column label="对比增长" min-width="120" align="center" sortable="custom">
+            <template #default="{ row }">
+              <span :class="growthClass(row.compareGrossAddRate)">{{ formatGrowth(row.compareGrossAddRate) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="毛利率" min-width="110" align="center" sortable="custom">
+            <template #default="{ row }">{{ formatPercent(row.compareGrossRate) }}</template>
+          </el-table-column>
+          <el-table-column label="客数" min-width="110" align="center" sortable="custom">
+            <template #default="{ row }">{{ formatInteger(row.compareCustomerCount) }}</template>
+          </el-table-column>
+          <el-table-column label="客单价" min-width="120" align="center" sortable="custom">
+            <template #default="{ row }">{{ formatAmount(row.compareCustomerPrice) }}</template>
+          </el-table-column>
         </el-table-column>
       </el-table>
     </el-card>
@@ -504,6 +545,10 @@ const formatGrowth = (value: unknown) => {
   return `${prefix}${num.toFixed(2)}%`;
 };
 
+const clampPercent = (value: unknown) => {
+  return Math.max(0, Math.min(100, toNumber(value, 2)));
+};
+
 const growthClass = (value: unknown) => {
   const num = Number(value ?? 0);
   if (num > 0) return 'growth-text is-up';
@@ -635,6 +680,9 @@ onUnmounted(() => {
   align-items: center;
   gap: 6px;
   min-width: 0;
+  justify-content: center;
+  width: 100%;
+  text-align: center;
 }
 
 .category-code {
@@ -648,6 +696,34 @@ onUnmounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.percent-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+  width: 100%;
+}
+
+.percent-track {
+  width: 72px;
+  height: 8px;
+  border-radius: 999px;
+  background: #e5f6f3;
+  overflow: hidden;
+  flex: 0 0 auto;
+}
+
+.percent-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #21b7a8 0%, #28d0c2 100%);
+}
+
+.percent-text {
+  min-width: 72px;
+  text-align: center;
 }
 
 .growth-text {
@@ -674,6 +750,7 @@ onUnmounted(() => {
 
 .sub-class-table :deep(.cell) {
   font-size: 13px;
+  text-align: center;
 }
 
 .sub-class-table :deep(.el-table__body td) {

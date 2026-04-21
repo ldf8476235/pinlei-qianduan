@@ -241,6 +241,20 @@ const getRadarDimensionValue = (item: CustomerSalesRadarItemResponse | undefined
   return toNumber(values[index], 2);
 };
 
+const buildRadarSourceRows = () => {
+  const ageGroupOrder = ['20岁及以下', '21-30岁', '31-40岁', '41-50岁', '51-60岁', '61岁及以上'];
+  const genderValue = filters.gender;
+  const rows = radarRows.value.filter((item) => item.ageCode !== 'ALL' && item.ageName !== '全部');
+  return ageGroupOrder.map((ageName) => {
+    const matched = rows.filter((item) => {
+      const sameAge = item.ageName === ageName;
+      const sameGender = genderValue === 'ALL' || String(item.gender ?? '') === genderValue;
+      return sameAge && sameGender;
+    });
+    return matched[0];
+  });
+};
+
 const renderRadarChart = () => {
   if (!radarChartRef.value) return;
   if (!radarChartIns.value) radarChartIns.value = echarts.init(radarChartRef.value);
@@ -254,14 +268,11 @@ const renderRadarChart = () => {
     '51-60岁': '#8b5cf6',
     '61岁及以上': '#14b8a6'
   };
-  const allRows = radarRows.value.filter((item) => item.ageCode === 'ALL' || item.ageName === '全部');
-  const chartSeries: RadarSeriesItem[] = ageGroupOrder.map((ageName) => {
-    const row = allRows.find((item) => item.ageName === ageName);
-    return {
-      name: ageName,
-      value: metricLabels.map((_, index) => getRadarDimensionValue(row, index))
-    };
-  });
+  const sourceRows = buildRadarSourceRows();
+  const chartSeries: RadarSeriesItem[] = ageGroupOrder.map((ageName, index) => ({
+    name: ageName,
+    value: metricLabels.map((_, metricIndex) => getRadarDimensionValue(sourceRows[index], metricIndex))
+  }));
 
   radarChartIns.value.setOption({
     tooltip: {
@@ -340,6 +351,14 @@ watch(
   () => route.query.sessionId,
   async () => {
     await loadPageData();
+  }
+);
+
+watch(
+  () => [filters.gender, filters.group],
+  async () => {
+    if (!sessionId.value) return;
+    await radarRequest.run(sessionId.value);
   }
 );
 
