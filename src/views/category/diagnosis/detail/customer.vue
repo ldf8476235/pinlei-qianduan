@@ -10,7 +10,7 @@
         </div>
         <div class="page-actions">
           <el-select v-model="filters.group" class="header-select" size="small">
-            <el-option label="全部" value="all" />
+            <el-option label="全部年龄" value="all" />
             <el-option v-for="item in ageGroups" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
           <el-select v-model="filters.gender" class="header-select" size="small">
@@ -143,6 +143,7 @@ interface RadarSeriesItem {
 }
 
 const metricLabels = ['购物次数', '消费金额', '平均客单价', '平均商品单价', '平均购买件数'];
+
 const ageGroups = [
   { label: '20岁及以下', value: '0' },
   { label: '21-30岁', value: '1' },
@@ -151,7 +152,9 @@ const ageGroups = [
   { label: '51-60岁', value: '4' },
   { label: '61岁及以上', value: '5' }
 ];
+
 const ageGroupOrder = ageGroups.map((item) => item.label);
+
 const ageColorMap: Record<string, string> = {
   '20岁及以下': '#3b82f6',
   '21-30岁': '#22c55e',
@@ -160,13 +163,14 @@ const ageColorMap: Record<string, string> = {
   '51-60岁': '#8b5cf6',
   '61岁及以上': '#14b8a6'
 };
+
 const ageLabelAliasMap: Record<string, string[]> = {
-  '20岁及以下': ['20岁及以下', '20岁以下', '20宀佸強浠ヤ笅'],
-  '21-30岁': ['21-30岁', '21-30宀?'],
-  '31-40岁': ['31-40岁', '31-40宀?'],
-  '41-50岁': ['41-50岁', '41-50宀?'],
-  '51-60岁': ['51-60岁', '51-60宀?'],
-  '61岁及以上': ['61岁及以上', '61岁以上', '61宀佸強浠ヤ笂']
+  '20岁及以下': ['20岁及以下', '20岁以下', '20及以下'],
+  '21-30岁': ['21-30岁', '21-30'],
+  '31-40岁': ['31-40岁', '31-40'],
+  '41-50岁': ['41-50岁', '41-50'],
+  '51-60岁': ['51-60岁', '51-60'],
+  '61岁及以上': ['61岁及以上', '61岁以上', '61及以上']
 };
 
 const route = useRoute();
@@ -281,47 +285,20 @@ const findRadarRowByAge = (ageName: string) => {
   return radarRows.value.find((item) => matchesGender(item) && aliases.includes(String(item.ageName || '')));
 };
 
-const buildRadarSourceRows = () => {
-  const ageGroupOrder = ['20岁及以下', '21-30岁', '31-40岁', '41-50岁', '51-60岁', '61岁及以上'];
-  const genderValue = filters.gender;
-  const rows = radarRows.value.filter((item) => item.ageCode !== 'ALL' && item.ageName !== '全部');
-  return ageGroupOrder.map((ageName) => {
-    const matched = rows.filter((item) => {
-      const sameAge = item.ageName === ageName;
-      const sameGender = genderValue === 'ALL' || String(item.gender ?? '') === genderValue;
-      return sameAge && sameGender;
-    });
-    return matched[0];
-  });
-};
-
 const renderRadarChart = () => {
   if (!radarChartRef.value) return;
-  if (!radarChartIns.value) {
-    radarChartIns.value = echarts.init(radarChartRef.value);
-  }
+  if (!radarChartIns.value) radarChartIns.value = echarts.init(radarChartRef.value);
 
-  const chartSeries: RadarSeriesItem[] = ageGroupOrder.filter(matchesGroup).map((ageName) => {
-    const row = findRadarRowByAge(ageName);
-    return {
-      name: ageName,
-      value: metricLabels.map((_, index) => getRadarDimensionValue(row, index))
-    };
-  });
-  const ageGroupOrder = ['20岁及以下', '21-30岁', '31-40岁', '41-50岁', '51-60岁', '61岁及以上'];
-  const ageColorMap: Record<string, string> = {
-    '20岁及以下': '#3b82f6',
-    '21-30岁': '#22c55e',
-    '31-40岁': '#f59e0b',
-    '41-50岁': '#ef4444',
-    '51-60岁': '#8b5cf6',
-    '61岁及以上': '#14b8a6'
-  };
-  const sourceRows = buildRadarSourceRows();
-  const chartSeries: RadarSeriesItem[] = ageGroupOrder.map((ageName, index) => ({
-    name: ageName,
-    value: metricLabels.map((_, metricIndex) => getRadarDimensionValue(sourceRows[index], metricIndex))
-  }));
+  const chartSeries: RadarSeriesItem[] = ageGroupOrder
+    .filter(matchesGroup)
+    .map((ageName) => {
+      const row = findRadarRowByAge(ageName);
+      return {
+        name: ageName,
+        value: metricLabels.map((_, index) => getRadarDimensionValue(row, index))
+      };
+    })
+    .filter((item) => item.value.some((value) => value > 0));
 
   const values = chartSeries.flatMap((item) => item.value);
   const radarMax = Math.max(1, ...values);
@@ -333,10 +310,7 @@ const renderRadarChart = () => {
         trigger: 'item',
         formatter: (params: any) => {
           const currentValues = Array.isArray(params?.value) ? params.value : [];
-          return [
-            params.name,
-            ...metricLabels.map((label, index) => `${label}：${formatAmount(currentValues[index])}`)
-          ].join('<br/>');
+          return [params.name, ...metricLabels.map((label, index) => `${label}：${formatAmount(currentValues[index])}`)].join('<br/>');
         }
       },
       legend: {
@@ -372,12 +346,17 @@ const renderRadarChart = () => {
 
 const displayRows = computed(() => {
   const order = ['ALL', '0', '1', '2', '3', '4', '5'];
-  return [...tableRows.value].sort((a, b) => {
-    const ai = order.indexOf(a.ageCode || '');
-    const bi = order.indexOf(b.ageCode || '');
-    if (ai !== bi) return ai - bi;
-    return Number(a.ageOrder || 0) - Number(b.ageOrder || 0);
-  });
+  return [...tableRows.value]
+    .filter((row) => {
+      if (filters.group === 'all') return true;
+      return String(order.indexOf(row.ageCode || '')) === String(filters.group);
+    })
+    .sort((a, b) => {
+      const ai = order.indexOf(a.ageCode || '');
+      const bi = order.indexOf(b.ageCode || '');
+      if (ai !== bi) return ai - bi;
+      return Number(a.ageOrder || 0) - Number(b.ageOrder || 0);
+    });
 });
 
 const loadPageData = async () => {
@@ -422,7 +401,7 @@ watch(
 );
 
 watch(
-  () => [filters.gender, filters.group],
+  () => filters.gender,
   async () => {
     if (!sessionId.value) return;
     await radarRequest.run(sessionId.value);
@@ -455,6 +434,11 @@ onUnmounted(() => {
   justify-content: space-between;
   gap: 16px;
   align-items: flex-start;
+}
+
+.page-header-left {
+  display: flex;
+  flex-direction: column;
 }
 
 .page-title-wrap {

@@ -159,7 +159,7 @@
 
 <script setup name="CategoryDiagnosisDetail" lang="ts">
 import * as echarts from 'echarts';
-import { markRaw } from 'vue';
+import { defineAsyncComponent, markRaw } from 'vue';
 import { useRequest } from '@/hooks/useRequest';
 import { getDiagnosisSessionStatus } from '@/api/category/diagnosis';
 import { getCategoryDiagnosisDetailSummary, getCategoryDiagnosisDetailTrend } from '@/api/category/diagnosis/detail';
@@ -172,17 +172,19 @@ import type {
   DiagnosisOverviewResponse
 } from '@/api/category/diagnosis/detail/types';
 import type { DiagnosisSessionStatusResponse } from '@/api/category/diagnosis/types';
-import SubClassView from './sub-class.vue';
-import ChannelView from './channel.vue';
-import CustomerView from './customer.vue';
-import SpecView from './spec.vue';
-import TagView from './tag.vue';
-import AbcAnalysisView from '@/views/abc/analysis.vue';
-import GrossContributionAnalysisView from '@/views/gross-contribution/analysis.vue';
-import GmroiAnalysisView from '@/views/gmroi/analysis.vue';
-import SupplierAnalysisView from '@/views/supplier/analysis.vue';
-import PriceBandAnalysisView from '@/views/price-band/analysis.vue';
-import BrandAnalysisView from '@/views/brand/analysis.vue';
+const SubClassView = defineAsyncComponent(() => import('./sub-class.vue'));
+const ChannelView = defineAsyncComponent(() => import('./channel.vue'));
+const CustomerView = defineAsyncComponent(() => import('./customer.vue'));
+const SpecView = defineAsyncComponent(() => import('./spec.vue'));
+const TagView = defineAsyncComponent(() => import('./tag.vue'));
+const RemoveGoodsView = defineAsyncComponent(() => import('./remove-goods.vue'));
+const IntroduceDirectionView = defineAsyncComponent(() => import('./introduce-direction.vue'));
+const AbcAnalysisView = defineAsyncComponent(() => import('@/views/abc/analysis.vue'));
+const GrossContributionAnalysisView = defineAsyncComponent(() => import('@/views/gross-contribution/analysis.vue'));
+const GmroiAnalysisView = defineAsyncComponent(() => import('@/views/gmroi/analysis.vue'));
+const SupplierAnalysisView = defineAsyncComponent(() => import('@/views/supplier/analysis.vue'));
+const PriceBandAnalysisView = defineAsyncComponent(() => import('@/views/price-band/analysis.vue'));
+const BrandAnalysisView = defineAsyncComponent(() => import('@/views/brand/analysis.vue'));
 
 const route = useRoute();
 
@@ -286,7 +288,9 @@ const embeddedSideViewMap = {
   priceBandAnalysis: markRaw(PriceBandAnalysisView),
   brandAnalysis: markRaw(BrandAnalysisView),
   specAnalysis: markRaw(SpecView),
-  tagAnalysis: markRaw(TagView)
+  tagAnalysis: markRaw(TagView),
+  removeGoods: markRaw(RemoveGoodsView),
+  introduceDirection: markRaw(IntroduceDirectionView)
 } as const;
 
 const trendMetricTabs = [

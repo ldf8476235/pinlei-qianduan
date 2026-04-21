@@ -144,9 +144,6 @@
           <el-table-column label="客数" min-width="112" align="center" sortable="custom">
             <template #default="{ row }">{{ formatInteger(row.compareCustomerCount) }}</template>
           </el-table-column>
-          <el-table-column label="对比增长" min-width="118" align="center">
-            <template #default>--</template>
-          </el-table-column>
           <el-table-column label="客单价" min-width="112" align="center" sortable="custom">
             <template #default="{ row }">{{ formatAmount(row.compareCustomerPrice) }}</template>
           </el-table-column>
@@ -157,11 +154,11 @@
           </el-table-column>
         </el-table-column>
 
-        <el-table-column label="本期" align="center">
-          <el-table-column label="库存周转率" min-width="124" align="center" sortable="custom">
+        <el-table-column label="效率指标" align="center">
+          <el-table-column label="动销率" min-width="124" align="center" sortable="custom">
             <template #default="{ row }">{{ formatPercent(row.currentTurnoverRate) }}</template>
           </el-table-column>
-          <el-table-column label="库存周转天数" min-width="132" align="center" sortable="custom">
+          <el-table-column label="周转天数" min-width="132" align="center" sortable="custom">
             <template #default="{ row }">{{ formatAmount(row.currentTurnoverDays) }}</template>
           </el-table-column>
           <el-table-column label="GMROI" min-width="112" align="center" sortable="custom">
@@ -365,6 +362,15 @@ const initTrendChart = () => {
   trendChartIns.value ||= echarts.init(trendChartRef.value);
 };
 
+const formatAmount = (value: unknown, digits = 2) => {
+  const num = Number(value ?? 0);
+  if (!Number.isFinite(num)) return '--';
+  return num.toLocaleString('zh-CN', { minimumFractionDigits: 0, maximumFractionDigits: digits });
+};
+
+const formatInteger = (value: unknown) => formatAmount(value, 0);
+const formatPercent = (value: unknown) => `${toNumber(value, 2).toFixed(2)}%`;
+
 const renderPieChart = () => {
   initPieChart();
   if (!pieChartIns.value) return;
@@ -372,7 +378,8 @@ const renderPieChart = () => {
     color: pieData.value.map((item) => item.color),
     tooltip: {
       trigger: 'item',
-      formatter: (params: any) => `${params.name}<br/>销售额：${formatAmount(params.value)}<br/>占比：${toNumber(params.percent, 2).toFixed(2)}%`
+      formatter: (params: any) =>
+        `${params.name}<br/>销售额：${formatAmount(params.value)}<br/>占比：${toNumber(params.percent, 2).toFixed(2)}%`
     },
     legend: { show: false },
     series: [
@@ -461,7 +468,11 @@ const loadPageData = async () => {
     return;
   }
   const body = buildRequestBody();
-  await Promise.all([pieRequest.run(body), trendRequest.run(body), tableRequest.run({ ...body, page: 1, size: 999, order: 'currentSales', orderType: 'desc' })]);
+  await Promise.all([
+    pieRequest.run(body),
+    trendRequest.run(body),
+    tableRequest.run({ ...body, page: 1, size: 999, order: 'currentSales', orderType: 'desc' })
+  ]);
 };
 
 const handleExport = () => {
@@ -472,18 +483,16 @@ const handleExport = () => {
   download('/api/v1/diagnosis/subClass/export', { sessionId: sessionId.value }, `子类贡献_${sessionId.value}.xlsx`);
 };
 
-const formatAmount = (value: unknown, digits = 2) => {
-  const num = Number(value ?? 0);
-  if (!Number.isFinite(num)) return '--';
-  return num.toLocaleString('zh-CN', { minimumFractionDigits: 0, maximumFractionDigits: digits });
+const getShareBarWidth = (value: unknown) => {
+  const normalized = Math.abs(toNumber(value));
+  return Math.min(normalized <= 1 ? normalized * 100 : normalized, 100);
 };
-const formatInteger = (value: unknown) => formatAmount(value, 0);
-const formatPercent = (value: unknown) => `${toNumber(value, 2).toFixed(2)}%`;
-const getShareBarWidth = (value: unknown) => Math.min(Math.abs(toNumber(value)) <= 1 ? Math.abs(toNumber(value)) * 100 : Math.abs(toNumber(value)), 100);
+
 const formatGrowth = (value: unknown) => {
   const num = toNumber(value, 2);
   return `${num > 0 ? '+' : ''}${num.toFixed(2)}%`;
 };
+
 const growthClass = (value: unknown) => {
   const num = Number(value ?? 0);
   if (num > 0) return 'growth-text is-up';

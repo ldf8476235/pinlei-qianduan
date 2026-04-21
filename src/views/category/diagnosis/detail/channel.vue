@@ -81,7 +81,7 @@
         <el-table-column label="对比日期-占比" min-width="130" align="right">
           <template #default="{ row }">{{ formatPercent(row.compareSalesPer) }}</template>
         </el-table-column>
-        <el-table-column label="对比日期-对比增长" min-width="140" align="right">
+        <el-table-column label="对比日期-销售增长" min-width="140" align="right">
           <template #default="{ row }">
             <span :class="growthClass(row.compareSalesInc)">{{ formatGrowth(row.compareSalesInc) }}</span>
           </template>
@@ -92,7 +92,7 @@
         <el-table-column label="对比日期-毛利额占比" min-width="150" align="right">
           <template #default="{ row }">{{ formatPercent(row.compareGrossPer) }}</template>
         </el-table-column>
-        <el-table-column label="对比日期-毛利额对比增长" min-width="170" align="right">
+        <el-table-column label="对比日期-毛利增长" min-width="170" align="right">
           <template #default="{ row }">
             <span :class="growthClass(row.compareGrossInc)">{{ formatGrowth(row.compareGrossInc) }}</span>
           </template>
@@ -103,7 +103,7 @@
         <el-table-column label="对比日期-客数" min-width="120" align="right">
           <template #default="{ row }">{{ formatInteger(row.compareCustomerCount) }}</template>
         </el-table-column>
-        <el-table-column label="对比日期-客数对比增长" min-width="170" align="right">
+        <el-table-column label="对比日期-客数增长" min-width="170" align="right">
           <template #default="{ row }">
             <span :class="growthClass(row.compareCustomerCountInc)">{{ formatGrowth(row.compareCustomerCountInc) }}</span>
           </template>
@@ -111,7 +111,7 @@
         <el-table-column label="对比日期-客单价" min-width="140" align="right">
           <template #default="{ row }">{{ formatAmount(row.compareCustomerPrice) }}</template>
         </el-table-column>
-        <el-table-column label="对比日期-客单价对比增长" min-width="180" align="right">
+        <el-table-column label="对比日期-客单价增长" min-width="180" align="right">
           <template #default="{ row }">
             <span :class="growthClass(row.compareCustomerPriceInc)">{{ formatGrowth(row.compareCustomerPriceInc) }}</span>
           </template>
@@ -190,9 +190,7 @@ const sessionId = computed(() => query.value.sessionId || '');
 const toNumber = (value: unknown, digits?: number) => {
   const num = Number(value ?? 0);
   if (!Number.isFinite(num)) return 0;
-  if (typeof digits === 'number') {
-    return Number(num.toFixed(digits));
-  }
+  if (typeof digits === 'number') return Number(num.toFixed(digits));
   return num;
 };
 
@@ -246,10 +244,11 @@ const trendSeries = computed<TrendChartSeriesItem[]>(() => {
     }
     map.get(key)!.values[String(item.dataDate || '')] = toNumber(item.sales, 2);
   });
+  const palette = Object.values(colorMap);
   return Array.from(map.entries()).map(([key, row], index) => ({
     key,
     displayName: row.displayName,
-    color: Object.values(colorMap)[index % Object.values(colorMap).length] || '#ff6b4a',
+    color: palette[index % palette.length] || '#ff6b4a',
     values: xdata.map((date) => row.values[date] ?? 0)
   }));
 });
@@ -278,16 +277,36 @@ const tableRequest = useRequest(async (id: string) => await getCategoryDiagnosis
 
 const initPieChart = () => {
   if (!pieChartRef.value) return;
-  if (!pieChartIns.value) {
-    pieChartIns.value = echarts.init(pieChartRef.value);
-  }
+  if (!pieChartIns.value) pieChartIns.value = echarts.init(pieChartRef.value);
 };
 
 const initTrendChart = () => {
   if (!trendChartRef.value) return;
-  if (!trendChartIns.value) {
-    trendChartIns.value = echarts.init(trendChartRef.value);
-  }
+  if (!trendChartIns.value) trendChartIns.value = echarts.init(trendChartRef.value);
+};
+
+const formatAmount = (value: unknown, digits = 2) => {
+  const num = Number(value ?? 0);
+  if (!Number.isFinite(num)) return '-';
+  return num.toLocaleString('zh-CN', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: digits
+  });
+};
+
+const formatInteger = (value: unknown) => formatAmount(value, 0);
+
+const formatPercent = (value: unknown) => {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return '-';
+  return `${toNumber(value, 2).toFixed(2)}%`;
+};
+
+const formatGrowth = (value: unknown) => {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return '-';
+  const fixed = toNumber(value, 2).toFixed(2);
+  return `${Number(fixed) > 0 ? '+' : ''}${fixed}%`;
 };
 
 const renderPieChart = () => {
@@ -448,30 +467,6 @@ const loadPageData = async () => {
 
 const handleExport = () => {
   ElMessage.info('后端暂未提供渠道业绩导出接口');
-};
-
-const formatAmount = (value: unknown, digits = 2) => {
-  const num = Number(value ?? 0);
-  if (!Number.isFinite(num)) return '-';
-  return num.toLocaleString('zh-CN', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: digits
-  });
-};
-
-const formatInteger = (value: unknown) => formatAmount(value, 0);
-
-const formatPercent = (value: unknown) => {
-  const num = Number(value);
-  if (!Number.isFinite(num)) return '-';
-  return `${toNumber(value, 2).toFixed(2)}%`;
-};
-
-const formatGrowth = (value: unknown) => {
-  const num = Number(value);
-  if (!Number.isFinite(num)) return '-';
-  const fixed = toNumber(value, 2).toFixed(2);
-  return `${Number(fixed) > 0 ? '+' : ''}${fixed}%`;
 };
 
 const growthClass = (value: unknown) => {

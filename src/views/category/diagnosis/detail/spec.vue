@@ -112,6 +112,7 @@ import {
 } from '@/api/category/diagnosis/analysis';
 
 const route = useRoute();
+const router = useRouter();
 const sessionId = computed(() => String(route.query.sessionId || ''));
 const loading = ref(false);
 
@@ -384,7 +385,7 @@ const reload = async () => {
 };
 
 const handleViewDetail = () => {
-  ElMessage.info('详情入口已保留，当前未配置独立规格详情路由。');
+  router.push({ path: '/spec/analysis/detail', query: { ...route.query } });
 };
 
 const handleRankPageChange = async (page: number) => {

@@ -123,7 +123,7 @@ export const constantRoutes: RouteRecordRaw[] = [
         path: 'analysis/detail',
         component: () => import('@/views/gross-contribution/goods-list.vue'),
         name: 'GrossContributionGoodsList',
-        meta: { title: '毛利贡献率商品明细', activeMenu: '/category/diagnosis/detail' }
+        meta: { title: '\u54c1\u7c7b\u6bdb\u5229\u8d21\u732e\u7387\u5546\u54c1\u6e05\u5355', activeMenu: '/category/diagnosis/detail' }
       }
     ]
   },
@@ -188,6 +188,19 @@ export const constantRoutes: RouteRecordRaw[] = [
         component: () => import('@/views/brand/detail.vue'),
         name: 'BrandDetail',
         meta: { title: '品牌商品明细', activeMenu: '/category/diagnosis/detail' }
+      }
+    ]
+  },
+  {
+    path: '/spec',
+    component: Layout,
+    hidden: true,
+    children: [
+      {
+        path: 'analysis/detail',
+        component: () => import('@/views/category/diagnosis/detail/spec-detail.vue'),
+        name: 'SpecDetail',
+        meta: { title: '品类规格清单', activeMenu: '/category/diagnosis/detail' }
       }
     ]
   },
