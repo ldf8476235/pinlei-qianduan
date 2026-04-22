@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="p-2 abc-goods-list-page">
     <el-card shadow="hover" class="page-card summary-card">
       <div class="page-main-title">品类ABC商品清单</div>
@@ -35,32 +35,32 @@
             </el-select>
           </el-form-item>
 
-          <el-form-item label="本期促销">
+          <el-form-item label="鏈湡淇冮攢">
             <el-select v-model="queryForm.promotion" clearable style="width: 140px">
-              <el-option label="全部" value="" />
+              <el-option label="鍏ㄩ儴" value="" />
               <el-option label="是" value="1" />
               <el-option label="否" value="2" />
             </el-select>
           </el-form-item>
 
-          <el-form-item label="ABC类型">
+          <el-form-item label="ABC绫诲瀷">
             <el-select v-model="queryForm.abcType" style="width: 160px">
               <el-option v-for="item in abcTypeOptions" :key="item.value" :label="item.label" :value="item.value" />
             </el-select>
           </el-form-item>
 
-          <el-form-item label="本期ABC">
+          <el-form-item label="鏈湡ABC">
             <el-select v-model="queryForm.currentAbc" clearable style="width: 120px">
-              <el-option label="全部" value="" />
+              <el-option label="鍏ㄩ儴" value="" />
               <el-option label="A" value="A" />
               <el-option label="B" value="B" />
               <el-option label="C" value="C" />
             </el-select>
           </el-form-item>
 
-          <el-form-item label="对比日期ABC">
+          <el-form-item label="瀵规瘮鏃ユ湡ABC">
             <el-select v-model="queryForm.compareAbc" clearable style="width: 140px">
-              <el-option label="全部" value="" />
+              <el-option label="鍏ㄩ儴" value="" />
               <el-option label="A" value="A" />
               <el-option label="B" value="B" />
               <el-option label="C" value="C" />
@@ -68,8 +68,8 @@
           </el-form-item>
 
           <el-form-item class="filter-actions">
-            <el-button type="primary" :disabled="!sessionReady" @click="handleQuery">查询</el-button>
-            <el-button @click="handleReset">重置</el-button>
+            <el-button type="primary" :disabled="!sessionReady" @click="handleQuery">鏌ヨ</el-button>
+            <el-button @click="handleReset">閲嶇疆</el-button>
           </el-form-item>
         </el-form>
       </div>
@@ -78,15 +78,13 @@
     <el-card shadow="hover" class="page-card table-card" v-loading="tableLoading">
       <template #header>
         <div class="card-header">
-          <span class="card-title">品类ABC商品清单</span>
+          <span class="card-title">鍝佺被ABC鍟嗗搧娓呭崟</span>
           <div class="card-actions">
-            <span class="unit-text">*金额单位：元</span>
-            <el-button type="primary" link @click="handleExport">导出</el-button>
+            <span class="unit-text">*閲戦鍗曚綅锛氬厓</span>
+            <el-button type="primary" link @click="handleExport">瀵煎嚭</el-button>
           </div>
         </div>
-      </template>
-
-      <div class="table-scroll-wrap">
+      </template>      <div class="table-scroll-wrap">
         <el-table
           :data="displayRows"
           border
@@ -107,7 +105,7 @@
             show-overflow-tooltip
           />
 
-          <el-table-column label="商品名称" prop="productName" min-width="220" fixed="left" align="left" header-align="center" sortable="custom" show-overflow-tooltip>
+          <el-table-column label="商品名称" prop="productName" min-width="220" fixed="left" align="left" header-align="center" show-overflow-tooltip>
             <template #default="{ row }">
               <el-button link type="primary" class="name-link" @click="handleGoodsDetail(row)">
                 {{ row.productName || '--' }}
@@ -115,7 +113,7 @@
             </template>
           </el-table-column>
 
-          <el-table-column label="当前状态" prop="productStatus" min-width="120" align="left" header-align="center" sortable="custom" show-overflow-tooltip>
+          <el-table-column label="当前状态" prop="productStatus" min-width="120" align="left" header-align="center" show-overflow-tooltip>
             <template #default="{ row }">
               {{ row.productStatus || row.productStatusNo || '--' }}
             </template>
@@ -127,81 +125,88 @@
             </template>
           </el-table-column>
 
-          <el-table-column label="销售额ABC类别分组列" align="center" header-align="center">
-            <el-table-column label="销售额ABC类别-本期" prop="currentAbc" min-width="110" align="center" header-align="center" sortable="custom" />
-            <el-table-column label="销售额ABC类别-对比日期" prop="compareAbc" min-width="120" align="center" header-align="center" sortable="custom" />
+          <el-table-column label="销售额ABC类别" align="center" header-align="center">
+            <el-table-column label="本期" prop="currentAbc" min-width="110" align="center" header-align="center" />
+            <el-table-column label="对比日期" prop="compareAbc" min-width="120" align="center" header-align="center" />
           </el-table-column>
 
-          <el-table-column label="销售量指标列" align="center" header-align="center">
-            <el-table-column label="销售量-总计" prop="saleQuantity" min-width="120" align="center" header-align="center" sortable="custom">
+          <el-table-column label="销售量" align="center" header-align="center">
+            <el-table-column label="总计" prop="saleQuantity" min-width="120" align="center" header-align="center" sortable="custom">
               <template #default="{ row }">{{ formatNumber(row.saleQuantity, 2) }}</template>
             </el-table-column>
-            <el-table-column label="销售量-PSD" prop="saleQuantityPsd" min-width="120" align="center" header-align="center" sortable="custom">
+            <el-table-column label="PSD" prop="saleQuantityPsd" min-width="120" align="center" header-align="center" sortable="custom">
               <template #default="{ row }">{{ formatNumber(row.saleQuantityPsd, 4) }}</template>
             </el-table-column>
           </el-table-column>
 
-          <el-table-column label="销售额指标列" align="center" header-align="center">
-            <el-table-column label="销售额-总计" prop="sales" min-width="130" align="center" header-align="center" sortable="custom">
+          <el-table-column label="销售额" align="center" header-align="center">
+            <el-table-column label="总计" prop="sales" min-width="130" align="center" header-align="center" sortable="custom">
               <template #default="{ row }">{{ formatNumber(row.sales, 2) }}</template>
             </el-table-column>
-            <el-table-column label="销售额-占比" prop="salesPer" min-width="120" align="center" header-align="center" sortable="custom">
+            <el-table-column label="占比" prop="salesPer" min-width="120" align="center" header-align="center" sortable="custom">
               <template #default="{ row }">{{ formatPercent(row.salesPer) }}</template>
             </el-table-column>
-            <el-table-column label="销售额-PSD" prop="salesPsd" min-width="120" align="center" header-align="center" sortable="custom">
+            <el-table-column label="PSD" prop="salesPsd" min-width="120" align="center" header-align="center" sortable="custom">
               <template #default="{ row }">{{ formatNumber(row.salesPsd, 4) }}</template>
             </el-table-column>
           </el-table-column>
 
-          <el-table-column label="毛利额&毛利率列" align="center" header-align="center">
-            <el-table-column label="毛利额-总计" prop="gross" min-width="130" align="center" header-align="center" sortable="custom">
+          <el-table-column label="毛利额" align="center" header-align="center">
+            <el-table-column label="总计" prop="gross" min-width="130" align="center" header-align="center" sortable="custom">
               <template #default="{ row }">{{ formatNumber(row.gross, 2) }}</template>
             </el-table-column>
-            <el-table-column label="毛利额-占比" prop="grossPer" min-width="120" align="center" header-align="center" sortable="custom">
+            <el-table-column label="占比" prop="grossPer" min-width="120" align="center" header-align="center" sortable="custom">
               <template #default="{ row }">{{ formatPercent(row.grossPer) }}</template>
             </el-table-column>
-            <el-table-column label="毛利额-PSD" prop="grossPsd" min-width="120" align="center" header-align="center" sortable="custom">
+            <el-table-column label="PSD" prop="grossPsd" min-width="120" align="center" header-align="center" sortable="custom">
               <template #default="{ row }">{{ formatNumber(row.grossPsd, 4) }}</template>
             </el-table-column>
-            <el-table-column label="毛利率" prop="grossRate" min-width="110" align="center" header-align="center" sortable="custom">
-              <template #default="{ row }">{{ formatPercent(row.grossRate) }}</template>
-            </el-table-column>
           </el-table-column>
 
-          <el-table-column label="库存&经营效率列" align="center" header-align="center">
-            <el-table-column label="当前库存数量" prop="stockQuantity" min-width="130" align="center" header-align="center" sortable="custom">
-              <template #default="{ row }">{{ formatNumber(row.stockQuantity, 2) }}</template>
-            </el-table-column>
-            <el-table-column label="库存周转率" prop="turnoverRate" min-width="120" align="center" header-align="center" sortable="custom">
-              <template #default="{ row }">{{ formatNumber(row.turnoverRate, 2) }}</template>
-            </el-table-column>
-            <el-table-column label="库存周转天数" prop="turnoverDays" min-width="130" align="center" header-align="center" sortable="custom">
-              <template #default="{ row }">{{ formatNumber(row.turnoverDays, 2) }}</template>
-            </el-table-column>
-            <el-table-column label="库销比" prop="stockSalesRate" min-width="110" align="center" header-align="center" sortable="custom">
-              <template #default="{ row }">{{ formatNumber(row.stockSalesRate, 2) }}</template>
-            </el-table-column>
-            <el-table-column label="毛利贡献率" prop="contributionRate" min-width="120" align="center" header-align="center" sortable="custom">
-              <template #default="{ row }">{{ formatPercent(row.contributionRate) }}</template>
-            </el-table-column>
-            <el-table-column label="GMROI" prop="gmroi" min-width="110" align="center" header-align="center" sortable="custom">
-              <template #default="{ row }">{{ formatNumber(row.gmroi, 4) }}</template>
-            </el-table-column>
-            <el-table-column label="销售率" prop="salesRate" min-width="110" align="center" header-align="center" sortable="custom">
-              <template #default="{ row }">{{ formatPercent(row.salesRate) }}</template>
-            </el-table-column>
+          <el-table-column label="毛利率" prop="grossRate" min-width="110" align="center" header-align="center" sortable="custom">
+            <template #default="{ row }">{{ formatPercent(row.grossRate) }}</template>
           </el-table-column>
 
-          <el-table-column label="商品属性扩展列" align="center" header-align="center">
-            <el-table-column label="本期促销" prop="activity" min-width="110" align="center" header-align="center" show-overflow-tooltip />
-            <el-table-column label="首次销售日期" prop="firstSaleDate" min-width="130" align="left" header-align="center" sortable="custom" show-overflow-tooltip />
-            <el-table-column label="本期新品" prop="newProduct" min-width="100" align="center" header-align="center" sortable="custom" />
-            <el-table-column label="重点商品" prop="keyProduct" min-width="100" align="center" header-align="center" sortable="custom" />
-            <el-table-column label="季节性商品" prop="seasonableFlagName" min-width="110" align="center" header-align="center" sortable="custom">
-              <template #default="{ row }">
-                {{ row.seasonableFlagName || row.seasonableFlag || '--' }}
-              </template>
-            </el-table-column>
+          <el-table-column label="当前库存数量" prop="stockQuantity" min-width="130" align="center" header-align="center" sortable="custom">
+            <template #default="{ row }">{{ formatNumber(row.stockQuantity, 2) }}</template>
+          </el-table-column>
+
+          <el-table-column label="库存周转率" prop="turnoverRate" min-width="120" align="center" header-align="center" sortable="custom">
+            <template #default="{ row }">{{ formatNumber(row.turnoverRate, 2) }}</template>
+          </el-table-column>
+
+          <el-table-column label="库存周转天数" prop="turnoverDays" min-width="130" align="center" header-align="center" sortable="custom">
+            <template #default="{ row }">{{ formatNumber(row.turnoverDays, 2) }}</template>
+          </el-table-column>
+
+          <el-table-column label="库销比" prop="stockSalesRate" min-width="110" align="center" header-align="center" sortable="custom">
+            <template #default="{ row }">{{ formatNumber(row.stockSalesRate, 2) }}</template>
+          </el-table-column>
+
+          <el-table-column label="毛利贡献率" prop="contributionRate" min-width="120" align="center" header-align="center" sortable="custom">
+            <template #default="{ row }">{{ formatPercent(row.contributionRate) }}</template>
+          </el-table-column>
+
+          <el-table-column label="GMROI" prop="gmroi" min-width="110" align="center" header-align="center" sortable="custom">
+            <template #default="{ row }">{{ formatNumber(row.gmroi, 4) }}</template>
+          </el-table-column>
+
+          <el-table-column label="销售率" prop="salesRate" min-width="110" align="center" header-align="center" sortable="custom">
+            <template #default="{ row }">{{ formatPercent(row.salesRate) }}</template>
+          </el-table-column>
+
+          <el-table-column label="本期促销" prop="activity" min-width="110" align="center" header-align="center" show-overflow-tooltip />
+
+          <el-table-column label="首次销售日期" prop="firstSaleDate" min-width="130" align="left" header-align="center" sortable="custom" show-overflow-tooltip />
+
+          <el-table-column label="本期新品" prop="newProduct" min-width="100" align="center" header-align="center" show-overflow-tooltip />
+
+          <el-table-column label="重点商品" prop="keyProduct" min-width="100" align="center" header-align="center" show-overflow-tooltip />
+
+          <el-table-column label="季节性商品" prop="seasonableFlagName" min-width="110" align="center" header-align="center" show-overflow-tooltip>
+            <template #default="{ row }">
+              {{ row.seasonableFlagName || row.seasonableFlag || '--' }}
+            </template>
           </el-table-column>
 
           <el-table-column label="操作" min-width="100" fixed="right" align="center" header-align="center">
@@ -211,7 +216,6 @@
           </el-table-column>
         </el-table>
       </div>
-
       <div class="pagination-wrap">
         <el-pagination
           background
@@ -273,7 +277,7 @@ const compareDateRangeText = computed(() => {
 const formatCategoryLevelName = (level?: string | number) => {
   const levelNumber = Number(level || 0);
   if (levelNumber >= 1 && levelNumber <= 5) {
-    return `${['', '一级', '二级', '三级', '四级', '五级'][levelNumber]}品类`;
+    return `${['', '一线', '二级', '三级', '四级', '五级'][levelNumber]}品类`;
   }
   return '一级品类';
 };
@@ -302,9 +306,9 @@ const pagination = reactive({
 });
 
 const abcTypeLabelMap: Record<string, string> = {
-  sales: '销售额ABC',
-  gross: '毛利额ABC',
-  contribution: '销售额ABC'
+  sales: '閿€鍞ABC',
+  gross: '姣涘埄棰滱BC',
+  contribution: '閿€鍞ABC'
 };
 
 const abcTypeOptions = computed(() =>
@@ -376,7 +380,7 @@ const loadTable = async () => {
 
 const loadSessionState = async () => {
   if (!sessionId.value) {
-    ElMessage.error('缺少 sessionId，无法加载ABC商品清单');
+    ElMessage.error('缂哄皯 sessionId锛屾棤娉曞姞杞紸BC鍟嗗搧娓呭崟');
     return;
   }
   const res: any = await getDiagnosisSessionStatus(sessionId.value);
@@ -449,7 +453,7 @@ const handleSortChange = ({ prop, order }: { prop: string; order: Sort['order'] 
 };
 
 const handleExport = () => {
-  ElMessage.info('导出功能后续对接真实接口');
+  ElMessage.info('瀵煎嚭鍔熻兘鍚庣画瀵规帴鐪熷疄鎺ュ彛');
 };
 
 const handleGoodsDetail = (_row: AbcSalesListItemVO) => {
@@ -596,11 +600,22 @@ onBeforeUnmount(() => {
 }
 
 .goods-table--wide {
-  min-width: 2480px;
+  min-width: 2860px;
 }
 
 .goods-table :deep(.el-table__fixed-right) {
   box-shadow: -8px 0 16px rgba(15, 23, 42, 0.05);
+}
+.goods-table :deep(.el-table__header th .cell) {
+  white-space: nowrap;
+}
+
+.goods-table :deep(.el-table__header th) {
+  height: 54px;
+}
+
+.goods-table :deep(.el-table__header .el-table__cell.is-leaf .cell) {
+  line-height: 1.15;
 }
 
 .store-count {
@@ -646,3 +661,4 @@ onBeforeUnmount(() => {
   }
 }
 </style>
+
