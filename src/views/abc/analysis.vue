@@ -347,12 +347,14 @@ const matrixRows = computed<MatrixRowVO[]>(() => {
   const aTotal = Number(matrix.aaNum || 0) + Number(matrix.abNum || 0) + Number(matrix.acNum || 0);
   const bTotal = Number(matrix.baNum || 0) + Number(matrix.bbNum || 0) + Number(matrix.bcNum || 0);
   const cTotal = Number(matrix.caNum || 0) + Number(matrix.cbNum || 0) + Number(matrix.ccNum || 0);
+  const nTotal = Number(matrix.anNum || 0) + Number(matrix.bnNum || 0) + Number(matrix.cnNum || 0);
+  const tTotal = Number(matrix.atNum || 0) + Number(matrix.btNum || 0) + Number(matrix.ctNum || 0);
   return [
     { rowKey: 'A', label: 'A类', a: Number(matrix.aaNum || 0), b: Number(matrix.abNum || 0), c: Number(matrix.acNum || 0), n: 0, t: 0, total: aTotal },
     { rowKey: 'B', label: 'B类', a: Number(matrix.baNum || 0), b: Number(matrix.bbNum || 0), c: Number(matrix.bcNum || 0), n: 0, t: 0, total: bTotal },
     { rowKey: 'C', label: 'C类', a: Number(matrix.caNum || 0), b: Number(matrix.cbNum || 0), c: Number(matrix.ccNum || 0), n: 0, t: 0, total: cTotal },
-    { rowKey: 'SEP', label: '/', a: 0, b: 0, c: 0, n: 0, t: 0, total: 0 },
-    { rowKey: 'TOTAL', label: '总计', a: aTotal, b: bTotal, c: cTotal, n: 0, t: 0, total: aTotal + bTotal + cTotal }
+    { rowKey: 'N', label: '/', a: Number(matrix.anNum || 0), b: Number(matrix.bnNum || 0), c: Number(matrix.cnNum || 0), n: 0, t: 0, total: nTotal },
+    { rowKey: 'TOTAL', label: '总计', a: Number(matrix.atNum || 0), b: Number(matrix.btNum || 0), c: Number(matrix.ctNum || 0), n: 0, t: 0, total: tTotal }
   ];
 });
 
@@ -960,6 +962,5 @@ onBeforeUnmount(() => {
   }
 }
 </style>
-
 
 

@@ -56,7 +56,7 @@ const loadList = async () => {
   loading.value = true;
   try {
     const res = await getVendorRanking(sessionId.value, metric.value, 1, 50, 'desc');
-    rows.value = res.data?.data?.list || [];
+    rows.value = res.data?.list || [];
   } finally {
     loading.value = false;
   }
