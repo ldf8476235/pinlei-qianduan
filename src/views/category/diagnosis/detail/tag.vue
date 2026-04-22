@@ -37,7 +37,7 @@
         </div>
       </template>
       <div class="cloud-wrap">
-        <div class="cloud-stage">
+        <div v-if="cloudWords.length" class="cloud-stage">
           <el-tooltip
             v-for="item in cloudWords"
             :key="item.key"
@@ -48,6 +48,7 @@
             <span class="cloud-word" :style="item.style">{{ item.name }}</span>
           </el-tooltip>
         </div>
+        <div v-else class="cloud-empty">暂无标签分析数据</div>
       </div>
     </el-card>
 
@@ -80,8 +81,6 @@ const handleDetail = () => {
   ElMessage.info('当前为内嵌页，详情入口保持在页面内展示');
 };
 
-const fixedTabs = ['原料', '功效', '香型', '包装', '人群', '产地', '产品形态'];
-
 const tabGroups = ref<TagTypeGroupResponse[]>([]);
 const activeTagType = ref('');
 const cloudWords = ref<CloudWordItem[]>([]);
@@ -92,18 +91,21 @@ const summaryItems = [
 ];
 
 const tabItems = computed(() =>
-  fixedTabs.map((label, index) => ({
-    label,
-    value: tabGroups.value[index]?.tagType || `${index}`
-  }))
+  tabGroups.value
+    .filter((item) => Boolean(item?.tagType))
+    .map((item) => ({
+      label: item.tagTypeName || item.tagType || '-',
+      value: item.tagType || ''
+    }))
 );
 
 const typesRequest = useRequest(async (sessionId: string) => await getCategoryDiagnosisTagTypes(sessionId), {
   onSuccess: (res) => {
-    tabGroups.value = res?.data || [];
-    activeTagType.value = tabGroups.value[0]?.tagType || tabItems.value[0]?.value || '';
+    tabGroups.value = Array.isArray(res?.data) ? res.data.filter((item) => Boolean(item?.tagType)) : [];
+    activeTagType.value = tabGroups.value[0]?.tagType || '';
+    cloudWords.value = [];
     if (activeTagType.value) {
-      loadCloud();
+      void loadCloud();
     }
   }
 });
@@ -278,6 +280,17 @@ watch(
   overflow: hidden;
 }
 
+.cloud-empty {
+  height: 520px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.72) 0%, rgba(255, 255, 255, 1) 100%);
+  color: #94a3b8;
+  font-size: 14px;
+}
+
 .cloud-stage {
   position: relative;
   width: 100%;
@@ -315,6 +328,10 @@ watch(
   }
 
   .cloud-stage {
+    height: 420px;
+  }
+
+  .cloud-empty {
     height: 420px;
   }
 }

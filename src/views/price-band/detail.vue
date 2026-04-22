@@ -1,16 +1,16 @@
-<template>
+﻿<template>
   <div class="price-band-detail-page">
     <el-card shadow="hover" class="page-card summary-card">
-      <div class="summary-line">数据日期：{{ currentDateRangeText }}；对比日期：{{ compareDateRangeText }}</div>
-      <div class="summary-line">组织：总部；业态：全部业态；商圈：全部商圈；</div>
-      <div class="summary-line">门店：全部</div>
+      <div class="summary-line">鏁版嵁鏃ユ湡锛歿{{ currentDateRangeText }}锛涘姣旀棩鏈燂細{{ compareDateRangeText }}</div>
+      <div class="summary-line">缁勭粐锛氭€婚儴锛涗笟鎬侊細鍏ㄩ儴涓氭€侊紱鍟嗗湀锛氬叏閮ㄥ晢鍦堬紱</div>
+      <div class="summary-line">闂ㄥ簵锛氬叏閮�</div>
       <div class="category-title">{{ categoryTitle }}</div>
     </el-card>
 
     <el-card shadow="hover" class="page-card filter-card">
       <div class="filter-row filter-row-top">
         <el-form :model="queryForm" inline class="filter-form">
-          <el-form-item label="当前状态">
+          <el-form-item label="褰撳墠鐘舵€?">
             <el-select
               v-model="queryForm.status"
               multiple
@@ -18,7 +18,7 @@
               collapse-tags-tooltip
               :max-collapse-tags="1"
               clearable
-              placeholder="全部 +2"
+              placeholder="鍏ㄩ儴 +2"
               style="width: 220px"
             >
               <el-option
@@ -30,24 +30,24 @@
             </el-select>
           </el-form-item>
 
-          <el-form-item label="本期促销">
-            <el-select v-model="queryForm.promotion" clearable placeholder="全部" style="width: 140px">
-              <el-option label="全部" value="" />
-              <el-option label="是" value="1" />
-              <el-option label="否" value="2" />
+          <el-form-item label="鏈湡淇冮攢">
+            <el-select v-model="queryForm.promotion" clearable placeholder="鍏ㄩ儴" style="width: 140px">
+              <el-option label="鍏ㄩ儴" value="" />
+              <el-option label="鏄?" value="1" />
+              <el-option label="鍚?" value="2" />
             </el-select>
           </el-form-item>
 
           <el-form-item class="filter-actions">
-            <el-button type="primary" @click="handleQuery">查询</el-button>
+            <el-button type="primary" @click="handleQuery">鏌ヨ</el-button>
           </el-form-item>
         </el-form>
       </div>
 
       <div class="filter-row filter-row-range">
-        <div class="range-label">价格区间</div>
+        <div class="range-label">浠锋牸鍖洪棿</div>
         <el-checkbox-group v-model="selectedRangeValues" class="range-checkbox-group" @change="handleRangeChange">
-          <el-checkbox :label="ALL_RANGE_VALUE">全部</el-checkbox>
+          <el-checkbox :label="ALL_RANGE_VALUE">鍏ㄩ儴</el-checkbox>
           <el-checkbox v-for="item in priceBandOptions" :key="item" :label="item">{{ item }}</el-checkbox>
         </el-checkbox-group>
       </div>
@@ -56,10 +56,10 @@
     <el-card shadow="hover" class="page-card table-card" v-loading="loading">
       <template #header>
         <div class="card-header">
-          <span class="card-title">品类价格区间商品清单</span>
+          <span class="card-title">鍝佺被浠锋牸鍖洪棿鍟嗗搧娓呭崟</span>
           <div class="card-actions">
-            <span class="unit-text">*金额单位：元</span>
-            <el-button type="primary" link @click="handleExport">导出</el-button>
+            <span class="unit-text">*閲戦鍗曚綅锛氬厓</span>
+            <el-button type="primary" link @click="handleExport">瀵煎嚭</el-button>
           </div>
         </div>
       </template>
@@ -72,7 +72,7 @@
         @sort-change="handleSortChange"
       >
         <el-table-column
-          label="商品编码"
+          label="鍟嗗搧缂栫爜"
           prop="productNo"
           min-width="130"
           fixed="left"
@@ -82,7 +82,7 @@
         />
 
         <el-table-column
-          label="商品名称"
+          label="鍟嗗搧鍚嶇О"
           prop="productName"
           min-width="220"
           fixed="left"
@@ -98,7 +98,7 @@
         </el-table-column>
 
         <el-table-column
-          label="当前状态"
+          label="褰撳墠鐘舵€?"
           prop="productStatus"
           min-width="120"
           align="left"
@@ -110,73 +110,73 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="销售门店数" prop="storeNum" min-width="120" align="center" sortable="custom">
+        <el-table-column label="閿€鍞棬搴楁暟" prop="storeNum" min-width="120" align="center" sortable="custom">
           <template #default="{ row }">
             <span class="store-count">{{ formatNumber(row.storeNum, 0) }}</span>
           </template>
         </el-table-column>
 
-        <el-table-column label="销售量-总计" prop="saleQuantity" min-width="120" align="center" sortable="custom">
+        <el-table-column label="閿€鍞噺-鎬昏" prop="saleQuantity" min-width="120" align="center" sortable="custom">
           <template #default="{ row }">{{ formatNumber(row.saleQuantity, 2) }}</template>
         </el-table-column>
-        <el-table-column label="销售量-PSD" prop="saleQuantityPsd" min-width="110" align="center" sortable="custom">
+        <el-table-column label="閿€鍞噺-PSD" prop="saleQuantityPsd" min-width="110" align="center" sortable="custom">
           <template #default="{ row }">{{ formatNumber(row.saleQuantityPsd, 4) }}</template>
         </el-table-column>
-        <el-table-column label="销售额-总计" prop="sales" min-width="130" align="center" sortable="custom">
+        <el-table-column label="閿€鍞-鎬昏" prop="sales" min-width="130" align="center" sortable="custom">
           <template #default="{ row }">{{ formatNumber(row.sales, 2) }}</template>
         </el-table-column>
-        <el-table-column label="销售额-占比" prop="salesPer" min-width="120" align="center" sortable="custom">
+        <el-table-column label="閿€鍞-鍗犳瘮" prop="salesPer" min-width="120" align="center" sortable="custom">
           <template #default="{ row }">{{ formatPercent(row.salesPer) }}</template>
         </el-table-column>
-        <el-table-column label="销售额-PSD" prop="salesPsd" min-width="110" align="center" sortable="custom">
+        <el-table-column label="閿€鍞-PSD" prop="salesPsd" min-width="110" align="center" sortable="custom">
           <template #default="{ row }">{{ formatNumber(row.salesPsd, 4) }}</template>
         </el-table-column>
-        <el-table-column label="毛利额-总计" prop="gross" min-width="130" align="center" sortable="custom">
+        <el-table-column label="姣涘埄棰?鎬昏" prop="gross" min-width="130" align="center" sortable="custom">
           <template #default="{ row }">{{ formatNumber(row.gross, 2) }}</template>
         </el-table-column>
-        <el-table-column label="毛利额-占比" prop="grossPer" min-width="120" align="center" sortable="custom">
+        <el-table-column label="姣涘埄棰?鍗犳瘮" prop="grossPer" min-width="120" align="center" sortable="custom">
           <template #default="{ row }">{{ formatPercent(row.grossPer) }}</template>
         </el-table-column>
-        <el-table-column label="毛利额-PSD" prop="grossPsd" min-width="110" align="center" sortable="custom">
+        <el-table-column label="姣涘埄棰?PSD" prop="grossPsd" min-width="110" align="center" sortable="custom">
           <template #default="{ row }">{{ formatNumber(row.grossPsd, 4) }}</template>
         </el-table-column>
-        <el-table-column label="毛利率" prop="grossRate" min-width="100" align="center" sortable="custom">
+        <el-table-column label="姣涘埄鐜?" prop="grossRate" min-width="100" align="center" sortable="custom">
           <template #default="{ row }">{{ formatPercent(row.grossRate) }}</template>
         </el-table-column>
 
-        <el-table-column label="当前库存数量" prop="stockQuantity" min-width="130" align="center" sortable="custom">
+        <el-table-column label="褰撳墠搴撳瓨鏁伴噺" prop="stockQuantity" min-width="130" align="center" sortable="custom">
           <template #default="{ row }">{{ formatNumber(row.stockQuantity, 2) }}</template>
         </el-table-column>
-        <el-table-column label="库存周转率" prop="turnoverRate" min-width="120" align="center" sortable="custom">
+        <el-table-column label="搴撳瓨鍛ㄨ浆鐜?" prop="turnoverRate" min-width="120" align="center" sortable="custom">
           <template #default="{ row }">{{ formatNumber(row.turnoverRate, 4) }}</template>
         </el-table-column>
-        <el-table-column label="库存周转天数" prop="turnoverDays" min-width="130" align="center" sortable="custom">
+        <el-table-column label="搴撳瓨鍛ㄨ浆澶╂暟" prop="turnoverDays" min-width="130" align="center" sortable="custom">
           <template #default="{ row }">{{ formatNumber(row.turnoverDays, 4) }}</template>
         </el-table-column>
-        <el-table-column label="库销比" prop="stockSalesRate" min-width="100" align="center" sortable="custom">
+        <el-table-column label="搴撻攢姣?" prop="stockSalesRate" min-width="100" align="center" sortable="custom">
           <template #default="{ row }">{{ formatNumber(row.stockSalesRate, 2) }}</template>
         </el-table-column>
-        <el-table-column label="毛利贡献率" prop="contributionRate" min-width="120" align="center" sortable="custom">
+        <el-table-column label="姣涘埄璐＄尞鐜?" prop="contributionRate" min-width="120" align="center" sortable="custom">
           <template #default="{ row }">{{ formatPercent(row.contributionRate) }}</template>
         </el-table-column>
         <el-table-column label="GMROI" prop="gmroi" min-width="100" align="center" sortable="custom">
           <template #default="{ row }">{{ formatNumber(row.gmroi, 4) }}</template>
         </el-table-column>
-        <el-table-column label="销售率" prop="salesRate" min-width="100" align="center" sortable="custom">
+        <el-table-column label="閿€鍞巼" prop="salesRate" min-width="100" align="center" sortable="custom">
           <template #default="{ row }">{{ formatPercent(row.salesRate) }}</template>
         </el-table-column>
-        <el-table-column label="本期促销" prop="activity" min-width="100" align="left" sortable="custom" show-overflow-tooltip>
+        <el-table-column label="鏈湡淇冮攢" prop="activity" min-width="100" align="left" sortable="custom" show-overflow-tooltip>
           <template #default="{ row }">{{ formatFlagText(row.activity) }}</template>
         </el-table-column>
-        <el-table-column label="首次销售日期" prop="firstSaleDate" min-width="130" align="left" sortable="custom" show-overflow-tooltip />
-        <el-table-column label="本期新品" prop="newProduct" min-width="100" align="left" sortable="custom" show-overflow-tooltip>
+        <el-table-column label="棣栨閿€鍞棩鏈?" prop="firstSaleDate" min-width="130" align="left" sortable="custom" show-overflow-tooltip />
+        <el-table-column label="鏈湡鏂板搧" prop="newProduct" min-width="100" align="left" sortable="custom" show-overflow-tooltip>
           <template #default="{ row }">{{ formatFlagText(row.newProduct) }}</template>
         </el-table-column>
-        <el-table-column label="重点商品" prop="keyProduct" min-width="100" align="left" sortable="custom" show-overflow-tooltip>
+        <el-table-column label="閲嶇偣鍟嗗搧" prop="keyProduct" min-width="100" align="left" sortable="custom" show-overflow-tooltip>
           <template #default="{ row }">{{ formatFlagText(row.keyProduct) }}</template>
         </el-table-column>
         <el-table-column
-          label="季节性商品"
+          label="瀛ｈ妭鎬у晢鍝?"
           prop="seasonableFlagName"
           min-width="120"
           align="left"
@@ -188,9 +188,9 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" min-width="100" fixed="right" align="center">
+        <el-table-column label="鎿嶄綔" min-width="100" fixed="right" align="center">
           <template #default="{ row }">
-            <el-button class="process-btn" @click="handleProcess(row)">处理</el-button>
+            <el-button class="process-btn" @click="handleProcess(row)">澶勭悊</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -208,11 +208,18 @@
         />
       </div>
     </el-card>
+
+    <GoodsProcessDialog
+      v-model="processDialogVisible"
+      @save="handleSaveProcess"
+      @dispatch="handleDispatchProcess"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import type { Sort } from 'element-plus';
+import GoodsProcessDialog from '@/components/GoodsProcessDialog/index.vue';
 import { getCategoryFilterOptions } from '@/api/category/tree';
 import { getPriceBandDetails, getPriceBandRangeSummary } from '@/api/category/diagnosis/analysis';
 import type { OptionVO } from '@/api/category/tree/types';
@@ -259,6 +266,7 @@ const selectedRangeValues = ref<string[]>([ALL_RANGE_VALUE]);
 const tableRows = ref<PriceBandGoodsRow[]>([]);
 const loading = ref(false);
 const total = ref(0);
+const processDialogVisible = ref(false);
 
 const sortState = reactive<{
   prop: string;
@@ -284,13 +292,13 @@ const resolveQueryValue = (value: string | string[] | null | undefined, fallback
 const currentDateRangeText = computed(() => {
   const start = resolveQueryValue(route.query.startDate as string | string[] | null | undefined, '2024/10/01');
   const end = resolveQueryValue(route.query.endDate as string | string[] | null | undefined, '2024/12/08');
-  return `${start}至${end}`;
+  return `${start}鑷?{end}`;
 });
 
 const compareDateRangeText = computed(() => {
   const start = resolveQueryValue(route.query.compareStartDate as string | string[] | null | undefined, '2023/10/01');
   const end = resolveQueryValue(route.query.compareEndDate as string | string[] | null | undefined, '2023/12/08');
-  return `${start}至${end}`;
+  return `${start}鑷?{end}`;
 });
 
 const formatCategoryLevelName = (level?: string | number) => {
@@ -305,7 +313,7 @@ const categoryTitle = computed(() => {
   const categoryId = resolveQueryValue(route.query.categoryId as string | string[] | null | undefined, '004');
   const categoryName = resolveQueryValue(route.query.categoryName as string | string[] | null | undefined, '洗化部');
   const categoryLevel = resolveQueryValue(route.query.categoryLevel as string | string[] | null | undefined, '1');
-  return `${categoryId}${categoryName}（${formatCategoryLevelName(categoryLevel)}）`;
+  return `${categoryId}${categoryName}，${formatCategoryLevelName(categoryLevel)}`;
 });
 
 const sortFieldMap: Record<string, string> = {
@@ -429,7 +437,7 @@ const handlePageSizeChange = async (size: number) => {
 };
 
 const handleExport = () => {
-  ElMessage.info('导出功能后续对接真实接口');
+  ElMessage.info('瀵煎嚭鍔熻兘鍚庣画瀵规帴鐪熷疄鎺ュ彛');
 };
 
 const handleGoodsDetail = (_row: PriceBandGoodsRow) => {
@@ -437,7 +445,15 @@ const handleGoodsDetail = (_row: PriceBandGoodsRow) => {
 };
 
 const handleProcess = (_row: PriceBandGoodsRow) => {
-  ElMessage.info('处理功能待接入');
+  processDialogVisible.value = true;
+};
+
+const handleSaveProcess = () => {
+  ElMessage.success('商品处理已暂存');
+};
+
+const handleDispatchProcess = () => {
+  ElMessage.success('商品处理已下发');
 };
 
 const formatNumber = (value: number | string | null | undefined, digits = 2) => {
@@ -682,3 +698,4 @@ watch(
   }
 }
 </style>
+

@@ -201,11 +201,6 @@
           </el-table-column>
         </el-table-column>
 
-        <el-table-column label="操作" min-width="90" fixed="right" align="center">
-          <template #default="{ row }">
-            <el-button type="primary" link @click="handleProcess(row)">处理</el-button>
-          </template>
-        </el-table-column>
       </el-table>
 
       <div class="pagination-wrap">
@@ -222,29 +217,6 @@
       </div>
     </el-card>
 
-    <el-dialog v-model="processDialogVisible" title="商品处理" width="520px" destroy-on-close>
-      <div class="process-tip">选中商品的销售门店需按照以下要求进行处理!</div>
-      <el-form :model="processForm" label-width="110px" class="dialog-form">
-        <el-form-item label="处理方案" required>
-          <el-select v-model="processForm.plan" clearable placeholder="请选择" style="width: 100%">
-            <el-option label="下架淘汰" value="remove" />
-            <el-option label="观察调整" value="observe" />
-            <el-option label="保留跟踪" value="retain" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="门店需完成日期" required>
-          <el-date-picker v-model="processForm.finishDate" type="date" placeholder="请选择" style="width: 100%" />
-        </el-form-item>
-      </el-form>
-
-      <template #footer>
-        <div class="dialog-footer">
-          <el-button @click="processDialogVisible = false">取消</el-button>
-          <el-button @click="handleSaveProcess">暂存</el-button>
-          <el-button type="primary" @click="handleDispatchProcess">下发</el-button>
-        </div>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
@@ -315,12 +287,6 @@ const sortState = reactive<{ prop: string; order: SortOrder }>({
 const tableLoading = ref(false);
 const total = ref(0);
 const tableRows = ref<GoodsRow[]>([]);
-const processDialogVisible = ref(false);
-const processForm = reactive({
-  plan: '',
-  finishDate: ''
-});
-
 const loadTableList = async () => {
   if (!sessionId.value) {
     ElMessage.error('缺少 sessionId，无法加载商品清单');
@@ -381,21 +347,6 @@ const handleGoodsDetail = (row: GoodsRow) => {
   });
 };
 
-const handleProcess = (row: GoodsRow) => {
-  processForm.plan = '';
-  processForm.finishDate = '';
-  processDialogVisible.value = true;
-};
-
-const handleSaveProcess = () => {
-  processDialogVisible.value = false;
-  ElMessage.success('商品处理已暂存');
-};
-
-const handleDispatchProcess = () => {
-  processDialogVisible.value = false;
-  ElMessage.success('商品处理已下发');
-};
 
 const resolveRoleClass = (value?: string) => {
   if (value === '1') return 'success';

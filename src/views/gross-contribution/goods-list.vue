@@ -222,10 +222,17 @@
         />
       </div>
     </el-card>
+
+    <GoodsProcessDialog
+      v-model="processDialogVisible"
+      @save="handleSaveProcess"
+      @dispatch="handleDispatchProcess"
+    />
   </div>
 </template>
 
 <script setup name="GrossContributionGoodsList" lang="ts">
+import GoodsProcessDialog from '@/components/GoodsProcessDialog/index.vue';
 import type { Sort } from 'element-plus';
 import { getGrossSalesList } from '@/api/gross-contribution';
 
@@ -307,7 +314,7 @@ const categoryTitle = computed(() => {
   const categoryId = resolveQueryValue(route.query.categoryId as string | string[] | null | undefined, '004');
   const categoryName = resolveQueryValue(route.query.categoryName as string | string[] | null | undefined, '洗化部');
   const categoryLevel = resolveQueryValue(route.query.categoryLevel as string | string[] | null | undefined, '1');
-  return `${categoryId}${categoryName}，${formatCategoryLevelName(categoryLevel)}；`;
+  return `${categoryId}${categoryName}（${formatCategoryLevelName(categoryLevel)}）`;
 });
 
 const queryForm = reactive<QueryForm>({
@@ -330,6 +337,7 @@ const sortState = reactive<{
 const tableLoading = ref(false);
 const total = ref(0);
 const tableRows = ref<GoodsRow[]>([]);
+const processDialogVisible = ref(false);
 
 const toNumber = (value: unknown) => {
   const num = Number(value);
@@ -431,7 +439,15 @@ const handleGoodsDetail = (_row: GoodsRow) => {
 };
 
 const handleProcess = (_row: GoodsRow) => {
-  ElMessage.info('处理功能待接入');
+  processDialogVisible.value = true;
+};
+
+const handleSaveProcess = () => {
+  ElMessage.success('商品处理已暂存');
+};
+
+const handleDispatchProcess = () => {
+  ElMessage.success('商品处理已下发');
 };
 
 const resolveRoleClass = (value?: string) => {

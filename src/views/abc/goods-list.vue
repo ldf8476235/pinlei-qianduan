@@ -35,32 +35,32 @@
             </el-select>
           </el-form-item>
 
-          <el-form-item label="鏈湡淇冮攢">
+          <el-form-item label="本期促销">
             <el-select v-model="queryForm.promotion" clearable style="width: 140px">
-              <el-option label="鍏ㄩ儴" value="" />
+              <el-option label="全部" value="" />
               <el-option label="是" value="1" />
               <el-option label="否" value="2" />
             </el-select>
           </el-form-item>
 
-          <el-form-item label="ABC绫诲瀷">
+          <el-form-item label="ABC类型">
             <el-select v-model="queryForm.abcType" style="width: 160px">
               <el-option v-for="item in abcTypeOptions" :key="item.value" :label="item.label" :value="item.value" />
             </el-select>
           </el-form-item>
 
-          <el-form-item label="鏈湡ABC">
+          <el-form-item label="本期ABC">
             <el-select v-model="queryForm.currentAbc" clearable style="width: 120px">
-              <el-option label="鍏ㄩ儴" value="" />
+              <el-option label="全部" value="" />
               <el-option label="A" value="A" />
               <el-option label="B" value="B" />
               <el-option label="C" value="C" />
             </el-select>
           </el-form-item>
 
-          <el-form-item label="瀵规瘮鏃ユ湡ABC">
+          <el-form-item label="对比日期ABC">
             <el-select v-model="queryForm.compareAbc" clearable style="width: 140px">
-              <el-option label="鍏ㄩ儴" value="" />
+              <el-option label="全部" value="" />
               <el-option label="A" value="A" />
               <el-option label="B" value="B" />
               <el-option label="C" value="C" />
@@ -68,8 +68,8 @@
           </el-form-item>
 
           <el-form-item class="filter-actions">
-            <el-button type="primary" :disabled="!sessionReady" @click="handleQuery">鏌ヨ</el-button>
-            <el-button @click="handleReset">閲嶇疆</el-button>
+            <el-button type="primary" :disabled="!sessionReady" @click="handleQuery">查询</el-button>
+            <el-button @click="handleReset">重置</el-button>
           </el-form-item>
         </el-form>
       </div>
@@ -78,10 +78,10 @@
     <el-card shadow="hover" class="page-card table-card" v-loading="tableLoading">
       <template #header>
         <div class="card-header">
-          <span class="card-title">鍝佺被ABC鍟嗗搧娓呭崟</span>
+          <span class="card-title">品类ABC商品清单</span>
           <div class="card-actions">
-            <span class="unit-text">*閲戦鍗曚綅锛氬厓</span>
-            <el-button type="primary" link @click="handleExport">瀵煎嚭</el-button>
+            <span class="unit-text">*金额单位：元</span>
+            <el-button type="primary" link @click="handleExport">导出</el-button>
           </div>
         </div>
       </template>      <div class="table-scroll-wrap">
@@ -229,10 +229,17 @@
         />
       </div>
     </el-card>
+
+    <GoodsProcessDialog
+      v-model="processDialogVisible"
+      @save="handleSaveProcess"
+      @dispatch="handleDispatchProcess"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
+import GoodsProcessDialog from '@/components/GoodsProcessDialog/index.vue';
 import { getDiagnosisSessionStatus } from '@/api/category/diagnosis';
 import { getCategoryFilterOptions } from '@/api/category/tree';
 import { getAbcParams, getAbcSalesList } from '@/api/category/abc';
@@ -250,6 +257,7 @@ const abcParams = ref<AbcTypeParamVO[]>([]);
 const statusOptions = ref<OptionVO[]>([]);
 const tableRows = ref<AbcSalesListItemVO[]>([]);
 const tableLoading = ref(false);
+const processDialogVisible = ref(false);
 
 const sortState = reactive<{
   prop: string;
@@ -306,9 +314,9 @@ const pagination = reactive({
 });
 
 const abcTypeLabelMap: Record<string, string> = {
-  sales: '閿€鍞ABC',
-  gross: '姣涘埄棰滱BC',
-  contribution: '閿€鍞ABC'
+  sales: '销售额ABC',
+  gross: '毛利额ABC',
+  contribution: '毛利贡献率ABC'
 };
 
 const abcTypeOptions = computed(() =>
@@ -380,7 +388,7 @@ const loadTable = async () => {
 
 const loadSessionState = async () => {
   if (!sessionId.value) {
-    ElMessage.error('缂哄皯 sessionId锛屾棤娉曞姞杞紸BC鍟嗗搧娓呭崟');
+    ElMessage.error('缺少 sessionId，无法加载 ABC 商品清单');
     return;
   }
   const res: any = await getDiagnosisSessionStatus(sessionId.value);
@@ -453,7 +461,7 @@ const handleSortChange = ({ prop, order }: { prop: string; order: Sort['order'] 
 };
 
 const handleExport = () => {
-  ElMessage.info('瀵煎嚭鍔熻兘鍚庣画瀵规帴鐪熷疄鎺ュ彛');
+  ElMessage.info('导出功能后续对接真实接口');
 };
 
 const handleGoodsDetail = (_row: AbcSalesListItemVO) => {
@@ -461,7 +469,15 @@ const handleGoodsDetail = (_row: AbcSalesListItemVO) => {
 };
 
 const handleProcess = (_row: AbcSalesListItemVO) => {
-  ElMessage.info('处理功能待接入');
+  processDialogVisible.value = true;
+};
+
+const handleSaveProcess = () => {
+  ElMessage.success('商品处理已暂存');
+};
+
+const handleDispatchProcess = () => {
+  ElMessage.success('商品处理已下发');
 };
 
 const formatNumber = (value: number | string | null | undefined, digits = 2) => {

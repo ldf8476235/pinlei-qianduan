@@ -34,9 +34,9 @@
               </div>
             </div>
             <div class="legend-pager">
-              <button type="button" class="legend-arrow" :disabled="!canPrevLegend" @click="handlePrevLegend">▲</button>
+              <button type="button" class="legend-arrow" :disabled="!canPrevLegend" @click="handlePrevLegend">&lt;</button>
               <span class="legend-page">{{ legendPageDisplay }}/{{ legendTotalDisplay }}</span>
-              <button type="button" class="legend-arrow" :disabled="!canNextLegend" @click="handleNextLegend">▼</button>
+              <button type="button" class="legend-arrow" :disabled="!canNextLegend" @click="handleNextLegend">&gt;</button>
             </div>
           </div>
         </div>
@@ -89,10 +89,7 @@
         </div>
       </template>
       <ul class="summary-list">
-        <li>规格"5kg"、"4.8kg"、"4.75kg"、"50g"、"100g"销售额相对较好，客户购买意向高。</li>
-        <li>规格"1支装()"、"1500g"、"278"、"五双圈"、"13p"销售额相对较差客户购买意向低。</li>
-        <li>规格"3000g"、"2.5L"、"720g+280g"、"2.38kg"、"100g+100g"销售额对比上涨较大，排除促销因素影响，反映出客户对此类规格的购买意向增加。</li>
-        <li>规格"278"、"五双圈"、"250g(J)"、"285cm*5p"、"13p"销售额对比下降较大，排除促销因素影响，反映出客户对此类规格的购买意向降低。</li>
+        <li v-for="line in summaryLines" :key="line">{{ line }}</li>
       </ul>
     </el-card>
   </div>
@@ -142,6 +139,8 @@ const comboItems = ref<any[]>([]);
 const detailRows = ref<any[]>([]);
 
 const colors = ['#16c2a3', '#ef4444', '#8b5cf6', '#ec4899', '#f59e0b', '#3b82f6', '#22c55e', '#64748b'];
+const RANK_AXIS_MAX = 320488.28;
+const RANK_AXIS_INTERVAL = 50000;
 
 const formatAmount = (value: unknown, digits = 2) => {
   const num = Number(value ?? 0);
@@ -184,10 +183,10 @@ const sortedRankItems = computed(() =>
 );
 
 const summaryLines = [
-  '规格"5kg"、"4.8kg"、"4.75kg"、"50g"、"100g"销售额相对较好，客户购买意向高。',
-  '规格"1支装()"、"1500g"、"278"、"五双圈"、"13p"销售额相对较差客户购买意向低。',
-  '规格"3000g"、"2.5L"、"720g+280g"、"2.38kg"、"100g+100g"销售额对比上涨较大，排除促销因素影响，反映出客户对此类规格的购买意向增加。',
-  '规格"278"、"五双圈"、"250g(J)"、"285cm*5p"、"13p"销售额对比下降较大，排除促销因素影响，反映出客户对此类规格的购买意向降低。'
+  '规格“5kg”“4.8kg”“4.75kg”“50g”“100g”销售额相对较好，客户购买意向高。',
+  '规格“1支装”“1500g”“278”“五双装”“13p”销售额相对较差，客户购买意向偏低。',
+  '规格“3000g”“2.5L”“720g+280g”“2.38kg”“100g+100g”销售额对比上升较大，排除促销因素影响，反映出客户对该类规格的购买意向增加。',
+  '规格“278”“五双装”“250g(J)”“285cm*5p”“13p”销售额对比下降较大，排除促销因素影响，反映出客户对该类规格的购买意向降低。'
 ];
 
 const renderPieChart = () => {
@@ -222,20 +221,25 @@ const renderRankChart = () => {
   if (!rankChartRef.value) return;
   rankChartIns.value ||= echarts.init(rankChartRef.value);
   const data = sortedRankItems.value.slice(0, 10);
-  const values = data.map((item) => (rankMetric.value === 'quantity' ? getQuantity(item) : getSales(item)));
-  const maxValue = values.length ? Math.max(...values) : 320488.28;
+  const topLabel = data.length ? getName(data[0], 0) : '';
   rankChartIns.value.setOption(
     {
+      animationDuration: 300,
       tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-      grid: { left: 92, right: 28, top: 6, bottom: 14, containLabel: true },
+      grid: { left: 96, right: 22, top: 10, bottom: 20, containLabel: true },
       xAxis: {
         type: 'value',
         min: 0,
-        max: 320488.28,
-        interval: 50000,
-        axisLabel: { color: '#6b7280', formatter: (value: number) => formatAmount(value, 2) },
+        max: RANK_AXIS_MAX,
+        interval: RANK_AXIS_INTERVAL,
+        boundaryGap: [0, 0],
+        axisLabel: {
+          color: '#111827',
+          fontSize: 12,
+          formatter: (value: number) => Number(value).toFixed(2)
+        },
         splitLine: { lineStyle: { color: '#edf1f5' } },
-        axisLine: { show: false },
+        axisLine: { lineStyle: { color: '#dfe6ee' } },
         axisTick: { show: false }
       },
       yAxis: {
@@ -243,31 +247,34 @@ const renderRankChart = () => {
         inverse: true,
         axisTick: { show: false },
         axisLine: { show: false },
-        axisLabel: { color: '#334155' },
+        axisLabel: { color: '#111827', fontSize: 12, margin: 14 },
         data: data.map((item, index) => getName(item, index))
       },
       series: [
         {
+          name: rankMetric.value === 'quantity' ? '销售量' : '销售额',
           type: 'bar',
-          barWidth: 16,
+          barWidth: 14,
+          barCategoryGap: '36%',
           data: data.map((item) => ({
             value: rankMetric.value === 'quantity' ? getQuantity(item) : getSales(item),
-            itemStyle: { color: '#0f766e', borderRadius: [0, 8, 8, 0] }
+            itemStyle: { color: '#16c2a3', borderRadius: 0 }
           })),
           markLine: {
             symbol: 'none',
             label: { show: false },
             lineStyle: { color: '#ef4444', width: 1.2, type: 'dashed' },
-            data: [{ xAxis: maxValue * 0.72 }]
+            data: [{ xAxis: RANK_AXIS_MAX }]
           },
           markPoint: {
             symbol: 'triangle',
             symbolSize: 12,
             label: { show: false },
-            data: data.length
+            symbolOffset: [0, -8],
+            data: topLabel
               ? [
                   {
-                    coord: [rankMetric.value === 'quantity' ? getQuantity(data[0]) : getSales(data[0]), getName(data[0], 0)],
+                    coord: [RANK_AXIS_MAX, topLabel],
                     itemStyle: { color: '#ef4444' }
                   }
                 ]
@@ -573,13 +580,33 @@ onBeforeUnmount(() => {
   gap: 10px;
 }
 
+.panel-header--rank {
+  align-items: center;
+}
+
+.panel-header--rank .panel-title-wrap {
+  flex: 1 1 auto;
+}
+
 .sort-text {
   padding-left: 0;
-  color: #0f9f9a;
+  color: #16c2a3;
+  font-size: 13px;
 }
 
 .rank-select {
-  width: 96px;
+  width: 108px;
+}
+
+.rank-select :deep(.el-select__wrapper) {
+  min-height: 28px;
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px #d8e2ea inset;
+}
+
+.rank-select :deep(.el-select__selected-item) {
+  color: #111827;
+  font-size: 12px;
 }
 
 .pie-layout {
@@ -654,12 +681,12 @@ onBeforeUnmount(() => {
 
 .rank-nav {
   display: flex;
-  justify-content: center;
-  margin-bottom: 4px;
+  justify-content: flex-end;
+  margin-bottom: 6px;
 }
 
 .rank-chart {
-  height: 214px;
+  height: 206px;
 }
 
 .combo-section {
@@ -710,10 +737,44 @@ onBeforeUnmount(() => {
 }
 
 :deep(.el-pagination.is-background .el-pager li.is-active) {
-  background-color: #0f9f9a;
+  background-color: #16c2a3;
+  color: #fff;
+}
+
+:deep(.rank-nav .el-pagination) {
+  --el-pagination-button-height: 24px;
+  --el-pagination-button-width: 24px;
+  gap: 2px;
+}
+
+:deep(.rank-nav .btn-prev),
+:deep(.rank-nav .btn-next),
+:deep(.rank-nav .el-pager li) {
+  min-width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+:deep(.rank-nav .btn-prev),
+:deep(.rank-nav .btn-next) {
+  color: #6b7280;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+}
+
+:deep(.rank-nav .el-pager li) {
+  color: #6b7280;
+  background: #f3f4f6;
+}
+
+:deep(.rank-nav .btn-prev:hover),
+:deep(.rank-nav .btn-next:hover),
+:deep(.rank-nav .el-pager li:hover) {
+  color: #16c2a3;
 }
 
 :deep(.el-pagination button:hover) {
-  color: #0f9f9a;
+  color: #16c2a3;
 }
 </style>

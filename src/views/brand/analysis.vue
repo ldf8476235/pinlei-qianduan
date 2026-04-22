@@ -49,10 +49,19 @@
             <el-option label="销售量" value="salesQuantity" />
           </el-select>
         </header>
-        <div class="rank-nav">
-          <button class="page-arrow" type="button" :disabled="rankPage.page <= 1" @click="changeRankPage(rankPage.page - 1)">‹</button>
-          <span v-for="item in rankPagerItems" :key="item.key" class="pager-item" :class="{ active: item.active }">{{ item.label }}</span>
-          <button class="page-arrow" type="button" :disabled="rankPage.page >= totalRankPages" @click="changeRankPage(rankPage.page + 1)">›</button>
+        <div class="rank-toolbar">
+          <div class="rank-nav">
+            <el-pagination
+              v-model:current-page="rankPage.page"
+              :page-size="rankPage.pageSize"
+              :total="rankPage.total"
+              layout="prev, pager, next"
+              :pager-count="6"
+              background
+              small
+              @current-change="handleRankPageChange"
+            />
+          </div>
         </div>
         <div ref="rankChartRef" class="chart-box rank-chart" />
       </article>
@@ -132,21 +141,6 @@ const canPrevLegend = computed(() => legendStart.value > 0);
 const canNextLegend = computed(() => legendStart.value + LEGEND_PAGE_SIZE < pieLegendItems.value.length);
 const legendCursorDisplay = computed(() => (pieLegendItems.value.length ? legendStart.value + 1 : 1));
 const legendTotalDisplay = computed(() => Math.max(1, pieLegendItems.value.length));
-const totalRankPages = computed(() => Math.max(1, Math.ceil((rankPage.total || rankItems.value.length || 1) / rankPage.pageSize)));
-const rankPagerItems = computed(() => {
-  const total = totalRankPages.value;
-  const current = rankPage.page;
-  const pages: Array<{ key: string; label: string; active?: boolean }> = [];
-  const add = (page: number) => pages.push({ key: String(page), label: String(page), active: page === current });
-  add(1);
-  if (total > 1 && current > 3) pages.push({ key: 'l', label: '…' });
-  for (let page = Math.max(2, current - 1); page <= Math.min(total - 1, current + 1); page++) {
-    if (page > 1 && page < total) add(page);
-  }
-  if (total > 1 && current < total - 2) pages.push({ key: 'r', label: '…' });
-  if (total > 1) add(total);
-  return pages;
-});
 
 const sortedRankItems = computed(() =>
   [...rankItems.value].sort((a, b) => {
@@ -154,6 +148,9 @@ const sortedRankItems = computed(() =>
     return rankDesc.value ? -diff : diff;
   })
 );
+
+const RANK_AXIS_MAX = 494691.6;
+const RANK_AXIS_INTERVAL = 100000;
 
 const reload = async () => {
   if (!sessionId.value) return;
@@ -256,17 +253,38 @@ const renderRankChart = () => {
     { name: '雕牌', value: 100000 },
     { name: '七度空间', value: 80000 }
   ]);
+  const topLabel = chartData.length ? normalizeName(chartData[0], 0) : '';
   rankChartIns.value.setOption(
     {
+      animationDuration: 300,
       tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-      grid: { left: 38, right: 26, top: 8, bottom: 16, containLabel: true },
+      grid: { left: 88, right: 20, top: 8, bottom: 24, containLabel: true },
+      graphic: [
+        {
+          type: 'text',
+          right: 0,
+          bottom: 0,
+          silent: true,
+          style: {
+            text: RANK_AXIS_MAX.toFixed(2),
+            fill: '#9ca3af',
+            fontSize: 12,
+            textAlign: 'right'
+          }
+        }
+      ],
       xAxis: {
         type: 'value',
         min: 0,
-        max: 494691.6,
-        splitNumber: 5,
-        axisLabel: { color: '#6b7280', formatter: (value: number) => formatAmount(value, 2) },
-        splitLine: { lineStyle: { color: '#edf1f5' } },
+        max: RANK_AXIS_MAX,
+        interval: RANK_AXIS_INTERVAL,
+        boundaryGap: [0, 0],
+        axisLabel: {
+          color: '#9ca3af',
+          fontSize: 12,
+          formatter: (value: number) => Number(value).toFixed(2)
+        },
+        splitLine: { lineStyle: { color: '#e5e7eb' } },
         axisLine: { show: false },
         axisTick: { show: false }
       },
@@ -276,25 +294,30 @@ const renderRankChart = () => {
         data: chartData.map((item, index) => normalizeName(item, index)),
         axisTick: { show: false },
         axisLine: { show: false },
-        axisLabel: { color: '#111827' }
+        axisLabel: { color: '#111827', fontSize: 12, margin: 14 }
       },
       series: [
         {
           type: 'bar',
-          barWidth: 16,
-          data: chartData.map((item) => ({ value: resolveRankValue(item, rankMetric.value), itemStyle: { color: '#16c2a3' } })),
+          barWidth: 14,
+          barCategoryGap: '38%',
+          data: chartData.map((item) => ({
+            value: resolveRankValue(item, rankMetric.value),
+            itemStyle: { color: '#16c2a3', borderRadius: 0 }
+          })),
           markLine: {
             symbol: 'none',
             label: { show: false },
-            lineStyle: { color: '#ef4444', width: 2, type: 'dashed' },
-            data: [{ xAxis: 0 }]
+            lineStyle: { color: '#ef4444', width: 1.2, type: 'dashed' },
+            data: [{ xAxis: RANK_AXIS_MAX }]
           },
           markPoint: {
             symbol: 'triangle',
             symbolSize: 12,
             itemStyle: { color: '#ef4444' },
             label: { show: false },
-            data: chartData.length ? [{ coord: [resolveRankValue(chartData[0], rankMetric.value), normalizeName(chartData[0], 0)] }] : []
+            symbolOffset: [0, -8],
+            data: topLabel ? [{ coord: [RANK_AXIS_MAX, topLabel] }] : []
           }
         }
       ]
@@ -374,7 +397,7 @@ const renderComboChart = () => {
 const handlePrevLegend = () => { if (canPrevLegend.value) legendStart.value -= 1; };
 const handleNextLegend = () => { if (canNextLegend.value) legendStart.value += 1; };
 const toggleRankDesc = async () => { rankDesc.value = !rankDesc.value; await reload(); };
-const changeRankPage = async (page: number) => { rankPage.page = Math.max(1, Math.min(page, totalRankPages.value)); await reload(); };
+const handleRankPageChange = async (page: number) => { rankPage.page = Math.max(1, Number(page || 1)); await reload(); };
 const handleViewDetail = () => { router.push({ path: '/brand/analysis/detail', query: { ...route.query } }); };
 
 const resizeCharts = () => {
@@ -487,15 +510,16 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 6px;
+  margin-bottom: 2px;
 }
 .panel-header--rank {
-  align-items: flex-start;
+  align-items: center;
 }
 .panel-title-wrap {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex: 1 1 auto;
 }
 .panel-title {
   margin: 0;
@@ -513,6 +537,7 @@ onBeforeUnmount(() => {
 }
 .rank-select {
   width: 108px;
+  flex: none;
 }
 .donut-layout {
   display: flex;
@@ -558,7 +583,6 @@ onBeforeUnmount(() => {
 .rank-nav {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 8px;
 }
 .pager-arrow,
@@ -579,12 +603,17 @@ onBeforeUnmount(() => {
   color: #9ca3af;
   font-size: 12px;
 }
-.pager-item.active {
-  color: #16c2a3;
-  font-weight: 700;
+.rank-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 4px;
+  min-height: 24px;
+}
+.rank-nav {
+  justify-content: flex-end;
 }
 .rank-chart {
-  height: 208px;
+  height: 214px;
 }
 .combo-section {
   flex: 0 0 320px;
@@ -609,5 +638,43 @@ onBeforeUnmount(() => {
   font-size: 14px;
   color: #111827;
   line-height: 1.55;
+}
+
+:deep(.rank-nav .el-pagination) {
+  --el-pagination-button-height: 24px;
+  --el-pagination-button-width: 24px;
+  gap: 2px;
+}
+
+:deep(.rank-nav .btn-prev),
+:deep(.rank-nav .btn-next),
+:deep(.rank-nav .el-pager li) {
+  min-width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+:deep(.rank-nav .btn-prev),
+:deep(.rank-nav .btn-next) {
+  color: #6b7280;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+}
+
+:deep(.rank-nav .el-pager li) {
+  color: #9ca3af;
+  background: #f3f4f6;
+}
+
+:deep(.rank-nav .el-pager li.is-active) {
+  background: #16c2a3;
+  color: #fff;
+}
+
+:deep(.rank-nav .btn-prev:hover),
+:deep(.rank-nav .btn-next:hover),
+:deep(.rank-nav .el-pager li:hover) {
+  color: #16c2a3;
 }
 </style>
