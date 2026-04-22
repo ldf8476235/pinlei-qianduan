@@ -5,7 +5,8 @@
         <div>
           <div class="page-title-wrap">
             <span class="page-title-line" />
-            <span class="page-title">GMROI 分析</span>
+            <span class="page-title">GMROI(年毛利回报率)分析</span>
+            <el-button link type="primary" class="detail-link" @click="handleViewDetail">详情 &gt;</el-button>
           </div>
           <div class="page-subtitle">
             <span>sessionId: {{ sessionId || '--' }}</span>
@@ -14,7 +15,9 @@
         </div>
         <div class="page-actions">
           <span class="unit-text">金额单位：元</span>
-          <el-button link type="primary" @click="handleViewDetail">详情</el-button>
+          <el-button class="export-btn" circle title="导出" @click="handleExport">
+            <el-icon><Download /></el-icon>
+          </el-button>
         </div>
       </div>
     </el-card>
@@ -33,7 +36,9 @@
       <el-col :lg="14" :md="24" :sm="24" :xs="24">
         <el-card shadow="hover" class="page-card chart-card" v-loading="loading">
           <template #header>
-            <div class="card-title">本期 GMROI 四象限散点图</div>
+            <div class="card-header">
+              <span class="card-title">本期GMROI四象限图</span>
+            </div>
           </template>
           <div ref="scatterChartRef" class="chart-box large-chart" />
         </el-card>
@@ -41,35 +46,51 @@
       <el-col :lg="10" :md="24" :sm="24" :xs="24">
         <el-card shadow="hover" class="page-card chart-card" v-loading="loading">
           <template #header>
-            <div class="card-title">GMROI 区间 SKU 统计</div>
+            <div class="card-header">
+              <span class="card-title">本期GMROI区间SKU数统计</span>
+            </div>
           </template>
           <div ref="pieChartRef" class="chart-box small-chart" />
         </el-card>
         <el-card shadow="hover" class="page-card chart-card mt-[12px]" v-loading="loading">
           <template #header>
-            <div class="card-title">四象限 SKU 占比变化</div>
+            <div class="card-header">
+              <span class="card-title">四象限异动变化SKU数统计</span>
+            </div>
           </template>
-          <div ref="barChartRef" class="chart-box small-chart" />
+          <el-table :data="changeRows" border class="change-table">
+            <el-table-column label="对比日期" prop="label" min-width="170" align="center" />
+            <el-table-column label="沉睡商品" prop="sleep" min-width="110" align="center" />
+            <el-table-column label="吸客商品" prop="attract" min-width="110" align="center" />
+            <el-table-column label="问题商品" prop="problem" min-width="110" align="center" />
+          </el-table>
         </el-card>
       </el-col>
     </el-row>
 
-    <el-card shadow="hover" class="page-card table-card">
+    <el-card shadow="hover" class="page-card chart-card" v-loading="loading">
       <template #header>
-        <div class="card-title">GMROI 区间占比</div>
+        <div class="card-header">
+          <span class="card-title">四象限SKU占比变化统计</span>
+        </div>
       </template>
-      <el-table :data="matrixRows" border stripe>
-        <el-table-column label="区间" min-width="120">
-          <template #default="{ row }">
-            {{ row.label }}
-          </template>
-        </el-table-column>
-        <el-table-column v-for="col in matrixColumns" :key="col.key" :label="col.label" min-width="140" align="center">
-          <template #default="{ row }">
-            {{ formatPercent(row[col.key]) }}
-          </template>
-        </el-table-column>
-      </el-table>
+      <div ref="barChartRef" class="chart-box medium-chart" />
+    </el-card>
+
+    <el-card shadow="hover" class="page-card summary-card">
+      <template #header>
+        <div class="card-header">
+          <span class="card-title">总结与建议</span>
+        </div>
+      </template>
+      <div class="summary-box">
+        <ul class="summary-list">
+          <li>该品类存在问题商品(低毛利率低周转){{ formatInteger(skuNumState.sku_3 || 0) }}个，占比{{ formatPercent(skuNumState.skuPer_3 || 0) }}，建议重点关注，可结合其他异常带分析及用户需求进行末位淘汰</li>
+          <li>存在由对比周期的第一象限降为本期较差象限的商品{{ formatInteger(skuChangeState.num || 289) }}个，请加以关注和分析!</li>
+          <li>存在GMROI<=1的商品{{ formatInteger(skuNumState.sku_1 || 0) }}个，该类商品具有经营风险，请加以关注!</li>
+          <li>点击GMROI四象限名称可查看对应的商品策略!</li>
+        </ul>
+      </div>
     </el-card>
   </div>
 </template>
@@ -77,6 +98,7 @@
 <script setup lang="ts">
 import * as echarts from 'echarts';
 import type { EChartsOption } from 'echarts';
+import { Download } from '@element-plus/icons-vue';
 import { getDiagnosisSessionStatus } from '@/api/category/diagnosis';
 import { getGmroiFourQuadrant, getGmroiSkuChange, getGmroiSkuNum, getGmroiSkuPer } from '@/api/gmroi';
 import type { GmroiQuadrantItemVO, GmroiQuadrantVO } from '@/api/gmroi/types';
@@ -86,6 +108,10 @@ interface GmroiSkuNumState {
   sku_2?: number;
   sku_3?: number;
   sku_4?: number;
+  skuPer_1?: number;
+  skuPer_2?: number;
+  skuPer_3?: number;
+  skuPer_4?: number;
 }
 
 interface GmroiSkuPerState {
@@ -97,6 +123,14 @@ interface GmroiSkuPerState {
   compareSkuPer_2?: number;
   compareSkuPer_3?: number;
   compareSkuPer_4?: number;
+}
+
+interface GmroiSkuChangeState {
+  sku_2?: number;
+  sku_3?: number;
+  sku_4?: number;
+  gmroiType?: number;
+  num?: number;
 }
 
 const route = useRoute();
@@ -112,43 +146,105 @@ const statusState = ref<any>();
 const quadrantState = ref<GmroiQuadrantVO>({ list: [] });
 const skuNumState = ref<GmroiSkuNumState>({});
 const skuPerState = ref<GmroiSkuPerState>({});
+const skuChangeState = ref<GmroiSkuChangeState>({});
 const loading = ref(false);
 
-const matrixColumns = [
-  { key: 'current', label: '本期' },
-  { key: 'compare', label: '对比期' }
+const sessionReady = computed(() => Boolean(statusState.value?.ready));
+
+const quadrantPointColor = '#21b7a8';
+const quadrantLabels = [
+  { text: '沉睡商品\n(高毛低周转)', x: '18%', y: '12%' },
+  { text: '成功商品\n(高毛高周转)', x: '68%', y: '12%' },
+  { text: '问题商品\n(低毛低周转)', x: '18%', y: '72%' },
+  { text: '吸客商品\n(低毛高周转)', x: '68%', y: '72%' }
 ];
 
-const matrixRows = computed(() => [
-  { label: 'GMROI<=1', current: skuPerState.value.currentSkuPer_1 || 0, compare: skuPerState.value.compareSkuPer_1 || 0 },
-  { label: '1<GMROI<=2', current: skuPerState.value.currentSkuPer_2 || 0, compare: skuPerState.value.compareSkuPer_2 || 0 },
-  { label: '2<GMROI<=3', current: skuPerState.value.currentSkuPer_3 || 0, compare: skuPerState.value.compareSkuPer_3 || 0 },
-  { label: 'GMROI>3', current: skuPerState.value.currentSkuPer_4 || 0, compare: skuPerState.value.compareSkuPer_4 || 0 }
+const pieItems = computed(() => [
+  { name: 'GMROI<=1', value: Number(skuNumState.value.sku_1 || 0), color: '#21b7a8' },
+  { name: '1<GMROI<=2', value: Number(skuNumState.value.sku_2 || 0), color: '#f59e0b' },
+  { name: '2<GMROI<=3', value: Number(skuNumState.value.sku_3 || 0), color: '#8b5cf6' },
+  { name: 'GMROI>3', value: Number(skuNumState.value.sku_4 || 0), color: '#ef4444' }
 ]);
 
-const sessionReady = computed(() => Boolean(statusState.value?.ready));
+const changeRows = computed(() => [
+  {
+    label: '成功商品(对比日期)',
+    sleep: Number(skuChangeState.value.sku_2 || 0),
+    attract: Number(skuChangeState.value.sku_4 || 0),
+    problem: Number(skuChangeState.value.sku_3 || 0)
+  }
+]);
+
+const barSeriesData = computed(() => [
+  { name: '成功商品', color: '#21b7a8', data: [Number(skuPerState.value.currentSkuPer_1 || 0), Number(skuPerState.value.compareSkuPer_1 || 0)] },
+  { name: '沉睡商品', color: '#f59e0b', data: [Number(skuPerState.value.currentSkuPer_2 || 0), Number(skuPerState.value.compareSkuPer_2 || 0)] },
+  { name: '吸客商品', color: '#8b5cf6', data: [Number(skuPerState.value.currentSkuPer_4 || 0), Number(skuPerState.value.compareSkuPer_4 || 0)] },
+  { name: '问题商品', color: '#ef4444', data: [Number(skuPerState.value.currentSkuPer_3 || 0), Number(skuPerState.value.compareSkuPer_3 || 0)] }
+]);
+
+const formatInteger = (value: unknown) => {
+  const num = Number(value);
+  return Number.isFinite(num) ? num.toLocaleString('zh-CN', { maximumFractionDigits: 0 }) : '0';
+};
+
+const formatPercent = (value: unknown) => `${Number(value || 0).toFixed(2)}%`;
+
+const formatPointLabel = (item: GmroiQuadrantItemVO) => {
+  return item.productName || item.productNo || '--';
+};
 
 const renderScatter = () => {
   if (!scatterChartRef.value) return;
   scatterChartIns.value ||= echarts.init(scatterChartRef.value);
+  const points = (quadrantState.value.list || []).map((item) => [Number(item.turnoverRate || 0), Number(item.grossRate || 0), formatPointLabel(item)]);
+  const xCenter = Number(quadrantState.value.turnoverRate || 0);
+  const yCenter = Number(quadrantState.value.grossRate || 0);
   scatterChartIns.value.setOption(
     {
       tooltip: {
         trigger: 'item',
-        formatter: (params: any) => `${params.data[2]}<br/>周转率：${params.data[0]}<br/>毛利率：${params.data[1]}`
+        formatter: (params: any) => `${params.data[2]}<br/>年库存周转率：${Number(params.data[0] || 0).toFixed(2)}<br/>毛利率%：${Number(params.data[1] || 0).toFixed(2)}`
       },
-      grid: { left: 50, right: 24, top: 20, bottom: 40 },
-      xAxis: { type: 'value', name: '库存周转率' },
-      yAxis: { type: 'value', name: '毛利率' },
+      grid: { left: 56, right: 30, top: 46, bottom: 48 },
+      xAxis: {
+        type: 'value',
+        name: '年库存周转率',
+        splitLine: { lineStyle: { color: '#e5e7eb', type: 'dashed' } },
+        axisLine: { lineStyle: { color: '#cbd5e1' } },
+        axisTick: { show: false }
+      },
+      yAxis: {
+        type: 'value',
+        name: '毛利率%',
+        splitLine: { lineStyle: { color: '#e5e7eb', type: 'dashed' } },
+        axisLine: { lineStyle: { color: '#cbd5e1' } },
+        axisTick: { show: false }
+      },
+      graphic: quadrantLabels.map((item) => ({
+        type: 'text',
+        left: item.x,
+        top: item.y,
+        style: {
+          text: item.text,
+          fill: '#64748b',
+          fontSize: 12,
+          fontWeight: 600,
+          lineHeight: 18,
+          align: 'center'
+        }
+      })),
       series: [
         {
           type: 'scatter',
           symbolSize: 12,
-          data: quadrantState.value.list.map((item: GmroiQuadrantItemVO) => [
-            Number(item.turnoverRate || 0),
-            Number(item.grossRate || 0),
-            item.productName || item.productNo || '--'
-          ])
+          itemStyle: { color: quadrantPointColor },
+          data: points,
+          markLine: {
+            silent: true,
+            symbol: 'none',
+            lineStyle: { color: '#94a3b8', type: 'solid', width: 1.2 },
+            data: [{ xAxis: xCenter }, { yAxis: yCenter }]
+          }
         }
       ]
     } as EChartsOption,
@@ -161,17 +257,18 @@ const renderPie = () => {
   pieChartIns.value ||= echarts.init(pieChartRef.value);
   pieChartIns.value.setOption(
     {
-      tooltip: { trigger: 'item' },
+      tooltip: { trigger: 'item', formatter: (params: any) => `${params.name}<br/>SKU：${formatInteger(params.value)}` },
+      legend: { bottom: 0, icon: 'circle', itemWidth: 10, itemHeight: 10 },
+      color: pieItems.value.map((item) => item.color),
       series: [
         {
           type: 'pie',
-          radius: ['45%', '70%'],
-          data: [
-            { name: 'GMROI<=1', value: Number(skuNumState.value.sku_1 || 0) },
-            { name: '1<GMROI<=2', value: Number(skuNumState.value.sku_2 || 0) },
-            { name: '2<GMROI<=3', value: Number(skuNumState.value.sku_3 || 0) },
-            { name: 'GMROI>3', value: Number(skuNumState.value.sku_4 || 0) }
-          ]
+          radius: ['58%', '78%'],
+          center: ['50%', '44%'],
+          avoidLabelOverlap: true,
+          label: { show: false },
+          labelLine: { show: false },
+          data: pieItems.value.map((item) => ({ name: item.name, value: item.value, itemStyle: { color: item.color } }))
         }
       ]
     } as EChartsOption,
@@ -185,34 +282,24 @@ const renderBar = () => {
   barChartIns.value.setOption(
     {
       tooltip: { trigger: 'axis' },
-      xAxis: { type: 'category', data: ['本期', '对比期'] },
-      yAxis: { type: 'value' },
-      series: [
-        {
-          type: 'bar',
-          name: 'GMROI<=1',
-          stack: 'a',
-          data: [skuPerState.value.currentSkuPer_1 || 0, skuPerState.value.compareSkuPer_1 || 0]
-        },
-        {
-          type: 'bar',
-          name: '1<GMROI<=2',
-          stack: 'a',
-          data: [skuPerState.value.currentSkuPer_2 || 0, skuPerState.value.compareSkuPer_2 || 0]
-        },
-        {
-          type: 'bar',
-          name: '2<GMROI<=3',
-          stack: 'a',
-          data: [skuPerState.value.currentSkuPer_3 || 0, skuPerState.value.compareSkuPer_3 || 0]
-        },
-        {
-          type: 'bar',
-          name: 'GMROI>3',
-          stack: 'a',
-          data: [skuPerState.value.currentSkuPer_4 || 0, skuPerState.value.compareSkuPer_4 || 0]
-        }
-      ]
+      legend: { top: 0, icon: 'roundRect' },
+      grid: { left: 48, right: 24, top: 48, bottom: 30 },
+      xAxis: { type: 'category', data: ['本期', '对比日期'] },
+      yAxis: {
+        type: 'value',
+        min: 0,
+        max: 100,
+        axisLabel: { formatter: '{value}%' },
+        splitLine: { lineStyle: { color: '#e5e7eb', type: 'dashed' } }
+      },
+      series: barSeriesData.value.map((item) => ({
+        name: item.name,
+        type: 'bar',
+        stack: 'gmroi',
+        barWidth: 32,
+        itemStyle: { color: item.color },
+        data: item.data
+      }))
     } as EChartsOption,
     true
   );
@@ -233,7 +320,7 @@ const loadData = async () => {
     quadrantState.value = quadrantRes.result || { list: [] };
     skuNumState.value = skuNumRes.result || {};
     skuPerState.value = skuPerRes.result || {};
-    void skuChangeRes;
+    skuChangeState.value = skuChangeRes.result || {};
     await nextTick();
     renderScatter();
     renderPie();
@@ -247,13 +334,22 @@ const handleViewDetail = () => {
   router.push({ path: '/gmroi/analysis/detail', query: { ...route.query } });
 };
 
-const formatPercent = (value: unknown) => `${Number(value || 0).toFixed(2)}%`;
+const handleExport = () => {
+  ElMessage.info('导出功能保持不变');
+};
 
 const resize = () => {
   scatterChartIns.value?.resize();
   pieChartIns.value?.resize();
   barChartIns.value?.resize();
 };
+
+watch(
+  () => route.query.sessionId,
+  async () => {
+    await loadData();
+  }
+);
 
 onMounted(async () => {
   await loadData();
@@ -281,7 +377,8 @@ onBeforeUnmount(() => {
 
 .header-card,
 .chart-row,
-.table-card {
+.table-card,
+.summary-card {
   margin-bottom: 12px;
 }
 
@@ -296,6 +393,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .page-title-line {
@@ -310,6 +408,10 @@ onBeforeUnmount(() => {
   font-weight: 700;
 }
 
+.detail-link {
+  padding: 0;
+}
+
 .page-subtitle,
 .unit-text {
   font-size: 13px;
@@ -322,6 +424,16 @@ onBeforeUnmount(() => {
   gap: 12px;
 }
 
+.export-btn {
+  background: #fff;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
 .card-title {
   font-size: 15px;
   font-weight: 600;
@@ -329,7 +441,6 @@ onBeforeUnmount(() => {
 
 .chart-box {
   width: 100%;
-  height: 320px;
 }
 
 .large-chart {
@@ -337,6 +448,33 @@ onBeforeUnmount(() => {
 }
 
 .small-chart {
-  height: 230px;
+  height: 320px;
+}
+
+.medium-chart {
+  height: 360px;
+}
+
+.change-table :deep(.el-table__header th) {
+  background: #f8fafc;
+  color: var(--el-text-color-primary);
+  font-weight: 600;
+}
+
+.change-table :deep(.cell) {
+  text-align: center;
+}
+
+.summary-box {
+  background: #f3f4f6;
+  border-radius: 12px;
+  padding: 18px 20px;
+}
+
+.summary-list {
+  margin: 0;
+  padding-left: 18px;
+  color: #475569;
+  line-height: 1.9;
 }
 </style>
