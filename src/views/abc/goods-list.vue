@@ -30,8 +30,11 @@
               :max-collapse-tags="1"
               clearable
               style="width: 220px"
+              @change="handleStatusChange"
             >
-              <el-option v-for="item in statusOptions" :key="String(item.value)" :label="item.label" :value="String(item.value)" />
+              <el-option label="全部" value="__ALL__" />
+              <el-option label="上架" value="1" />
+              <el-option label="下架" value="2" />
             </el-select>
           </el-form-item>
 
@@ -241,10 +244,8 @@
 <script setup lang="ts">
 import GoodsProcessDialog from '@/components/GoodsProcessDialog/index.vue';
 import { getDiagnosisSessionStatus } from '@/api/category/diagnosis';
-import { getCategoryFilterOptions } from '@/api/category/tree';
 import { getAbcParams, getAbcSalesList } from '@/api/category/abc';
 import type { AbcSalesListItemVO, AbcTypeParamVO } from '@/api/category/abc/types';
-import type { OptionVO } from '@/api/category/tree/types';
 import type { Sort } from 'element-plus';
 
 type SortOrder = 'ascending' | 'descending' | null;
@@ -254,7 +255,6 @@ const pollTimer = ref<number | null>(null);
 
 const statusState = ref<any>();
 const abcParams = ref<AbcTypeParamVO[]>([]);
-const statusOptions = ref<OptionVO[]>([]);
 const tableRows = ref<AbcSalesListItemVO[]>([]);
 const tableLoading = ref(false);
 const processDialogVisible = ref(false);
@@ -350,16 +350,6 @@ const loadAbcParams = async () => {
   }
 };
 
-const loadStatusOptions = async () => {
-  const res: any = await getCategoryFilterOptions();
-  statusOptions.value = Array.isArray(res?.classSalesStatusNo)
-    ? res.classSalesStatusNo.map((item) => ({
-        label: String(item.label || item.value || ''),
-        value: String(item.value || '')
-      }))
-    : [];
-};
-
 const loadTable = async () => {
   if (!sessionReady.value || !sessionId.value || !queryForm.abcType) return;
   tableLoading.value = true;
@@ -410,6 +400,12 @@ const loadSessionState = async () => {
 const handleQuery = async () => {
   pagination.pageNum = 1;
   await loadTable();
+};
+
+const handleStatusChange = (values: string[]) => {
+  if (values.includes('__ALL__')) {
+    queryForm.status = [];
+  }
 };
 
 const handleReset = async () => {
@@ -497,7 +493,7 @@ const formatPercent = (value: number | string | null | undefined) => {
 };
 
 onMounted(async () => {
-  await Promise.all([loadStatusOptions(), loadSessionState()]);
+  await loadSessionState();
 });
 
 onBeforeUnmount(() => {
@@ -677,4 +673,3 @@ onBeforeUnmount(() => {
   }
 }
 </style>
-

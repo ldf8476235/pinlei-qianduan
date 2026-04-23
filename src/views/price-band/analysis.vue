@@ -185,8 +185,7 @@ const formatInteger = (value: unknown) => formatNumber(value, 0);
 const formatPercent = (value: unknown) => {
   const num = Number(value ?? 0);
   if (!Number.isFinite(num)) return '--';
-  const percent = Math.abs(num) <= 1 ? num * 100 : num;
-  return `${percent.toFixed(2)}%`;
+  return `${num.toFixed(2)}%`;
 };
 
 const sortNumber = (field: keyof PriceBandTableRow) => (a: PriceBandTableRow, b: PriceBandTableRow) => Number(a[field] || 0) - Number(b[field] || 0);
