@@ -102,6 +102,7 @@ import {
   getSpecDetails,
   getSpecOverview,
   getSpecRanking,
+  getSpecFilterOptions,
   getSpecSalesShare,
   getSpecSkuSalesChange
 } from '@/api/category/diagnosis/analysis';
@@ -137,6 +138,7 @@ const pieItems = ref<any[]>([]);
 const rankItems = ref<any[]>([]);
 const comboItems = ref<any[]>([]);
 const detailRows = ref<any[]>([]);
+const specSummary = ref<{ summaryOne?: string[]; summaryTwo?: string[]; summaryThree?: string[]; summaryFour?: string[] }>({});
 
 const colors = ['#16c2a3', '#ef4444', '#8b5cf6', '#ec4899', '#f59e0b', '#3b82f6', '#22c55e', '#64748b'];
 const RANK_AXIS_MAX = 320488.28;
@@ -182,12 +184,34 @@ const sortedRankItems = computed(() =>
   })
 );
 
-const summaryLines = [
+const defaultSummaryLines = [
   '规格“5kg”“4.8kg”“4.75kg”“50g”“100g”销售额相对较好，客户购买意向高。',
   '规格“1支装”“1500g”“278”“五双装”“13p”销售额相对较差，客户购买意向偏低。',
   '规格“3000g”“2.5L”“720g+280g”“2.38kg”“100g+100g”销售额对比上升较大，排除促销因素影响，反映出客户对该类规格的购买意向增加。',
   '规格“278”“五双装”“250g(J)”“285cm*5p”“13p”销售额对比下降较大，排除促销因素影响，反映出客户对该类规格的购买意向降低。'
 ];
+
+const summaryLines = computed(() => {
+  const one = (specSummary.value.summaryOne || []).filter(Boolean);
+  const two = (specSummary.value.summaryTwo || []).filter(Boolean);
+  const three = (specSummary.value.summaryThree || []).filter(Boolean);
+  const four = (specSummary.value.summaryFour || []).filter(Boolean);
+
+  return [
+    one.length
+      ? `规格“${one.join('”“')}”销售额相对较好，客户购买意向高。`
+      : defaultSummaryLines[0],
+    two.length
+      ? `规格“${two.join('”“')}”销售额相对较差，客户购买意向偏低。`
+      : defaultSummaryLines[1],
+    three.length
+      ? `规格“${three.join('”“')}”销售额对比上升较大，排除促销因素影响，反映出客户对该类规格的购买意向增加。`
+      : defaultSummaryLines[2],
+    four.length
+      ? `规格“${four.join('”“')}”销售额对比下降较大，排除促销因素影响，反映出客户对该类规格的购买意向降低。`
+      : defaultSummaryLines[3]
+  ];
+});
 
 const renderPieChart = () => {
   if (!pieChartRef.value) return;
@@ -359,7 +383,7 @@ const reload = async () => {
   if (!sessionId.value) return;
   loading.value = true;
   try {
-    const [overviewRes, shareRes, rankingRes, comboRes, detailsRes] = await Promise.all([
+    const [overviewRes, shareRes, rankingRes, comboRes, detailsRes, filterRes] = await Promise.all([
       getSpecOverview(sessionId.value),
       getSpecSalesShare(sessionId.value),
       getSpecRanking({
@@ -370,7 +394,8 @@ const reload = async () => {
         order: rankDesc.value ? 'desc' : 'asc'
       }),
       getSpecSkuSalesChange(sessionId.value),
-      getSpecDetails({ sessionId: sessionId.value, page: 1, size: 20 })
+      getSpecDetails({ sessionId: sessionId.value, page: 1, size: 20 }),
+      getSpecFilterOptions(sessionId.value)
     ]);
 
     const overview: any = overviewRes.data || {};
@@ -403,6 +428,7 @@ const reload = async () => {
         : Array.isArray((detailsRes.data as any)?.data)
           ? (detailsRes.data as any).data
           : [];
+    specSummary.value = (filterRes.data as any)?.data || (filterRes.data as any) || {};
 
     rankPage.total = Number((rankingRes.data as any)?.data?.total || (rankingRes.data as any)?.data?.pages || rankItems.value.length || 0);
     legendStart.value = Math.min(legendStart.value, Math.max(0, pieLegendItems.value.length - legendPageSize));

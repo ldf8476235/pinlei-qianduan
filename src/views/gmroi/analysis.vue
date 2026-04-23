@@ -85,8 +85,8 @@
       </template>
       <div class="summary-box">
         <ul class="summary-list">
-          <li>该品类存在问题商品(低毛利率低周转){{ formatInteger(skuNumState.sku_3 || 0) }}个，占比{{ formatPercent(skuNumState.skuPer_3 || 0) }}，建议重点关注，可结合其他异常带分析及用户需求进行末位淘汰</li>
-          <li>存在由对比周期的第一象限降为本期较差象限的商品{{ formatInteger(skuChangeState.num || 289) }}个，请加以关注和分析!</li>
+          <li>该品类存在问题商品(低毛利率低周转){{ formatInteger(skuPerState.currentSku_3 || skuNumState.sku_3 || 0) }}个，占比{{ formatPercent(skuPerState.currentSkuPer_3 || skuNumState.skuPer_3 || 0) }}，建议重点关注，可结合其他异常带分析及用户需求进行末位淘汰</li>
+          <li>存在由对比周期的第一象限降为本期较差象限的商品{{ formatInteger((skuChangeState.sku_2 || 0) + (skuChangeState.sku_3 || 0) + (skuChangeState.sku_4 || 0)) }}个，请加以关注和分析!</li>
           <li>存在GMROI<=1的商品{{ formatInteger(skuNumState.sku_1 || 0) }}个，该类商品具有经营风险，请加以关注!</li>
           <li>点击GMROI四象限名称可查看对应的商品策略!</li>
         </ul>
@@ -118,6 +118,7 @@ interface GmroiSkuPerState {
   currentSkuPer_1?: number;
   currentSkuPer_2?: number;
   currentSkuPer_3?: number;
+  currentSku_3?: number;
   currentSkuPer_4?: number;
   compareSkuPer_1?: number;
   compareSkuPer_2?: number;
@@ -320,6 +321,7 @@ const loadData = async () => {
     quadrantState.value = quadrantRes.result || { list: [] };
     skuNumState.value = skuNumRes.result || {};
     skuPerState.value = skuPerRes.result || {};
+    skuPerState.value.currentSku_3 = Number((skuPerRes.result as any)?.currentSku_3 || 0);
     skuChangeState.value = skuChangeRes.result || {};
     await nextTick();
     renderScatter();

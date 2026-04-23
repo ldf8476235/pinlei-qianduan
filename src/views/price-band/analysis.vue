@@ -93,6 +93,19 @@
         </el-table-column>
       </el-table>
     </el-card>
+
+    <el-card shadow="hover" class="page-card summary-card">
+      <template #header>
+        <div class="card-header">
+          <span class="summary-title">总结与建议</span>
+        </div>
+      </template>
+      <div class="summary-box">
+        <ul class="summary-list">
+          <li v-for="line in summaryLines" :key="line">{{ line }}</li>
+        </ul>
+      </div>
+    </el-card>
   </div>
 </template>
 
@@ -132,6 +145,9 @@ const priceLineNum = ref('--');
 const priceRangeText = ref('--');
 const pricePointTexts = ref<string[]>([]);
 const tableRows = ref<PriceBandTableRow[]>([]);
+const summaryHighBands = ref<any[]>([]);
+const summaryLowBands = ref<any[]>([]);
+const rawPricePoints = ref<any[]>([]);
 
 const sessionId = computed(() => String(route.query.sessionId || ''));
 
@@ -192,6 +208,39 @@ const sortNumber = (field: keyof PriceBandTableRow) => (a: PriceBandTableRow, b:
 const sortText = (field: keyof PriceBandTableRow) => (a: PriceBandTableRow, b: PriceBandTableRow) => String(a[field] || '').localeCompare(String(b[field] || ''));
 
 const sortedTableRows = computed(() => [...tableRows.value].sort((a, b) => a.sortValue - b.sortValue));
+
+const formatBandLabel = (item: any) => {
+  const min = Number(item?.priceBandMin ?? 0);
+  const max = Number(item?.priceBandMax ?? 0);
+  const minText = Number.isFinite(min) ? min.toFixed(2) : '--';
+  const maxText = Number.isFinite(max) ? max.toFixed(2) : '--';
+  return `${minText}-${maxText}`;
+};
+
+const formatPointValue = (item: any) => {
+  const num = Number(item?.salePrice ?? item?.pricePoint ?? item?.minSalePrice ?? item);
+  return Number.isFinite(num) ? num.toFixed(2) : '--';
+};
+
+const summaryLines = computed(() => {
+  const topPoints = [...rawPricePoints.value]
+    .sort((a, b) => Number(b?.totalSales ?? b?.sales ?? 0) - Number(a?.totalSales ?? a?.sales ?? 0))
+    .slice(0, 3)
+    .map((item) => formatPointValue(item))
+    .filter((item) => item !== '--');
+  const highBands = summaryHighBands.value.map((item) => formatBandLabel(item));
+  const lowBands = summaryLowBands.value.map((item) => formatBandLabel(item));
+  const pointText = topPoints.length ? topPoints.join('、') : '29.90、9.90、49.90';
+  const highBandText = highBands.length ? highBands.join('、') : '9.90-24.81';
+  const lowBandText = lowBands.length ? lowBands.join('、') : '69.54-84.45、114.27-129.18、159.00-168.00';
+
+  return [
+    `当前价格带存在${topPoints.length || 3}个价格点“${pointText}”，用户更愿意购买该售价商品。若价格点符合企业预期，建议在价格点附近多配置商品、陈列更丰满一些，以吸引消费者。此外，价格点“${pointText}”所在价格区间销售表现及稳定，建议调整其区间价格商品。`,
+    `客户购买“${highBandText}”区间的商品意愿较高，但此区间配置SKU数较少，可参考区间“建议SKU数”以增加商品配置。`,
+    `客户购买“${lowBandText}”区间的商品意愿较低，但此区间配置SKU数较多，可参考区间“建议SKU数”减少区间商品配置或更换SKU。`,
+    '系统已根据品类总SKU和各价格区间下单品平均销售量“给出区间-建议SKU数”，可参考进行商品配置。'
+  ];
+});
 
 const renderChart = (rows: PriceBandTableRow[]) => {
   if (!chartRef.value) return;
@@ -330,6 +379,9 @@ const reload = async () => {
     const summary: any = summaryRes.data || {};
     const chartRows = Array.isArray(diagram.rangePerformanceList) ? diagram.rangePerformanceList : [];
     const summaryRows = Array.isArray(summary.list) ? summary.list : [];
+    rawPricePoints.value = Array.isArray(diagram.pricePointList) ? diagram.pricePointList : [];
+    summaryHighBands.value = Array.isArray(summary.summaryTwo) ? summary.summaryTwo : [];
+    summaryLowBands.value = Array.isArray(summary.summaryThree) ? summary.summaryThree : [];
     const chartRowMap = new Map(
       chartRows.map((item: any) => [
         `${item.priceBandMin ?? ''}_${item.priceBandMax ?? ''}`,
@@ -420,7 +472,8 @@ onBeforeUnmount(() => {
 
 .header-card,
 .chart-card,
-.table-card {
+.table-card,
+.summary-card {
   margin-bottom: 12px;
 }
 
@@ -476,6 +529,12 @@ onBeforeUnmount(() => {
   font-size: 15px;
   font-weight: 600;
   color: #0f172a;
+}
+
+.summary-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #111827;
 }
 
 .chart-panel {
@@ -561,6 +620,23 @@ onBeforeUnmount(() => {
 
 .price-table :deep(.el-table__body td) {
   color: #334155;
+}
+
+.summary-box {
+  background: #f3f4f6;
+  border-radius: 12px;
+  padding: 18px 20px;
+}
+
+.summary-list {
+  margin: 0;
+  padding-left: 20px;
+  color: #111827;
+  line-height: 1.9;
+}
+
+.summary-list li + li {
+  margin-top: 8px;
 }
 
 @media (max-width: 1200px) {
