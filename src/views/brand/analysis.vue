@@ -241,18 +241,7 @@ const renderPieChart = () => {
 const renderRankChart = () => {
   if (!rankChartRef.value) return;
   rankChartIns.value ||= echarts.init(rankChartRef.value);
-  const chartData = (sortedRankItems.value.slice(0, 10).length ? sortedRankItems.value.slice(0, 10) : [
-    { name: '立白', value: 420000 },
-    { name: '舒影', value: 320000 },
-    { name: '丝飘', value: 280000 },
-    { name: '超能', value: 260000 },
-    { name: '安安全纯', value: 220000 },
-    { name: '云南白药', value: 180000 },
-    { name: '萌力优', value: 140000 },
-    { name: '心相印', value: 120000 },
-    { name: '雕牌', value: 100000 },
-    { name: '七度空间', value: 80000 }
-  ]);
+  const chartData = sortedRankItems.value.slice(0, 10);
   const topLabel = chartData.length ? normalizeName(chartData[0], 0) : '';
   rankChartIns.value.setOption(
     {

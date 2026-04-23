@@ -52,6 +52,29 @@
       </div>
     </el-card>
 
+    <el-card shadow="hover" class="page-card detail-card" v-loading="detailLoading">
+      <template #header>
+        <div class="card-header">
+          <span class="card-title">标签明细</span>
+        </div>
+      </template>
+      <el-table :data="detailRows" border stripe>
+        <el-table-column label="标签名称" prop="tagName" min-width="180" />
+        <el-table-column label="销售额" prop="sales" min-width="120" align="right">
+          <template #default="{ row }">{{ formatAmount(row.sales) }}</template>
+        </el-table-column>
+        <el-table-column label="销售占比" prop="salesPer" min-width="120" align="right">
+          <template #default="{ row }">{{ formatPercent(row.salesPer) }}</template>
+        </el-table-column>
+        <el-table-column label="SKU" prop="sku" min-width="100" align="right">
+          <template #default="{ row }">{{ formatAmount(row.sku, 0) }}</template>
+        </el-table-column>
+        <el-table-column label="SKU占比" prop="skuPer" min-width="120" align="right">
+          <template #default="{ row }">{{ formatPercent(row.skuPer) }}</template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
     <el-card shadow="hover" class="page-card summary-card">
       <template #header>
         <div class="card-header">
@@ -66,8 +89,8 @@
 </template>
 
 <script setup name="TagAnalysis" lang="ts">
-import { getCategoryDiagnosisTagSalesShare, getCategoryDiagnosisTagTypes } from '@/api/category/diagnosis/detail';
-import type { TagSalesSkuItemResponse, TagTypeGroupResponse } from '@/api/category/diagnosis/detail/types';
+import { getCategoryDiagnosisTagList, getCategoryDiagnosisTagSalesShare, getCategoryDiagnosisTagTypes } from '@/api/category/diagnosis/detail';
+import type { TagDetailItemResponse, TagSalesSkuItemResponse, TagTypeGroupResponse } from '@/api/category/diagnosis/detail/types';
 import { useRequest } from '@/hooks/useRequest';
 
 interface CloudWordItem {
@@ -84,6 +107,7 @@ const handleDetail = () => {
 const tabGroups = ref<TagTypeGroupResponse[]>([]);
 const activeTagType = ref('');
 const cloudWords = ref<CloudWordItem[]>([]);
+const detailRows = ref<TagDetailItemResponse[]>([]);
 
 const summaryItems = [
   '标签为植物精华、熏香配方、自然配方、天然配方、香氛配方的商品销售额相对较好，客户购买意向高。',
@@ -104,6 +128,7 @@ const typesRequest = useRequest(async (sessionId: string) => await getCategoryDi
     tabGroups.value = Array.isArray(res?.data) ? res.data.filter((item) => Boolean(item?.tagType)) : [];
     activeTagType.value = tabGroups.value[0]?.tagType || '';
     cloudWords.value = [];
+    detailRows.value = [];
     if (activeTagType.value) {
       void loadCloud();
     }
@@ -112,11 +137,21 @@ const typesRequest = useRequest(async (sessionId: string) => await getCategoryDi
 
 const cloudRequest = useRequest(async (params: { sessionId: string; tagType: string }) => await getCategoryDiagnosisTagSalesShare(params.sessionId, params.tagType), {
   onSuccess: (res) => {
-    cloudWords.value = buildCloudWords((res?.data?.salesAndSkuList || []) as TagSalesSkuItemResponse[]);
+    cloudWords.value = buildCloudWords((res?.data?.salesAndSkuList || detailRows.value || []) as TagSalesSkuItemResponse[]);
+  }
+});
+
+const detailRequest = useRequest(async (params: { sessionId: string; tagType: string }) => await getCategoryDiagnosisTagList(params.sessionId, params.tagType, undefined, 1, 20, 'sales', 'desc'), {
+  onSuccess: (res) => {
+    detailRows.value = Array.isArray(res?.data?.records) ? res.data.records : [];
+    if (!cloudWords.value.length) {
+      cloudWords.value = buildCloudWords(detailRows.value as unknown as TagSalesSkuItemResponse[]);
+    }
   }
 });
 
 const cloudLoading = computed(() => typesRequest.loading.value || cloudRequest.loading.value);
+const detailLoading = computed(() => detailRequest.loading.value);
 
 const route = useRoute();
 const sessionId = computed(() => String(route.query.sessionId || ''));
@@ -167,7 +202,10 @@ const formatPercent = (value: unknown) => {
 
 const loadCloud = async () => {
   if (!sessionId.value || !activeTagType.value) return;
-  await cloudRequest.run({ sessionId: sessionId.value, tagType: activeTagType.value });
+  await Promise.all([
+    cloudRequest.run({ sessionId: sessionId.value, tagType: activeTagType.value }),
+    detailRequest.run({ sessionId: sessionId.value, tagType: activeTagType.value })
+  ]);
 };
 
 const handleTabChange = async (tagType: string) => {
@@ -187,6 +225,7 @@ watch(
     tabGroups.value = [];
     activeTagType.value = '';
     cloudWords.value = [];
+    detailRows.value = [];
     if (sessionId.value) {
       await typesRequest.run(sessionId.value);
     }
@@ -207,6 +246,7 @@ watch(
 .header-card,
 .tab-card,
 .cloud-card,
+.detail-card,
 .summary-card {
   margin-bottom: 12px;
 }

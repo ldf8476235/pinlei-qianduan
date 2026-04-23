@@ -1,16 +1,16 @@
-﻿<template>
+<template>
   <div class="price-band-detail-page">
     <el-card shadow="hover" class="page-card summary-card">
-      <div class="summary-line">鏁版嵁鏃ユ湡锛歿{{ currentDateRangeText }}锛涘姣旀棩鏈燂細{{ compareDateRangeText }}</div>
-      <div class="summary-line">缁勭粐锛氭€婚儴锛涗笟鎬侊細鍏ㄩ儴涓氭€侊紱鍟嗗湀锛氬叏閮ㄥ晢鍦堬紱</div>
-      <div class="summary-line">闂ㄥ簵锛氬叏閮�</div>
+      <div class="summary-line">数据日期：{{ currentDateRangeText }}；对比日期：{{ compareDateRangeText }}</div>
+      <div class="summary-line">组织：总部；业态：全部业态；商圈：全部商圈；</div>
+      <div class="summary-line">门店：全部</div>
       <div class="category-title">{{ categoryTitle }}</div>
     </el-card>
 
     <el-card shadow="hover" class="page-card filter-card">
       <div class="filter-row filter-row-top">
         <el-form :model="queryForm" inline class="filter-form">
-          <el-form-item label="褰撳墠鐘舵€?">
+          <el-form-item label="当前状态">
             <el-select
               v-model="queryForm.status"
               multiple
@@ -18,36 +18,31 @@
               collapse-tags-tooltip
               :max-collapse-tags="1"
               clearable
-              placeholder="鍏ㄩ儴 +2"
+              placeholder="全部 +2"
               style="width: 220px"
             >
-              <el-option
-                v-for="item in statusOptions"
-                :key="String(item.value)"
-                :label="item.label"
-                :value="String(item.value)"
-              />
+              <el-option v-for="item in statusOptions" :key="String(item.value)" :label="item.label" :value="String(item.value)" />
             </el-select>
           </el-form-item>
 
-          <el-form-item label="鏈湡淇冮攢">
-            <el-select v-model="queryForm.promotion" clearable placeholder="鍏ㄩ儴" style="width: 140px">
-              <el-option label="鍏ㄩ儴" value="" />
-              <el-option label="鏄?" value="1" />
-              <el-option label="鍚?" value="2" />
+          <el-form-item label="本期促销">
+            <el-select v-model="queryForm.promotion" clearable placeholder="全部" style="width: 140px">
+              <el-option label="全部" value="" />
+              <el-option label="是" value="1" />
+              <el-option label="否" value="2" />
             </el-select>
           </el-form-item>
 
           <el-form-item class="filter-actions">
-            <el-button type="primary" @click="handleQuery">鏌ヨ</el-button>
+            <el-button type="primary" @click="handleQuery">查询</el-button>
           </el-form-item>
         </el-form>
       </div>
 
       <div class="filter-row filter-row-range">
-        <div class="range-label">浠锋牸鍖洪棿</div>
+        <div class="range-label">价格区间</div>
         <el-checkbox-group v-model="selectedRangeValues" class="range-checkbox-group" @change="handleRangeChange">
-          <el-checkbox :label="ALL_RANGE_VALUE">鍏ㄩ儴</el-checkbox>
+          <el-checkbox :label="ALL_RANGE_VALUE">全部</el-checkbox>
           <el-checkbox v-for="item in priceBandOptions" :key="item" :label="item">{{ item }}</el-checkbox>
         </el-checkbox-group>
       </div>
@@ -56,141 +51,91 @@
     <el-card shadow="hover" class="page-card table-card" v-loading="loading">
       <template #header>
         <div class="card-header">
-          <span class="card-title">鍝佺被浠锋牸鍖洪棿鍟嗗搧娓呭崟</span>
+          <span class="card-title">品类价格区间商品清单</span>
           <div class="card-actions">
-            <span class="unit-text">*閲戦鍗曚綅锛氬厓</span>
-            <el-button type="primary" link @click="handleExport">瀵煎嚭</el-button>
+            <span class="unit-text">*金额单位：元</span>
+            <el-button type="primary" link @click="handleExport">导出</el-button>
           </div>
         </div>
       </template>
 
-      <el-table
-        :data="tableRows"
-        border
-        stripe
-        class="goods-table"
-        @sort-change="handleSortChange"
-      >
-        <el-table-column
-          label="鍟嗗搧缂栫爜"
-          prop="productNo"
-          min-width="130"
-          fixed="left"
-          align="left"
-          sortable="custom"
-          show-overflow-tooltip
-        />
-
-        <el-table-column
-          label="鍟嗗搧鍚嶇О"
-          prop="productName"
-          min-width="220"
-          fixed="left"
-          align="left"
-          sortable="custom"
-          show-overflow-tooltip
-        >
+      <el-table :data="tableRows" border stripe class="goods-table" @sort-change="handleSortChange">
+        <el-table-column label="商品编码" prop="productNo" min-width="130" fixed="left" align="left" sortable="custom" show-overflow-tooltip />
+        <el-table-column label="商品名称" prop="productName" min-width="220" fixed="left" align="left" sortable="custom" show-overflow-tooltip>
           <template #default="{ row }">
-            <el-button link type="primary" class="name-link" @click="handleGoodsDetail(row)">
-              {{ row.productName || '--' }}
-            </el-button>
+            <el-button link type="primary" class="name-link" @click="handleGoodsDetail(row)">{{ row.productName || '--' }}</el-button>
           </template>
         </el-table-column>
-
-        <el-table-column
-          label="褰撳墠鐘舵€?"
-          prop="productStatus"
-          min-width="120"
-          align="left"
-          sortable="custom"
-          show-overflow-tooltip
-        >
-          <template #default="{ row }">
-            {{ row.productStatus || row.productStatusNo || '--' }}
-          </template>
+        <el-table-column label="当前状态" prop="productStatus" min-width="120" align="left" sortable="custom" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.productStatus || row.productStatusNo || '--' }}</template>
         </el-table-column>
-
-        <el-table-column label="閿€鍞棬搴楁暟" prop="storeNum" min-width="120" align="center" sortable="custom">
-          <template #default="{ row }">
-            <span class="store-count">{{ formatNumber(row.storeNum, 0) }}</span>
-          </template>
+        <el-table-column label="销售门店数" prop="storeNum" min-width="120" align="center" sortable="custom">
+          <template #default="{ row }"><span class="store-count">{{ formatNumber(row.storeNum, 0) }}</span></template>
         </el-table-column>
-
-        <el-table-column label="閿€鍞噺-鎬昏" prop="saleQuantity" min-width="120" align="center" sortable="custom">
+        <el-table-column label="销售量-总计" prop="saleQuantity" min-width="120" align="center" sortable="custom">
           <template #default="{ row }">{{ formatNumber(row.saleQuantity, 2) }}</template>
         </el-table-column>
-        <el-table-column label="閿€鍞噺-PSD" prop="saleQuantityPsd" min-width="110" align="center" sortable="custom">
+        <el-table-column label="销售量-PSD" prop="saleQuantityPsd" min-width="110" align="center" sortable="custom">
           <template #default="{ row }">{{ formatNumber(row.saleQuantityPsd, 4) }}</template>
         </el-table-column>
-        <el-table-column label="閿€鍞-鎬昏" prop="sales" min-width="130" align="center" sortable="custom">
+        <el-table-column label="销售额-总计" prop="sales" min-width="130" align="center" sortable="custom">
           <template #default="{ row }">{{ formatNumber(row.sales, 2) }}</template>
         </el-table-column>
-        <el-table-column label="閿€鍞-鍗犳瘮" prop="salesPer" min-width="120" align="center" sortable="custom">
+        <el-table-column label="销售额-构成比" prop="salesPer" min-width="120" align="center" sortable="custom">
           <template #default="{ row }">{{ formatPercent(row.salesPer) }}</template>
         </el-table-column>
-        <el-table-column label="閿€鍞-PSD" prop="salesPsd" min-width="110" align="center" sortable="custom">
+        <el-table-column label="销售额-PSD" prop="salesPsd" min-width="110" align="center" sortable="custom">
           <template #default="{ row }">{{ formatNumber(row.salesPsd, 4) }}</template>
         </el-table-column>
-        <el-table-column label="姣涘埄棰?鎬昏" prop="gross" min-width="130" align="center" sortable="custom">
+        <el-table-column label="毛利额-总计" prop="gross" min-width="130" align="center" sortable="custom">
           <template #default="{ row }">{{ formatNumber(row.gross, 2) }}</template>
         </el-table-column>
-        <el-table-column label="姣涘埄棰?鍗犳瘮" prop="grossPer" min-width="120" align="center" sortable="custom">
+        <el-table-column label="毛利额-构成比" prop="grossPer" min-width="120" align="center" sortable="custom">
           <template #default="{ row }">{{ formatPercent(row.grossPer) }}</template>
         </el-table-column>
-        <el-table-column label="姣涘埄棰?PSD" prop="grossPsd" min-width="110" align="center" sortable="custom">
+        <el-table-column label="毛利额-PSD" prop="grossPsd" min-width="110" align="center" sortable="custom">
           <template #default="{ row }">{{ formatNumber(row.grossPsd, 4) }}</template>
         </el-table-column>
-        <el-table-column label="姣涘埄鐜?" prop="grossRate" min-width="100" align="center" sortable="custom">
+        <el-table-column label="毛利率" prop="grossRate" min-width="100" align="center" sortable="custom">
           <template #default="{ row }">{{ formatPercent(row.grossRate) }}</template>
         </el-table-column>
-
-        <el-table-column label="褰撳墠搴撳瓨鏁伴噺" prop="stockQuantity" min-width="130" align="center" sortable="custom">
+        <el-table-column label="当前库存数量" prop="stockQuantity" min-width="130" align="center" sortable="custom">
           <template #default="{ row }">{{ formatNumber(row.stockQuantity, 2) }}</template>
         </el-table-column>
-        <el-table-column label="搴撳瓨鍛ㄨ浆鐜?" prop="turnoverRate" min-width="120" align="center" sortable="custom">
+        <el-table-column label="库存周转率" prop="turnoverRate" min-width="120" align="center" sortable="custom">
           <template #default="{ row }">{{ formatNumber(row.turnoverRate, 4) }}</template>
         </el-table-column>
-        <el-table-column label="搴撳瓨鍛ㄨ浆澶╂暟" prop="turnoverDays" min-width="130" align="center" sortable="custom">
+        <el-table-column label="库存周转天数" prop="turnoverDays" min-width="130" align="center" sortable="custom">
           <template #default="{ row }">{{ formatNumber(row.turnoverDays, 4) }}</template>
         </el-table-column>
-        <el-table-column label="搴撻攢姣?" prop="stockSalesRate" min-width="100" align="center" sortable="custom">
+        <el-table-column label="库销比" prop="stockSalesRate" min-width="100" align="center" sortable="custom">
           <template #default="{ row }">{{ formatNumber(row.stockSalesRate, 2) }}</template>
         </el-table-column>
-        <el-table-column label="姣涘埄璐＄尞鐜?" prop="contributionRate" min-width="120" align="center" sortable="custom">
+        <el-table-column label="毛利贡献率" prop="contributionRate" min-width="120" align="center" sortable="custom">
           <template #default="{ row }">{{ formatPercent(row.contributionRate) }}</template>
         </el-table-column>
         <el-table-column label="GMROI" prop="gmroi" min-width="100" align="center" sortable="custom">
           <template #default="{ row }">{{ formatNumber(row.gmroi, 4) }}</template>
         </el-table-column>
-        <el-table-column label="閿€鍞巼" prop="salesRate" min-width="100" align="center" sortable="custom">
+        <el-table-column label="销售率" prop="salesRate" min-width="100" align="center" sortable="custom">
           <template #default="{ row }">{{ formatPercent(row.salesRate) }}</template>
         </el-table-column>
-        <el-table-column label="鏈湡淇冮攢" prop="activity" min-width="100" align="left" sortable="custom" show-overflow-tooltip>
+        <el-table-column label="本期促销" prop="activity" min-width="100" align="left" sortable="custom" show-overflow-tooltip>
           <template #default="{ row }">{{ formatFlagText(row.activity) }}</template>
         </el-table-column>
-        <el-table-column label="棣栨閿€鍞棩鏈?" prop="firstSaleDate" min-width="130" align="left" sortable="custom" show-overflow-tooltip />
-        <el-table-column label="鏈湡鏂板搧" prop="newProduct" min-width="100" align="left" sortable="custom" show-overflow-tooltip>
+        <el-table-column label="首次销售日期" prop="firstSaleDate" min-width="130" align="left" sortable="custom" show-overflow-tooltip />
+        <el-table-column label="本期新品" prop="newProduct" min-width="100" align="left" sortable="custom" show-overflow-tooltip>
           <template #default="{ row }">{{ formatFlagText(row.newProduct) }}</template>
         </el-table-column>
-        <el-table-column label="閲嶇偣鍟嗗搧" prop="keyProduct" min-width="100" align="left" sortable="custom" show-overflow-tooltip>
+        <el-table-column label="重点商品" prop="keyProduct" min-width="100" align="left" sortable="custom" show-overflow-tooltip>
           <template #default="{ row }">{{ formatFlagText(row.keyProduct) }}</template>
         </el-table-column>
-        <el-table-column
-          label="瀛ｈ妭鎬у晢鍝?"
-          prop="seasonableFlagName"
-          min-width="120"
-          align="left"
-          sortable="custom"
-          show-overflow-tooltip
-        >
-          <template #default="{ row }">
-            {{ row.seasonableFlagName || row.seasonableFlag || '--' }}
-          </template>
+        <el-table-column label="季节性商品" prop="seasonableFlagName" min-width="120" align="left" sortable="custom" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.seasonableFlagName || row.seasonableFlag || '--' }}</template>
         </el-table-column>
-
-        <el-table-column label="鎿嶄綔" min-width="100" fixed="right" align="center">
+        <el-table-column label="操作" min-width="100" fixed="right" align="center">
           <template #default="{ row }">
-            <el-button class="process-btn" @click="handleProcess(row)">澶勭悊</el-button>
+            <el-button class="process-btn" @click="handleProcess(row)">处理</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -209,11 +154,7 @@
       </div>
     </el-card>
 
-    <GoodsProcessDialog
-      v-model="processDialogVisible"
-      @save="handleSaveProcess"
-      @dispatch="handleDispatchProcess"
-    />
+    <GoodsProcessDialog v-model="processDialogVisible" @save="handleSaveProcess" @dispatch="handleDispatchProcess" />
   </div>
 </template>
 
@@ -268,13 +209,7 @@ const loading = ref(false);
 const total = ref(0);
 const processDialogVisible = ref(false);
 
-const sortState = reactive<{
-  prop: string;
-  order: SortOrder;
-}>( {
-  prop: 'sales',
-  order: 'descending'
-});
+const sortState = reactive<{ prop: string; order: SortOrder }>({ prop: 'sales', order: 'descending' });
 
 const queryForm = reactive({
   status: [] as string[],
@@ -292,20 +227,18 @@ const resolveQueryValue = (value: string | string[] | null | undefined, fallback
 const currentDateRangeText = computed(() => {
   const start = resolveQueryValue(route.query.startDate as string | string[] | null | undefined, '2024/10/01');
   const end = resolveQueryValue(route.query.endDate as string | string[] | null | undefined, '2024/12/08');
-  return `${start}鑷?{end}`;
+  return `${start}至${end}`;
 });
 
 const compareDateRangeText = computed(() => {
   const start = resolveQueryValue(route.query.compareStartDate as string | string[] | null | undefined, '2023/10/01');
   const end = resolveQueryValue(route.query.compareEndDate as string | string[] | null | undefined, '2023/12/08');
-  return `${start}鑷?{end}`;
+  return `${start}至${end}`;
 });
 
 const formatCategoryLevelName = (level?: string | number) => {
   const levelNumber = Number(level || 1);
-  if (levelNumber >= 1 && levelNumber <= 5) {
-    return `${['', '一级', '二级', '三级', '四级', '五级'][levelNumber]}品类`;
-  }
+  if (levelNumber >= 1 && levelNumber <= 5) return `${['', '一级', '二级', '三级', '四级', '五级'][levelNumber]}品类`;
   return '一级品类';
 };
 
@@ -350,10 +283,7 @@ const currentOrderType = computed(() => (sortState.order === 'ascending' ? 'asc'
 const loadStatusOptions = async () => {
   const res: any = await getCategoryFilterOptions();
   statusOptions.value = Array.isArray(res?.classSalesStatusNo)
-    ? res.classSalesStatusNo.map((item: any) => ({
-        label: String(item.label || item.value || ''),
-        value: String(item.value || '')
-      }))
+    ? res.classSalesStatusNo.map((item: any) => ({ label: String(item.label || item.value || ''), value: String(item.value || '') }))
     : [];
 };
 
@@ -361,9 +291,7 @@ const loadPriceBandOptions = async () => {
   if (!sessionId.value) return;
   const res: any = await getPriceBandRangeSummary(sessionId.value);
   const list = Array.isArray(res?.data?.list) ? res.data.list : [];
-  priceBandOptions.value = list
-    .map((item: any) => String(item?.priceBand || '').trim())
-    .filter((item: string) => item);
+  priceBandOptions.value = list.map((item: any) => String(item?.priceBand || '').trim()).filter((item: string) => item);
 };
 
 const loadTable = async () => {
@@ -408,9 +336,7 @@ const handleRangeChange = (values: string[]) => {
     return;
   }
   queryForm.priceBandList = values.filter((item) => item !== ALL_RANGE_VALUE);
-  if (!queryForm.priceBandList.length) {
-    selectedRangeValues.value = [ALL_RANGE_VALUE];
-  }
+  if (!queryForm.priceBandList.length) selectedRangeValues.value = [ALL_RANGE_VALUE];
 };
 
 const handleQuery = async () => {
@@ -437,7 +363,7 @@ const handlePageSizeChange = async (size: number) => {
 };
 
 const handleExport = () => {
-  ElMessage.info('瀵煎嚭鍔熻兘鍚庣画瀵规帴鐪熷疄鎺ュ彛');
+  ElMessage.info('导出功能后续对接真实接口');
 };
 
 const handleGoodsDetail = (_row: PriceBandGoodsRow) => {
@@ -459,10 +385,7 @@ const handleDispatchProcess = () => {
 const formatNumber = (value: number | string | null | undefined, digits = 2) => {
   const num = Number(value);
   if (!Number.isFinite(num)) return '--';
-  return num.toLocaleString('zh-CN', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: digits
-  });
+  return num.toLocaleString('zh-CN', { minimumFractionDigits: 0, maximumFractionDigits: digits });
 };
 
 const formatPercent = (value: number | string | null | undefined) => {
@@ -503,199 +426,102 @@ watch(
   padding: 8px;
   background: #f5f7fa;
 }
-
 .page-card {
   border: 1px solid #dbe4f0;
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
 }
-
 .summary-card,
 .filter-card {
   margin-bottom: 12px;
 }
-
 .summary-line {
   color: #475569;
   font-size: 13px;
   line-height: 1.8;
 }
-
 .category-title {
   margin-top: 14px;
   color: #0f172a;
   font-size: 24px;
   font-weight: 700;
-  letter-spacing: 0.02em;
 }
-
 .filter-row + .filter-row {
   margin-top: 14px;
 }
-
 .filter-form {
   display: flex;
   width: 100%;
   flex-wrap: wrap;
   gap: 8px 0;
 }
-
 .filter-form :deep(.el-form-item) {
   margin-right: 18px;
   margin-bottom: 0;
 }
-
 .filter-form :deep(.el-form-item__label) {
   color: #334155;
   font-weight: 600;
 }
-
 .filter-form :deep(.el-input__wrapper),
 .filter-form :deep(.el-select__wrapper) {
   border-radius: 10px;
   box-shadow: 0 0 0 1px #d7e0ea inset;
 }
-
 .filter-actions {
   margin-left: auto;
 }
-
 .filter-row-range {
   display: flex;
-  align-items: flex-start;
-  gap: 16px;
+  align-items: center;
+  gap: 12px;
 }
-
 .range-label {
-  min-width: 56px;
-  padding-top: 5px;
   color: #334155;
-  font-size: 14px;
   font-weight: 600;
+  flex: 0 0 auto;
 }
-
 .range-checkbox-group {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px 18px;
+  gap: 8px 14px;
 }
-
-.range-checkbox-group :deep(.el-checkbox) {
-  margin-right: 0;
-}
-
 .card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
 }
-
 .card-title {
-  color: #0f172a;
-  font-size: 20px;
+  font-size: 16px;
   font-weight: 700;
+  color: #0f172a;
 }
-
 .card-actions {
   display: flex;
   align-items: center;
   gap: 12px;
 }
-
 .unit-text {
   color: #64748b;
   font-size: 13px;
 }
-
-.table-card :deep(.el-card__body) {
-  padding-top: 8px;
-}
-
 .goods-table {
   width: 100%;
 }
-
-.goods-table :deep(.el-table__header th) {
-  background: #f8fafc;
-  color: #0f172a;
-  font-weight: 600;
-}
-
-.goods-table :deep(.cell) {
-  font-size: 13px;
-}
-
-.goods-table :deep(.el-table__body td) {
-  color: #334155;
-}
-
-.goods-table :deep(.el-table__body tr:hover > td) {
-  background: #f6fbff;
-}
-
-.goods-table :deep(.el-table__fixed-right),
-.goods-table :deep(.el-table__fixed-left) {
-  box-shadow: 0 0 18px rgba(15, 23, 42, 0.06);
-}
-
-.store-count {
-  color: #0f9f9a;
-  font-weight: 700;
-}
-
 .name-link {
   padding: 0;
-  font-weight: 600;
 }
-
+.store-count {
+  color: #16c2a3;
+  font-weight: 700;
+}
 .process-btn {
-  border-color: rgba(22, 194, 163, 0.18);
-  background: rgba(22, 194, 163, 0.12);
+  border-color: #16c2a3;
   color: #16c2a3;
 }
-
-.process-btn:hover,
-.process-btn:focus {
-  border-color: #16c2a3;
-  background: rgba(22, 194, 163, 0.18);
-  color: #0f9f9a;
-}
-
 .pagination-wrap {
   display: flex;
   justify-content: flex-end;
-  margin-top: 16px;
-}
-
-@media (max-width: 1200px) {
-  .filter-actions {
-    margin-left: 0;
-  }
-
-  .filter-row-range {
-    flex-direction: column;
-    gap: 10px;
-  }
-
-  .range-label {
-    padding-top: 0;
-  }
-}
-
-@media (max-width: 992px) {
-  .card-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .card-actions {
-    width: 100%;
-    justify-content: space-between;
-  }
-
-  .pagination-wrap {
-    justify-content: center;
-  }
+  padding-top: 12px;
 }
 </style>
-
