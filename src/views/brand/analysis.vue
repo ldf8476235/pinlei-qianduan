@@ -47,20 +47,23 @@
           <el-select v-model="rankMetric" class="rank-select" size="small" @change="reload">
             <el-option label="销售额" value="salesAmount" />
             <el-option label="销售量" value="salesQuantity" />
+            <el-option label="毛利额" value="grossAmount" />
+            <el-option label="毛利率" value="grossRate" />
           </el-select>
         </header>
         <div class="rank-toolbar">
           <div class="rank-nav">
-            <el-pagination
-              v-model:current-page="rankPage.page"
-              :page-size="rankPage.pageSize"
-              :total="rankPage.total"
-              layout="prev, pager, next"
-              :pager-count="6"
-              background
-              small
-              @current-change="handleRankPageChange"
-            />
+            <button type="button" class="page-arrow" :disabled="rankPage.page <= 1" @click="handleRankPageChange(rankPage.page - 1)">&lt;</button>
+            <span
+              v-for="item in rankPagerItems"
+              :key="item.key"
+              class="pager-item"
+              :class="{ active: item.active, ellipsis: item.label === '…' }"
+              @click="item.page && handleRankPageChange(item.page)"
+            >
+              {{ item.label }}
+            </span>
+            <button type="button" class="page-arrow" :disabled="rankPage.page >= totalRankPages" @click="handleRankPageChange(rankPage.page + 1)">&gt;</button>
           </div>
         </div>
         <div ref="rankChartRef" class="chart-box rank-chart" />
@@ -142,15 +145,42 @@ const canNextLegend = computed(() => legendStart.value + LEGEND_PAGE_SIZE < pieL
 const legendCursorDisplay = computed(() => (pieLegendItems.value.length ? legendStart.value + 1 : 1));
 const legendTotalDisplay = computed(() => Math.max(1, pieLegendItems.value.length));
 
-const sortedRankItems = computed(() =>
-  [...rankItems.value].sort((a, b) => {
-    const diff = resolveRankValue(a, rankMetric.value) - resolveRankValue(b, rankMetric.value);
-    return rankDesc.value ? -diff : diff;
-  })
-);
-
 const RANK_AXIS_MAX = 494691.6;
 const RANK_AXIS_INTERVAL = 100000;
+const totalRankPages = computed(() => Math.max(1, Math.ceil((rankPage.total || rankItems.value.length || 1) / rankPage.pageSize)));
+const rankPagerItems = computed(() => {
+  const total = totalRankPages.value;
+  const current = rankPage.page;
+  const pages: Array<{ key: string; label: string; active?: boolean; page?: number }> = [];
+  const add = (page: number) => pages.push({ key: String(page), label: String(page), active: page === current, page });
+  const addEllipsis = (key: string) => pages.push({ key, label: '…' });
+
+  if (total <= 8) {
+    for (let page = 1; page <= total; page += 1) add(page);
+    return pages;
+  }
+
+  if (current <= 6) {
+    for (let page = 1; page <= 6; page += 1) add(page);
+    addEllipsis('r');
+    add(total);
+    return pages;
+  }
+
+  if (current >= total - 5) {
+    add(1);
+    addEllipsis('l');
+    for (let page = total - 5; page <= total; page += 1) add(page);
+    return pages;
+  }
+
+  add(1);
+  addEllipsis('l');
+  for (let page = current - 1; page <= current + 1; page += 1) add(page);
+  addEllipsis('r');
+  add(total);
+  return pages;
+});
 
 const reload = async () => {
   if (!sessionId.value) return;
@@ -241,27 +271,13 @@ const renderPieChart = () => {
 const renderRankChart = () => {
   if (!rankChartRef.value) return;
   rankChartIns.value ||= echarts.init(rankChartRef.value);
-  const chartData = sortedRankItems.value.slice(0, 10);
-  const topLabel = chartData.length ? normalizeName(chartData[0], 0) : '';
+  const chartData = rankItems.value.slice(0, 10);
+  const rankGrid = { left: 88, right: 20, top: 8, bottom: 24, containLabel: true };
   rankChartIns.value.setOption(
     {
       animationDuration: 300,
       tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-      grid: { left: 88, right: 20, top: 8, bottom: 24, containLabel: true },
-      graphic: [
-        {
-          type: 'text',
-          right: 0,
-          bottom: 0,
-          silent: true,
-          style: {
-            text: RANK_AXIS_MAX.toFixed(2),
-            fill: '#9ca3af',
-            fontSize: 12,
-            textAlign: 'right'
-          }
-        }
-      ],
+      grid: rankGrid,
       xAxis: {
         type: 'value',
         min: 0,
@@ -293,25 +309,65 @@ const renderRankChart = () => {
           data: chartData.map((item) => ({
             value: resolveRankValue(item, rankMetric.value),
             itemStyle: { color: '#16c2a3', borderRadius: 0 }
-          })),
-          markLine: {
-            symbol: 'none',
-            label: { show: false },
-            lineStyle: { color: '#ef4444', width: 1.2, type: 'dashed' },
-            data: [{ xAxis: RANK_AXIS_MAX }]
-          },
-          markPoint: {
-            symbol: 'triangle',
-            symbolSize: 12,
-            itemStyle: { color: '#ef4444' },
-            label: { show: false },
-            symbolOffset: [0, -8],
-            data: topLabel ? [{ coord: [RANK_AXIS_MAX, topLabel] }] : []
-          }
+          }))
         }
       ]
     } as EChartsOption,
     true
+  );
+
+  const xZero = Number(rankChartIns.value.convertToPixel({ xAxisIndex: 0 }, 0));
+  const chartHeight = rankChartRef.value.clientHeight;
+  const guideTop = Number(rankGrid.top);
+  const guideBottom = chartHeight - Number(rankGrid.bottom);
+  rankChartIns.value.setOption(
+    {
+      graphic: [
+        {
+          id: 'rank-max-label',
+          type: 'text',
+          right: 0,
+          bottom: 0,
+          silent: true,
+          style: {
+            text: RANK_AXIS_MAX.toFixed(2),
+            fill: '#9ca3af',
+            fontSize: 12,
+            textAlign: 'right'
+          }
+        },
+        {
+          id: 'rank-guide-triangle',
+          type: 'polygon',
+          silent: true,
+          shape: {
+            points: [
+              [xZero, guideTop],
+              [xZero - 6, guideTop + 10],
+              [xZero + 6, guideTop + 10]
+            ]
+          },
+          style: { fill: '#ef4444' }
+        },
+        {
+          id: 'rank-guide-line',
+          type: 'line',
+          silent: true,
+          shape: {
+            x1: xZero,
+            y1: guideTop + 10,
+            x2: xZero,
+            y2: guideBottom
+          },
+          style: {
+            stroke: '#ef4444',
+            lineWidth: 1.2,
+            lineDash: [4, 4]
+          }
+        }
+      ]
+    } as EChartsOption,
+    false
   );
 };
 
@@ -386,7 +442,10 @@ const renderComboChart = () => {
 const handlePrevLegend = () => { if (canPrevLegend.value) legendStart.value -= 1; };
 const handleNextLegend = () => { if (canNextLegend.value) legendStart.value += 1; };
 const toggleRankDesc = async () => { rankDesc.value = !rankDesc.value; await reload(); };
-const handleRankPageChange = async (page: number) => { rankPage.page = Math.max(1, Number(page || 1)); await reload(); };
+const handleRankPageChange = async (page: number) => {
+  rankPage.page = Math.max(1, Math.min(Number(page || 1), totalRankPages.value));
+  await reload();
+};
 const handleViewDetail = () => { router.push({ path: '/brand/analysis/detail', query: { ...route.query } }); };
 
 const resizeCharts = () => {
@@ -592,10 +651,23 @@ onBeforeUnmount(() => {
   color: #9ca3af;
   font-size: 12px;
 }
+.pager-item {
+  min-width: 14px;
+  text-align: center;
+  cursor: pointer;
+  user-select: none;
+}
+.pager-item.active {
+  color: #16c2a3;
+  font-weight: 700;
+}
+.pager-item.ellipsis {
+  cursor: default;
+}
 .rank-toolbar {
   display: flex;
   justify-content: flex-end;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
   min-height: 24px;
 }
 .rank-nav {
@@ -627,43 +699,5 @@ onBeforeUnmount(() => {
   font-size: 14px;
   color: #111827;
   line-height: 1.55;
-}
-
-:deep(.rank-nav .el-pagination) {
-  --el-pagination-button-height: 24px;
-  --el-pagination-button-width: 24px;
-  gap: 2px;
-}
-
-:deep(.rank-nav .btn-prev),
-:deep(.rank-nav .btn-next),
-:deep(.rank-nav .el-pager li) {
-  min-width: 24px;
-  height: 24px;
-  border-radius: 4px;
-  font-size: 12px;
-}
-
-:deep(.rank-nav .btn-prev),
-:deep(.rank-nav .btn-next) {
-  color: #6b7280;
-  background: #fff;
-  border: 1px solid #e5e7eb;
-}
-
-:deep(.rank-nav .el-pager li) {
-  color: #9ca3af;
-  background: #f3f4f6;
-}
-
-:deep(.rank-nav .el-pager li.is-active) {
-  background: #16c2a3;
-  color: #fff;
-}
-
-:deep(.rank-nav .btn-prev:hover),
-:deep(.rank-nav .btn-next:hover),
-:deep(.rank-nav .el-pager li:hover) {
-  color: #16c2a3;
 }
 </style>
