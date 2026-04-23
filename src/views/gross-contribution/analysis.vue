@@ -79,8 +79,8 @@
       </template>
 
       <ul class="advice-list">
-        <li>该品类存在问题商品(低毛利率低周转)1,082个，占比22.85%，建议重点关注，可结合其他异常分析及用户需求进行末位淘汰;</li>
-        <li>存在由对比周期的第一象限降为本期较差象限的商品289个，请加以关注和分析!</li>
+        <li>该品类存在问题商品(低毛利率低周转){{ formatInteger(skuPer.currentSku_3 || 0) }}个，占比{{ formatPercent(skuPer.currentSkuPer_3 || 0) }}，建议重点关注，可结合其他异常分析及用户需求进行末位淘汰;</li>
+        <li>存在由对比周期的第一象限降为本期较差象限的商品{{ formatInteger((skuChange.sku_2 || 0) + (skuChange.sku_3 || 0) + (skuChange.sku_4 || 0)) }}个，请加以关注和分析!</li>
         <li>存在GMROI<=1的商品4,686个，该类商品具有经营风险，请加以关注!</li>
         <li>点击GMROI四象限名称可查看对应的商品策略!</li>
       </ul>
@@ -173,6 +173,16 @@ const summaryStats = computed(() => {
   const downgradeCount = Number(skuChange.value.sku_2 || 0) + Number(skuChange.value.sku_3 || 0) + Number(skuChange.value.sku_4 || 0);
   return { problemCount, downgradeCount };
 });
+
+const formatInteger = (value: unknown) => {
+  const num = Number(value ?? 0);
+  return Number.isFinite(num) ? num.toLocaleString('zh-CN', { maximumFractionDigits: 0 }) : '0';
+};
+
+const formatPercent = (value: unknown) => {
+  const num = Number(value ?? 0);
+  return Number.isFinite(num) ? `${num.toFixed(2)}%` : '0.00%';
+};
 
 const sessionId = computed(() => String(route.query.sessionId || ''));
 
