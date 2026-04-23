@@ -329,13 +329,21 @@ const reload = async () => {
     const [diagramRes, summaryRes] = await Promise.all([getPriceBandDiagram(sessionId.value), getPriceBandRangeSummary(sessionId.value)]);
     const diagram: any = diagramRes.data || {};
     const summary: any = summaryRes.data || {};
-    const sourceRows = Array.isArray(diagram.rangePerformanceList) ? diagram.rangePerformanceList : [];
+    const chartRows = Array.isArray(diagram.rangePerformanceList) ? diagram.rangePerformanceList : [];
+    const summaryRows = Array.isArray(summary.list) ? summary.list : [];
+    const chartRowMap = new Map(
+      chartRows.map((item: any) => [
+        `${item.priceBandMin ?? ''}_${item.priceBandMax ?? ''}`,
+        item
+      ])
+    );
 
-    tableRows.value = sourceRows.map((item: any, index: number) => {
+    tableRows.value = summaryRows.map((item: any, index: number) => {
       const priceBandMin = Number(item.priceBandMin ?? item.minPrice ?? 0);
       const priceBandMax = Number(item.priceBandMax ?? item.maxPrice ?? 0);
+      const chartItem = chartRowMap.get(`${item.priceBandMin ?? ''}_${item.priceBandMax ?? ''}`) || {};
       return {
-        label: `${item.priceBandMin ?? '--'} - ${item.priceBandMax ?? '--'}`,
+        label: item.priceBand ?? `${item.priceBandMin ?? '--'} - ${item.priceBandMax ?? '--'}`,
         sortValue: Number.isFinite(priceBandMin) ? priceBandMin : index,
         raw: item,
         sku: readNumber(item, numericFields.sku),
@@ -348,12 +356,12 @@ const reload = async () => {
         promotionSku: readNumber(item, numericFields.promotionSku),
         suggestSku: readNumber(item, numericFields.suggestSku),
         suggestSkuPer: readNumber(item, numericFields.suggestSkuPer),
-        xLabel: String(item.pricePoint ?? item.priceBandMin ?? item.priceBandMax ?? index + 1),
-        skuLineValue: readNumber(item, numericFields.sku),
-        salesLineValue: readNumber(item, numericFields.sales),
-        quantityLineValue: readNumber(item, numericFields.saleQuantity),
-        priceLineSkuValue: readNumber(item, numericFields.priceLineSkuValue),
-        priceLineSalesValue: readNumber(item, numericFields.priceLineSalesValue)
+        xLabel: String(chartItem.pricePoint ?? item.priceBand ?? item.priceBandMin ?? item.priceBandMax ?? index + 1),
+        skuLineValue: readNumber(chartItem, numericFields.sku) || readNumber(item, numericFields.sku),
+        salesLineValue: readNumber(chartItem, numericFields.sales) || readNumber(item, numericFields.sales),
+        quantityLineValue: readNumber(chartItem, numericFields.saleQuantity) || readNumber(item, numericFields.saleQuantity),
+        priceLineSkuValue: readNumber(chartItem, numericFields.priceLineSkuValue),
+        priceLineSalesValue: readNumber(chartItem, numericFields.priceLineSalesValue)
       } satisfies PriceBandTableRow;
     });
 
@@ -366,11 +374,11 @@ const reload = async () => {
     if (!priceRangeText.value || priceRangeText.value === '-- - --') {
       priceRangeText.value =
         (summary.list || []).map((item: any) => `${item.priceBandMin ?? '--'}-${item.priceBandMax ?? '--'}`).join(' / ') ||
-        `${sourceRows[0]?.priceBandMin ?? '--'} - ${sourceRows[sourceRows.length - 1]?.priceBandMax ?? '--'}`;
+        `${chartRows[0]?.priceBandMin ?? '--'} - ${chartRows[chartRows.length - 1]?.priceBandMax ?? '--'}`;
     }
 
     if (!pricePointTexts.value.length) {
-      pricePointTexts.value = sourceRows.map((item: any) => String(item.pricePoint ?? item.priceBandMin ?? '--'));
+      pricePointTexts.value = chartRows.map((item: any) => String(item.pricePoint ?? item.priceBandMin ?? '--'));
     }
 
     renderChart(sortedTableRows.value);
