@@ -20,21 +20,14 @@
       </div>
     </template>
 
-    <div class="dialog-tip">选中商品的销售门店需按照以下要求进行处理!</div>
+    <div class="dialog-tip">请选择商品处理方案后再提交。</div>
 
-    <el-form
-      ref="formRef"
-      :model="form"
-      :rules="rules"
-      label-width="120px"
-      class="dialog-form"
-      status-icon
-    >
+    <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" class="dialog-form" status-icon>
       <el-form-item label="处理方案" prop="plan" required>
         <el-select v-model="form.plan" placeholder="请选择" clearable class="full-width">
-          <el-option label="下架淘汰" value="remove" />
-          <el-option label="观察调整" value="observe" />
-          <el-option label="保留跟踪" value="retain" />
+          <el-option label="上架" value="on_shelf" />
+          <el-option label="下架" value="off_shelf" />
+          <el-option label="其他" value="other" />
         </el-select>
       </el-form-item>
 
@@ -60,15 +53,15 @@
 </template>
 
 <script setup lang="ts">
-import type { FormInstance, FormRules } from 'element-plus';
 import { Close } from '@element-plus/icons-vue';
+import type { FormInstance, FormRules } from 'element-plus';
 
 interface GoodsProcessForm {
   plan: string;
   finishDate: string;
 }
 
-const props = defineProps<{
+defineProps<{
   modelValue: boolean;
 }>();
 
@@ -115,14 +108,12 @@ const validateForm = async () => {
 };
 
 const handleSave = async () => {
-  const valid = await validateForm();
-  if (!valid) return;
+  if (!(await validateForm())) return;
   emit('save', { ...form });
 };
 
 const handleDispatch = async () => {
-  const valid = await validateForm();
-  if (!valid) return;
+  if (!(await validateForm())) return;
   emit('dispatch', { ...form });
   emit('update:modelValue', false);
 };
@@ -137,11 +128,15 @@ const handleClosed = () => {
 .goods-process-dialog :deep(.el-dialog) {
   border-radius: 14px;
   background: #fff;
-  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.24);
+}
+
+.goods-process-dialog :deep(.el-dialog__header),
+.goods-process-dialog :deep(.el-dialog__body),
+.goods-process-dialog :deep(.el-dialog__footer) {
+  margin: 0;
 }
 
 .goods-process-dialog :deep(.el-dialog__header) {
-  margin: 0;
   padding: 18px 20px 0;
 }
 
@@ -153,65 +148,26 @@ const handleClosed = () => {
   padding: 8px 20px 20px;
 }
 
-.goods-process-dialog :deep(.el-overlay-dialog) {
-  overflow: hidden;
-}
-
 .dialog-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
 }
 
 .dialog-title {
-  color: #111827;
-  font-size: 20px;
-  font-weight: 800;
-  line-height: 1.2;
+  font-size: 18px;
+  font-weight: 700;
 }
 
 .dialog-close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border: none;
-  border-radius: 999px;
-  background: #f3f4f6;
-  color: #6b7280;
+  border: 0;
+  background: transparent;
   cursor: pointer;
-  transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
-}
-
-.dialog-close:hover {
-  background: #e5e7eb;
-  color: #374151;
-}
-
-.dialog-close:active {
-  transform: scale(0.96);
 }
 
 .dialog-tip {
-  margin-bottom: 18px;
+  margin-bottom: 16px;
   color: #0f9f9a;
-  font-size: 16px;
-  font-weight: 700;
-  line-height: 1.5;
-}
-
-.dialog-form {
-  padding-top: 2px;
-}
-
-.dialog-form :deep(.el-form-item) {
-  margin-bottom: 18px;
-}
-
-.dialog-form :deep(.el-form-item__label) {
-  color: #111827;
   font-weight: 600;
 }
 
@@ -219,56 +175,14 @@ const handleClosed = () => {
   width: 100%;
 }
 
-.dialog-form :deep(.el-input__wrapper),
-.dialog-form :deep(.el-select__wrapper),
-.dialog-form :deep(.el-date-editor.el-input__wrapper) {
-  min-height: 42px;
-  border-radius: 10px;
-  box-shadow: 0 0 0 1px #d1d5db inset;
-  transition: box-shadow 0.2s ease, border-color 0.2s ease;
-}
-
-.dialog-form :deep(.el-input__wrapper:hover),
-.dialog-form :deep(.el-select__wrapper:hover),
-.dialog-form :deep(.el-date-editor.el-input__wrapper:hover) {
-  box-shadow: 0 0 0 1px #9ca3af inset;
-}
-
-.dialog-form :deep(.is-focus .el-input__wrapper),
-.dialog-form :deep(.is-focused.el-select__wrapper),
-.dialog-form :deep(.el-date-editor.el-input__wrapper.is-focus) {
-  box-shadow: 0 0 0 2px rgba(15, 159, 154, 0.2), 0 0 0 1px #0f9f9a inset;
-}
-
 .dialog-footer {
   display: flex;
-  align-items: center;
   justify-content: flex-end;
   gap: 12px;
 }
 
-.cancel-btn {
-  min-width: 84px;
-  border-color: #d1d5db;
-  color: #111827;
-}
-
 .dark-btn {
-  min-width: 84px;
-  border-color: #374151;
   background: #374151;
   color: #fff;
-}
-
-.dark-btn:hover,
-.dark-btn:focus-visible {
-  border-color: #1f2937;
-  background: #1f2937;
-  color: #fff;
-}
-
-.dark-btn:active {
-  border-color: #111827;
-  background: #111827;
 }
 </style>

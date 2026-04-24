@@ -32,9 +32,9 @@
               style="width: 220px"
               @change="handleStatusChange"
             >
-              <el-option label="全部" value="__ALL__" />
-              <el-option label="上架" value="1" />
-              <el-option label="下架" value="2" />
+              <el-option label="全部" value="-1" />
+              <el-option label="上架" value="0" />
+              <el-option label="下架" value="1" />
             </el-select>
           </el-form-item>
 
@@ -299,7 +299,7 @@ const categoryTitle = computed(() => {
 
 const initialQueryForm = () => ({
   abcType: String(route.query.abcType || ''),
-  status: [] as string[],
+  status: ['-1'] as string[],
   promotion: '',
   currentAbc: '',
   compareAbc: ''
@@ -403,8 +403,8 @@ const handleQuery = async () => {
 };
 
 const handleStatusChange = (values: string[]) => {
-  if (values.includes('__ALL__')) {
-    queryForm.status = [];
+  if (values.includes('-1')) {
+    queryForm.status = ['-1'];
   }
 };
 

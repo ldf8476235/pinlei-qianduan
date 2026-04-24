@@ -170,49 +170,162 @@
       </div>
     </el-card>
 
-    <el-dialog v-model="modelDialogVisible" title="淘汰模型设置" width="760px" destroy-on-close>
-      <div class="dialog-section-title">淘汰选品范围</div>
-      <el-form :model="modelForm" label-width="128px" class="dialog-form">
-        <el-row :gutter="16">
-          <el-col :span="12">
-            <el-form-item label="商品状态">
-              <el-select v-model="modelForm.productStatusList" multiple clearable placeholder="请选择" style="width: 100%">
-                <el-option v-for="item in statusOptions" :key="String(item.value)" :label="item.label" :value="String(item.value)" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="首次销售日期早于">
-              <el-date-picker v-model="modelForm.firstSaleDateBefore" type="date" placeholder="请选择日期" style="width: 100%" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="排除商品">
-              <el-select v-model="modelForm.excludeGoods" clearable placeholder="请选择" style="width: 100%">
-                <el-option label="无" value="" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="最多淘汰商品个数">
-              <el-input-number v-model="modelForm.maxRemoveCount" :min="0" :step="1" controls-position="right" style="width: 100%" />
-            </el-form-item>
-          </el-col>
-        </el-row>
+    <el-dialog
+      v-model="modelDialogVisible"
+      class="obsolescence-model-dialog"
+      width="1040px"
+      align-center
+      destroy-on-close
+      :close-on-click-modal="false"
+      :close-on-press-escape="false"
+      :show-close="false"
+    >
+      <template #header>
+        <div class="model-dialog-header">
+          <div class="model-dialog-title">淘汰模型设置</div>
+          <el-button class="dialog-close-btn" text :icon="Close" @click="modelDialogVisible = false" />
+        </div>
+      </template>
 
-        <div class="dialog-section-title logic-title">淘汰选品逻辑</div>
-        <el-checkbox-group v-model="modelForm.logicDimensions" class="logic-group">
-          <el-checkbox label="ABC维度" />
-          <el-checkbox label="毛利贡献率维度" />
-          <el-checkbox label="毛利回报率维度" />
-          <el-checkbox label="用户需求维度" />
-        </el-checkbox-group>
-      </el-form>
+      <div class="model-dialog-body">
+        <div class="model-section">
+          <div class="section-title">
+            <span class="section-bar" />
+            <span>淘汰选品范围</span>
+          </div>
+
+          <div class="range-grid">
+            <div class="field-block">
+              <div class="field-label required">商品状态</div>
+              <div class="select-with-badge">
+                <el-select v-model="modelForm.productStatus" class="control-full" popper-class="model-popper">
+                  <el-option v-for="item in modelStatusOptions" :key="item.value" :label="item.label" :value="item.value" />
+                </el-select>
+                <span class="select-badge">+2</span>
+              </div>
+            </div>
+
+            <div class="field-block">
+              <div class="field-label">首次销售日期早于</div>
+              <el-date-picker
+                v-model="modelForm.firstSaleDateBefore"
+                class="control-full"
+                type="date"
+                placeholder="选择日期"
+                :prefix-icon="Calendar"
+              />
+            </div>
+
+            <div class="field-block">
+              <div class="field-label">排除商品</div>
+              <el-select v-model="modelForm.excludeGoods" class="control-full" placeholder="请选择状态" popper-class="model-popper">
+                <el-option v-for="item in excludeGoodsOptions" :key="item.value" :label="item.label" :value="item.value" />
+              </el-select>
+            </div>
+
+            <div class="field-block">
+              <div class="field-label required">
+                <span>最多淘汰商品个数</span>
+                <el-icon class="help-icon"><QuestionFilled /></el-icon>
+              </div>
+              <el-input-number
+                v-model="modelForm.maxRemoveCount"
+                class="control-number"
+                :min="0"
+                :step="1"
+                controls-position="right"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div class="model-section logic-section">
+          <div class="section-title">
+            <span class="section-bar" />
+            <span>淘汰选品逻辑</span>
+          </div>
+
+          <div class="logic-stack">
+            <div class="logic-card" :class="{ 'is-disabled': !modelForm.abcEnabled }">
+              <div class="logic-head">
+                <el-checkbox v-model="modelForm.abcEnabled">ABC维度</el-checkbox>
+              </div>
+              <div class="logic-fields">
+                <div class="logic-field">
+                  <div class="field-label required">ABC类型</div>
+                  <el-select v-model="modelForm.abcType" class="control-full" :disabled="!modelForm.abcEnabled">
+                    <el-option v-for="item in abcTypeOptions" :key="item.value" :label="item.label" :value="item.value" />
+                  </el-select>
+                </div>
+                <div class="logic-field">
+                  <div class="field-label required">本期类别</div>
+                  <el-select v-model="modelForm.currentAbc" class="control-full" :disabled="!modelForm.abcEnabled">
+                    <el-option v-for="item in abcLevelOptions" :key="item.value" :label="item.label" :value="item.value" />
+                  </el-select>
+                </div>
+                <div class="logic-field">
+                  <div class="field-label required">对比日期类别</div>
+                  <el-select v-model="modelForm.compareAbc" class="control-full" :disabled="!modelForm.abcEnabled">
+                    <el-option v-for="item in abcLevelOptions" :key="item.value" :label="item.label" :value="item.value" />
+                  </el-select>
+                </div>
+              </div>
+            </div>
+
+            <div class="logic-card" :class="{ 'is-disabled': !modelForm.grossContributionEnabled }">
+              <div class="logic-head">
+                <el-checkbox v-model="modelForm.grossContributionEnabled">毛利贡献率维度</el-checkbox>
+              </div>
+              <div class="logic-fields logic-fields-two">
+                <div class="logic-field">
+                  <div class="field-label required">本期角色</div>
+                  <el-select v-model="modelForm.currentGrossRole" class="control-full" :disabled="!modelForm.grossContributionEnabled">
+                    <el-option v-for="item in grossRoleOptions" :key="item.value" :label="item.label" :value="item.value" />
+                  </el-select>
+                </div>
+                <div class="logic-field">
+                  <div class="field-label required">对比日期角色</div>
+                  <el-select v-model="modelForm.compareGrossRole" class="control-full" :disabled="!modelForm.grossContributionEnabled">
+                    <el-option v-for="item in grossRoleOptions" :key="item.value" :label="item.label" :value="item.value" />
+                  </el-select>
+                </div>
+              </div>
+            </div>
+
+            <div class="logic-card" :class="{ 'is-disabled': !modelForm.grossReturnEnabled }">
+              <div class="logic-head">
+                <el-checkbox v-model="modelForm.grossReturnEnabled">毛利回报率维度</el-checkbox>
+              </div>
+              <div class="logic-fields logic-fields-two">
+                <div class="logic-field">
+                  <div class="field-label required">本期角色</div>
+                  <el-select v-model="modelForm.currentGmroiRole" class="control-full" :disabled="!modelForm.grossReturnEnabled">
+                    <el-option v-for="item in gmroiRoleOptions" :key="item.value" :label="item.label" :value="item.value" />
+                  </el-select>
+                </div>
+                <div class="logic-field">
+                  <div class="field-label required">对比日期角色</div>
+                  <el-select v-model="modelForm.compareGmroiRole" class="control-full" :disabled="!modelForm.grossReturnEnabled">
+                    <el-option v-for="item in gmroiRoleOptions" :key="item.value" :label="item.label" :value="item.value" />
+                  </el-select>
+                </div>
+              </div>
+            </div>
+
+            <div class="logic-card user-demand-card" :class="{ 'is-disabled': !modelForm.userDemandEnabled }">
+              <div class="logic-head">
+                <el-checkbox v-model="modelForm.userDemandEnabled">用户需求维度</el-checkbox>
+                <el-icon class="help-icon"><QuestionFilled /></el-icon>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <template #footer>
         <div class="dialog-footer">
-          <el-button @click="handleResetModel">重置</el-button>
-          <el-button type="primary" @click="handleConfirmModel">确定</el-button>
+          <el-button class="secondary-action" @click="handleResetModel">重置</el-button>
+          <el-button class="primary-action" type="primary" @click="handleConfirmModel">确定</el-button>
         </div>
       </template>
     </el-dialog>
@@ -245,6 +358,7 @@
 
 <script setup lang="ts">
 import type { Sort } from 'element-plus';
+import { Calendar, Close, QuestionFilled } from '@element-plus/icons-vue';
 import { getCategoryFilterOptions } from '@/api/category/tree';
 import type { OptionVO } from '@/api/category/tree/types';
 
@@ -296,6 +410,24 @@ const tableRows = ref<RemoveGoodsRow[]>([]);
 const statusOptions = ref<OptionVO[]>([]);
 const modelDialogVisible = ref(false);
 const processDialogVisible = ref(false);
+const modelStatusOptions = [
+  { label: '全部', value: 'all' },
+  { label: '上架', value: 'on' },
+  { label: '下架', value: 'off' }
+];
+const excludeGoodsOptions = [
+  { label: '请选择状态', value: '' },
+  { label: '已淘汰商品', value: 'removed' },
+  { label: '待处理商品', value: 'pending' }
+];
+const abcTypeOptions = [{ label: '销售额ABC', value: 'sales' }];
+const abcLevelOptions = [
+  { label: 'A类', value: 'A' },
+  { label: 'B类', value: 'B' },
+  { label: 'C类', value: 'C' }
+];
+const grossRoleOptions = [{ label: '问题商品(低销低毛)', value: '3' }];
+const gmroiRoleOptions = [{ label: '问题商品(低毛低周转)', value: '3' }];
 
 const sortState = reactive<{ prop: string; order: SortOrder }>({
   prop: 'sales',
@@ -309,11 +441,21 @@ const pagination = reactive({
 });
 
 const initialModelForm = () => ({
-  productStatusList: [] as string[],
+  productStatus: 'all',
   firstSaleDateBefore: '',
   excludeGoods: '',
-  maxRemoveCount: undefined as number | undefined,
-  logicDimensions: ['ABC维度', '毛利贡献率维度', '毛利回报率维度'] as string[]
+  maxRemoveCount: 474 as number | undefined,
+  abcEnabled: true,
+  abcType: 'sales',
+  currentAbc: 'C',
+  compareAbc: 'C',
+  grossContributionEnabled: true,
+  currentGrossRole: '3',
+  compareGrossRole: '3',
+  grossReturnEnabled: true,
+  currentGmroiRole: '3',
+  compareGmroiRole: '3',
+  userDemandEnabled: false
 });
 
 const modelForm = reactive(initialModelForm());
@@ -379,9 +521,23 @@ const openProcessDialog = (row: RemoveGoodsRow) => {
 
 const handleResetModel = () => {
   Object.assign(modelForm, initialModelForm());
+  modelDialogVisible.value = false;
+  ElMessage.success('已重置为默认配置');
 };
 
 const handleConfirmModel = () => {
+  if (modelForm.abcEnabled && (!modelForm.abcType || !modelForm.currentAbc || !modelForm.compareAbc)) {
+    ElMessage.error('请先完善ABC维度必填项');
+    return;
+  }
+  if (modelForm.grossContributionEnabled && (!modelForm.currentGrossRole || !modelForm.compareGrossRole)) {
+    ElMessage.error('请先完善毛利贡献率维度必填项');
+    return;
+  }
+  if (modelForm.grossReturnEnabled && (!modelForm.currentGmroiRole || !modelForm.compareGmroiRole)) {
+    ElMessage.error('请先完善毛利回报率维度必填项');
+    return;
+  }
   modelDialogVisible.value = false;
   ElMessage.success('淘汰模型设置已暂存');
 };
@@ -554,6 +710,194 @@ onMounted(async () => {
   margin-top: 16px;
 }
 
+.obsolescence-model-dialog {
+  :deep(.el-dialog) {
+    border-radius: 18px;
+    overflow: hidden;
+  }
+
+  :deep(.el-dialog__header) {
+    margin: 0;
+    padding: 0;
+  }
+
+  :deep(.el-dialog__body) {
+    padding: 0 28px 24px;
+  }
+
+  :deep(.el-dialog__footer) {
+    padding: 0 28px 28px;
+  }
+}
+
+.model-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 28px 0;
+}
+
+.model-dialog-title {
+  color: #111827;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.dialog-close-btn {
+  color: #9ca3af;
+  font-size: 18px;
+}
+
+.dialog-close-btn:hover {
+  color: #6b7280;
+}
+
+.model-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.model-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #111827;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.section-bar {
+  width: 4px;
+  height: 18px;
+  border-radius: 999px;
+  background: #14b8a6;
+}
+
+.range-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.field-block,
+.logic-field {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.field-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #1f2937;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.field-label.required::before {
+  color: #ef4444;
+  content: '*';
+  font-weight: 700;
+}
+
+.help-icon {
+  color: #9ca3af;
+  font-size: 14px;
+}
+
+.select-with-badge {
+  position: relative;
+}
+
+.select-badge {
+  position: absolute;
+  top: 50%;
+  right: 42px;
+  color: #14b8a6;
+  font-size: 12px;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.control-full,
+.control-number {
+  width: 100%;
+}
+
+:deep(.control-full .el-input__wrapper),
+:deep(.control-full .el-select__wrapper),
+:deep(.control-number .el-input__wrapper) {
+  border: 1px solid #d9e2ec;
+  border-radius: 12px;
+  box-shadow: none;
+}
+
+:deep(.control-full .el-input__wrapper:hover),
+:deep(.control-full .el-select__wrapper:hover),
+:deep(.control-number .el-input__wrapper:hover),
+:deep(.control-full .el-input__wrapper.is-focus),
+:deep(.control-full .el-select__wrapper.is-focused),
+:deep(.control-number .el-input__wrapper.is-focus) {
+  border-color: #14b8a6;
+  box-shadow: 0 0 0 1px rgba(20, 184, 166, 0.12);
+}
+
+.logic-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.logic-card {
+  border: 1px solid #e5eaf2;
+  border-radius: 16px;
+  padding: 16px 18px 18px;
+  background: #fff;
+}
+
+.logic-card.is-disabled {
+  background: #f8fafc;
+}
+
+.logic-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.logic-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.logic-fields-two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.user-demand-card {
+  padding-bottom: 14px;
+}
+
+:deep(.el-checkbox__input.is-checked .el-checkbox__inner),
+:deep(.el-checkbox__input.is-indeterminate .el-checkbox__inner) {
+  background-color: #14b8a6;
+  border-color: #14b8a6;
+}
+
+:deep(.el-checkbox__input.is-checked + .el-checkbox__label) {
+  color: #111827;
+}
+
 .dialog-section-title {
   margin-bottom: 14px;
   color: #0f172a;
@@ -579,6 +923,16 @@ onMounted(async () => {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
+}
+
+.secondary-action {
+  border-color: #d1d5db;
+  color: #111827;
+}
+
+.primary-action {
+  background: #14b8a6;
+  border-color: #14b8a6;
 }
 
 .process-tip {

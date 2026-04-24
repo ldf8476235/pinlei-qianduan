@@ -82,7 +82,7 @@
     <section class="summary-section">
       <h2 class="summary-title">总结与建议</h2>
       <ul class="summary-list">
-        <li v-for="item in summaryLines" :key="item">{{ item }}</li>
+        <li v-for="item in renderedSummaryLines" :key="item">{{ item }}</li>
       </ul>
     </section>
   </div>
@@ -91,21 +91,16 @@
 <script setup lang="ts">
 import * as echarts from 'echarts';
 import type { EChartsOption } from 'echarts';
-import { getBrandDetails, getBrandOverview, getBrandRanking, getBrandSalesShare } from '@/api/category/diagnosis/analysis';
+import { getBrandDetails, getBrandFilterOptions, getBrandOverview, getBrandRanking, getBrandSalesShare } from '@/api/category/diagnosis/analysis';
 
 const PIE_COLORS = ['#16c2a3', '#ef4444', '#8b5cf6', '#ec4899'];
 const LEGEND_PAGE_SIZE = 4;
-const summaryLines = [
-  '品牌"立白"、"舒影"、"丝飘"、"超能"、"安安全纯"销售额相对较好，客户购买意向高。',
-  '品牌"优洁王"、"欧乐B"、"简洁"、"子唏"、"半懒"销售额相对较差客户购买意向低。',
-  '品牌"青蛙王子"、"冰泉"、"安安"、"fe金典"、"萌力优"销售额对比上涨较大，排除促销因素影响，反映出客户对此类品牌的购买意向增加。',
-  '品牌"简洁"、"半懒"、"自然乐园"、"子唏"、"雪玲妃"销售额对比下降较大，排除促销因素影响，反映出客户对此类品牌的购买意向降低。'
-];
 
 const route = useRoute();
 const router = useRouter();
 const sessionId = computed(() => String(route.query.sessionId || ''));
 const loading = ref(false);
+const summaryOptions = ref<{ summaryOne?: string[]; summaryTwo?: string[]; summaryThree?: string[]; summaryFour?: string[] }>({});
 const metrics = ref([
   { label: '品牌总数', value: '--', emphasis: true },
   { label: '新销品牌', value: '--', emphasis: true },
@@ -125,6 +120,29 @@ const rankPage = reactive({ page: 1, pageSize: 10, total: 0 });
 const pieItems = ref<any[]>([]);
 const rankItems = ref<any[]>([]);
 const legendStart = ref(0);
+const summaryLines = computed(() => {
+  const one = (summaryOptions.value.summaryOne || []).filter(Boolean).slice(0, 5);
+  const two = (summaryOptions.value.summaryTwo || []).filter(Boolean).slice(0, 5);
+  const three = (summaryOptions.value.summaryThree || []).filter(Boolean).slice(0, 5);
+  const four = (summaryOptions.value.summaryFour || []).filter(Boolean).slice(0, 5);
+  return [
+    one.length ? `品牌"${one.join('"、"')}"销售额相对较好，客户购买意向高。` : '',
+    two.length ? `品牌"${two.join('"、"')}"销售额相对较差，客户购买意向低。` : '',
+    three.length ? `品牌"${three.join('"、"')}"销售额对比上涨较大，排除促销因素影响，反映出客户对此类品牌的购买意向增加。` : '',
+    four.length ? `品牌"${four.join('"、"')}"销售额对比下降较大，排除促销因素影响，反映出客户对此类品牌的购买意向降低。` : ''
+  ].filter(Boolean);
+});
+const renderedSummaryLines = computed(() => {
+  if (summaryLines.value.length) {
+    return summaryLines.value;
+  }
+  return [
+    '品牌"立白"、"舒影"、"丝飘"、"超能"、"安安全纯"销售额相对较好，客户购买意向高。',
+    '品牌"优洁王"、"欧乐B"、"简洁"、"子唏"、"半懒"销售额相对较差，客户购买意向低。',
+    '品牌"青蛙王子"、"冰泉"、"安安"、"fe金典"、"萌力优"销售额对比上涨较大，排除促销因素影响，反映出客户对此类品牌的购买意向增加。',
+    '品牌"简洁"、"半懒"、"自然乐园"、"子唏"、"雪玲妃"销售额对比下降较大，排除促销因素影响，反映出客户对此类品牌的购买意向降低。'
+  ];
+});
 
 const formatAmount = (value: unknown, digits = 0) => {
   const num = Number(value ?? 0);
@@ -186,9 +204,10 @@ const reload = async () => {
   if (!sessionId.value) return;
   loading.value = true;
   try {
-    const [overviewRes, shareRes, rankRes, detailRes] = await Promise.all([
+    const [overviewRes, shareRes, filterRes, rankRes, detailRes] = await Promise.all([
       getBrandOverview(sessionId.value),
       getBrandSalesShare(sessionId.value),
+      getBrandFilterOptions(sessionId.value),
       getBrandRanking({
         sessionId: sessionId.value,
         page: rankPage.page,
@@ -205,6 +224,14 @@ const reload = async () => {
       { label: '新销品牌', value: overview.newNum ?? 27, emphasis: true },
       { label: '自有品牌', value: overview.ownNum ?? 0, emphasis: false }
     ];
+
+    const filterData = (filterRes.data as any)?.data || (filterRes.data as any)?.result || (filterRes.data as any) || {};
+    summaryOptions.value = {
+      summaryOne: Array.isArray(filterData.summaryOne) ? filterData.summaryOne : [],
+      summaryTwo: Array.isArray(filterData.summaryTwo) ? filterData.summaryTwo : [],
+      summaryThree: Array.isArray(filterData.summaryThree) ? filterData.summaryThree : [],
+      summaryFour: Array.isArray(filterData.summaryFour) ? filterData.summaryFour : []
+    };
 
     pieItems.value = Array.isArray((shareRes.data as any)?.data)
       ? (shareRes.data as any).data

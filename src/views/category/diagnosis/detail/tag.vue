@@ -19,7 +19,7 @@
       <div class="tag-tabs">
         <el-button
           v-for="item in tabItems"
-          :key="item.value"
+          :key="item.value"d
           :type="activeTagType === item.value ? 'primary' : 'default'"
           :plain="activeTagType !== item.value"
           class="tag-tab-btn"

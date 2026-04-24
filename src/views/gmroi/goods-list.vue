@@ -21,9 +21,9 @@
             style="width: 220px"
             @change="handleQuery"
           >
-            <el-option label="正常" value="normal" />
-            <el-option label="观察" value="observe" />
-            <el-option label="待优化" value="optimize" />
+            <el-option label="全部" value="-1" />
+            <el-option label="上架" value="0" />
+            <el-option label="下架" value="1" />
           </el-select>
         </el-form-item>
 
@@ -270,7 +270,7 @@ const categoryTitle = computed(() => {
 });
 
 const queryForm = reactive({
-  status: ['normal', 'observe', 'optimize'] as string[],
+  status: ['-1', '0', '1'] as string[],
   promotion: '',
   currentGmroi: '',
   compareGmroi: '',
@@ -294,9 +294,12 @@ const loadTableList = async () => {
   }
   tableLoading.value = true;
   try {
+    const statusList = queryForm.status.includes('-1')
+      ? queryForm.status.filter((item) => item !== '-1')
+      : queryForm.status;
     const res = await getGmroiSalesList({
       sessionId: sessionId.value,
-      status: queryForm.status,
+      status: statusList.length ? statusList : undefined,
       promotion: queryForm.promotion || undefined,
       currentGmroi: queryForm.currentGmroi || undefined,
       compareGmroi: queryForm.compareGmroi || undefined,
@@ -320,7 +323,7 @@ const handleQuery = async () => {
 };
 
 const handleReset = async () => {
-  queryForm.status = ['normal', 'observe', 'optimize'];
+  queryForm.status = ['-1', '0', '1'];
   queryForm.promotion = '';
   queryForm.currentGmroi = '';
   queryForm.compareGmroi = '';

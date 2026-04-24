@@ -20,9 +20,9 @@
             placeholder="全部 +2"
             style="width: 220px"
           >
-            <el-option label="正常" value="normal" />
-            <el-option label="观察" value="observe" />
-            <el-option label="待优化" value="optimize" />
+            <el-option label="全部" value="-1" />
+            <el-option label="上架" value="0" />
+            <el-option label="下架" value="1" />
           </el-select>
         </el-form-item>
 
@@ -318,7 +318,7 @@ const categoryTitle = computed(() => {
 });
 
 const queryForm = reactive<QueryForm>({
-  status: [],
+  status: ['-1', '0', '1'],
   promotion: '',
   currentGross: '',
   compareGross: '',
@@ -396,9 +396,12 @@ const loadTableList = async () => {
   }
   tableLoading.value = true;
   try {
+    const statusList = queryForm.status.includes('-1')
+      ? queryForm.status.filter((item) => item !== '-1')
+      : queryForm.status;
     const res = await getGrossSalesList({
       sessionId: sessionId.value,
-      status: queryForm.status.length ? queryForm.status : undefined,
+      status: statusList.length ? statusList : undefined,
       promotion: queryForm.promotion || undefined,
       currentGross: queryForm.currentGross || undefined,
       compareGross: queryForm.compareGross || undefined,
@@ -421,7 +424,7 @@ const handleQuery = async () => {
 };
 
 const handleReset = async () => {
-  queryForm.status = [];
+  queryForm.status = ['-1', '0', '1'];
   queryForm.promotion = '';
   queryForm.currentGross = '';
   queryForm.compareGross = '';

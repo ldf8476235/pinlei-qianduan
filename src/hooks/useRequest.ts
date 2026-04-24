@@ -1,3 +1,5 @@
+import { onBeforeUnmount, ref } from 'vue';
+
 export type RequestExecutor<TParams, TResult> = (params: TParams) => Promise<TResult>;
 
 export interface UseRequestOptions<TResult> {
@@ -10,18 +12,27 @@ export interface UseRequestOptions<TResult> {
  */
 export const useRequest = <TParams = void, TResult = any>(executor: RequestExecutor<TParams, TResult>, options?: UseRequestOptions<TResult>) => {
   const loading = ref(false);
+  let alive = true;
+
+  onBeforeUnmount(() => {
+    alive = false;
+  });
 
   const run = async (params: TParams): Promise<TResult | undefined> => {
     loading.value = true;
     try {
       const res = await executor(params);
+      if (!alive) return undefined;
       options?.onSuccess?.(res);
       return res;
     } catch (err: any) {
+      if (!alive) return undefined;
       options?.onError?.(err);
       return undefined;
     } finally {
-      loading.value = false;
+      if (alive) {
+        loading.value = false;
+      }
     }
   };
 
