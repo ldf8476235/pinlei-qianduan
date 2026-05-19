@@ -15,10 +15,6 @@
           诊断状态:
           <el-tag :type="statusTagType" effect="dark" class="ml-1">{{ statusText }}</el-tag>
         </div>
-        <div class="core-right">
-          sessionId: {{ sessionId || '--' }}
-          <span v-if="statusState?.dataVersion">；版本: {{ statusState.dataVersion }}</span>
-        </div>
       </div>
     </el-card>
 
@@ -135,7 +131,7 @@
                     v-for="item in trendMetricTabs"
                     :key="item.key"
                     size="small"
-                    :type="activeTrendMetric === item.key ? 'success' : 'default'"
+                    :class="{ 'is-brand-active': activeTrendMetric === item.key }"
                     @click="handleTrendMetricChange(item.key)"
                   >
                     {{ item.label }}
@@ -143,11 +139,44 @@
                 </div>
               </div>
             </template>
-            <div v-loading="trendLoading" class="trend-chart-wrap">
+            <div v-loading="trendLoading" class="trend-chart-wrap" @mousemove="handleTrendChartMousemove" @mouseleave="hideTrendTooltip">
               <div ref="chartRef" class="trend-chart" />
+              <template v-if="customTrendTooltip.visible">
+                <div class="trend-guide-line trend-guide-line--vertical" :style="{ left: `${customTrendTooltip.guideX}px` }" />
+                <div class="trend-guide-line trend-guide-line--horizontal" :style="{ top: `${customTrendTooltip.guideY}px` }" />
+                <div class="trend-axis-tag trend-axis-tag--top" :style="{ left: `${customTrendTooltip.guideX}px` }">
+                  {{ customTrendTooltip.compareDate }}
+                </div>
+                <div class="trend-axis-tag trend-axis-tag--bottom" :style="{ left: `${customTrendTooltip.guideX}px` }">
+                  {{ customTrendTooltip.currentDate }}
+                </div>
+              </template>
+              <div
+                v-if="customTrendTooltip.visible"
+                class="custom-trend-tooltip"
+                :style="{ left: `${customTrendTooltip.x}px`, top: `${customTrendTooltip.y}px` }"
+              >
+                <div class="tooltip-section">
+                  <div class="tooltip-label">本期</div>
+                  <div class="tooltip-row">
+                    <span class="tooltip-dot current" />
+                    <span>{{ customTrendTooltip.currentDate }} {{ customTrendTooltip.current }}</span>
+                  </div>
+                </div>
+                <div class="tooltip-section">
+                  <div class="tooltip-label">对比日期</div>
+                  <div class="tooltip-row">
+                    <span class="tooltip-dot compare" />
+                    <span>{{ customTrendTooltip.compareDate }} {{ customTrendTooltip.compare }}</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </el-card>
         </template>
+        <div v-else-if="!sessionReady" class="placeholder-panel">
+          <el-empty description="诊断预计算中，分析模块将在数据就绪后自动加载" />
+        </div>
         <component :is="activeEmbeddedComponent" v-else-if="activeEmbeddedComponent" />
         <div v-else class="placeholder-panel">
           <el-empty description="该模块待接入" />
@@ -161,8 +190,9 @@
 import * as echarts from 'echarts';
 import { defineAsyncComponent, markRaw } from 'vue';
 import { useRequest } from '@/hooks/useRequest';
-import { getDiagnosisSessionStatus } from '@/api/category/diagnosis';
+import { createDiagnosisSession, getDiagnosisSessionStatus } from '@/api/category/diagnosis';
 import { getCategoryDiagnosisDetailSummary, getCategoryDiagnosisDetailTrend } from '@/api/category/diagnosis/detail';
+import type { DiagnosisSessionCreateRequest } from '@/api/category/diagnosis/types';
 import type {
   CategoryDiagnosisDetailQuery,
   CategoryDiagnosisDetailSummaryVO,
@@ -172,6 +202,7 @@ import type {
   DiagnosisOverviewResponse
 } from '@/api/category/diagnosis/detail/types';
 import type { DiagnosisSessionStatusResponse } from '@/api/category/diagnosis/types';
+import { getCategoryIndexByMouse, showVueChartTooltip } from './useVueChartTooltip';
 const SubClassView = defineAsyncComponent(() => import('./sub-class.vue'));
 const ChannelView = defineAsyncComponent(() => import('./channel.vue'));
 const CustomerView = defineAsyncComponent(() => import('./customer.vue'));
@@ -179,6 +210,7 @@ const SpecView = defineAsyncComponent(() => import('./spec.vue'));
 const TagView = defineAsyncComponent(() => import('./tag.vue'));
 const RemoveGoodsView = defineAsyncComponent(() => import('./remove-goods.vue'));
 const IntroduceDirectionView = defineAsyncComponent(() => import('./introduce-direction.vue'));
+const OverallSummaryView = defineAsyncComponent(() => import('./overall-summary.vue'));
 const AbcAnalysisView = defineAsyncComponent(() => import('@/views/abc/analysis.vue'));
 const GrossContributionAnalysisView = defineAsyncComponent(() => import('@/views/gross-contribution/analysis.vue'));
 const GmroiAnalysisView = defineAsyncComponent(() => import('@/views/gmroi/analysis.vue'));
@@ -187,10 +219,13 @@ const PriceBandAnalysisView = defineAsyncComponent(() => import('@/views/price-b
 const BrandAnalysisView = defineAsyncComponent(() => import('@/views/brand/analysis.vue'));
 
 const route = useRoute();
+const router = useRouter();
 
 const chartRef = ref<HTMLDivElement>();
 const chartIns = ref<echarts.ECharts>();
 const pollTimer = ref<number | null>(null);
+const recoveringSession = ref(false);
+const sessionRecoverAttempted = ref(false);
 const NAV_STATE_KEY = 'category-diagnosis-detail-nav-state';
 
 const activeMainNav = ref('performance');
@@ -289,6 +324,7 @@ const embeddedSideViewMap = {
   brandAnalysis: markRaw(BrandAnalysisView),
   specAnalysis: markRaw(SpecView),
   tagAnalysis: markRaw(TagView),
+  summaryAnalysis: markRaw(OverallSummaryView),
   removeGoods: markRaw(RemoveGoodsView),
   introduceDirection: markRaw(IntroduceDirectionView)
 } as const;
@@ -344,6 +380,19 @@ const trendData = ref<CategoryDiagnosisTrendVO>({
   currentSeries: [],
   compareSeries: []
 });
+const customTrendTooltip = reactive({
+  visible: false,
+  x: 0,
+  y: 0,
+  guideX: 0,
+  guideY: 0,
+  currentDate: '--',
+  compareDate: '--',
+  current: '--',
+  compare: '--',
+  title: '',
+  rows: []
+});
 
 const query = computed<CategoryDiagnosisDetailQuery>(() => ({
   sessionId: (route.query.sessionId as string) || '',
@@ -374,8 +423,71 @@ const statusTagType = computed(() => {
   return 'warning';
 });
 
+const isSessionExpiredError = (err: any) => {
+  const code = err?.code || err?.data?.code || err?.response?.data?.code;
+  const message = String(err?.message || err?.data?.message || err?.response?.data?.message || '');
+  return code === 'DIAG-400' && message.includes('session not found or expired');
+};
+
+const buildRecoverRequest = (): DiagnosisSessionCreateRequest | null => {
+  const current = query.value;
+  if (!current.categoryId || !current.categoryLevel || !current.startDate || !current.endDate) {
+    return null;
+  }
+  return {
+    classLevel: Number(current.categoryLevel),
+    classNo: current.categoryId,
+    className: current.categoryName,
+    storeNo: current.storeNo,
+    periodStart: current.startDate,
+    periodEnd: current.endDate,
+    compareStart: current.compareStartDate,
+    compareEnd: current.compareEndDate,
+    triggerIfMissing: true,
+    waitSeconds: 0
+  };
+};
+
+const recoverExpiredSession = async () => {
+  if (recoveringSession.value || sessionRecoverAttempted.value) {
+    return false;
+  }
+  const request = buildRecoverRequest();
+  if (!request) {
+    ElMessage.error('诊断会话已失效，请重新发起诊断');
+    return false;
+  }
+  recoveringSession.value = true;
+  sessionRecoverAttempted.value = true;
+  try {
+    const res = await createDiagnosisSession(request);
+    const session = res?.data?.data ?? (res?.data as any);
+    const nextSessionId = session?.sessionId;
+    if (!nextSessionId) {
+      ElMessage.error('诊断会话恢复失败，请重新发起诊断');
+      return false;
+    }
+    statusState.value = undefined;
+    await router.replace({
+      path: route.path,
+      query: {
+        ...route.query,
+        sessionId: nextSessionId
+      }
+    });
+    await nextTick();
+    await loadSessionState();
+    return true;
+  } finally {
+    recoveringSession.value = false;
+  }
+};
+
 const isPerformanceView = computed(() => !activeSideModule.value && activeMainNav.value === 'performance');
 const activeEmbeddedComponent = computed(() => {
+  if (!sessionReady.value) {
+    return null;
+  }
   if (activeSideModule.value && activeSideModule.value in embeddedSideViewMap) {
     return embeddedSideViewMap[activeSideModule.value as keyof typeof embeddedSideViewMap];
   }
@@ -386,6 +498,13 @@ const activeEmbeddedComponent = computed(() => {
 });
 
 const getDefaultExpandedGroupKeys = () => navGroups.filter((group) => group.defaultExpanded).map((group) => group.key);
+
+const resolveGroupKeyByActiveModule = (activeMain: string, activeSide: string) => {
+  if (activeSide) {
+    return navGroups.find((group) => group.items.some((item) => item.key === activeSide))?.key;
+  }
+  return navGroups.find((group) => group.items.some((item) => item.key === activeMain))?.key;
+};
 
 const readNavState = () => {
   if (typeof window === 'undefined') return null;
@@ -411,25 +530,27 @@ const writeNavState = () => {
 
 const syncNavState = () => {
   const state = readNavState();
-  expandedGroupKeys.value = state?.expandedGroupKeys?.length ? state.expandedGroupKeys : getDefaultExpandedGroupKeys();
   activeMainNav.value = state?.activeMainNav || 'performance';
   activeSideModule.value = state?.activeSideModule || '';
+  const activeGroupKey = resolveGroupKeyByActiveModule(activeMainNav.value, activeSideModule.value);
+  const fallbackGroupKey = state?.expandedGroupKeys?.[0] || getDefaultExpandedGroupKeys()[0] || navGroups[0]?.key;
+  expandedGroupKeys.value = [activeGroupKey || fallbackGroupKey].filter(Boolean) as string[];
 };
 
 const isGroupExpanded = (groupKey: string) => expandedGroupKeys.value.includes(groupKey);
 
 const toggleGroup = (groupKey: string) => {
   if (isGroupExpanded(groupKey)) {
-    expandedGroupKeys.value = expandedGroupKeys.value.filter((key) => key !== groupKey);
+    expandedGroupKeys.value = [];
   } else {
-    expandedGroupKeys.value = [...expandedGroupKeys.value, groupKey];
+    expandedGroupKeys.value = [groupKey];
   }
   writeNavState();
 };
 
 const ensureGroupExpanded = (groupKey: string) => {
   if (!isGroupExpanded(groupKey)) {
-    expandedGroupKeys.value = [...expandedGroupKeys.value, groupKey];
+    expandedGroupKeys.value = [groupKey];
     writeNavState();
   }
 };
@@ -438,6 +559,11 @@ const statusRequest = useRequest(async (id: string) => await getDiagnosisSession
   onSuccess: (res) => {
     if (res?.data) {
       statusState.value = res.data;
+    }
+  },
+  onError: async (err) => {
+    if (isSessionExpiredError(err)) {
+      await recoverExpiredSession();
     }
   }
 });
@@ -496,7 +622,97 @@ const formatNumber = (value: number | string | undefined, digits = 2) => {
   return Number.isFinite(n) ? n.toLocaleString('zh-CN', { minimumFractionDigits: 0, maximumFractionDigits: digits }) : '--';
 };
 
+const getChartValue = (value: unknown) => {
+  if (Array.isArray(value)) return value[value.length - 1];
+  if (value && typeof value === 'object') return (value as any).value;
+  return value;
+};
+
 const formatPercent = (value?: number) => `${Number(value || 0).toFixed(0)}%`;
+
+const parseLocalDate = (value?: string) => {
+  if (!value) return null;
+  const [year, month, day] = value.split(/[-/]/).map(Number);
+  if (!year || !month || !day) return null;
+  return new Date(year, month - 1, day);
+};
+
+const formatLocalDate = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}/${month}/${day}`;
+};
+
+const formatAxisDate = (value?: string) => {
+  if (!value) return '--';
+  const date = parseLocalDate(value);
+  return date ? formatLocalDate(date) : value.replace(/-/g, '/');
+};
+
+const buildDateSeries = (start?: string, end?: string, fallbackLength = 0) => {
+  const startDate = parseLocalDate(start);
+  const endDate = parseLocalDate(end);
+  if (!startDate || !endDate || startDate > endDate) return [];
+  const result: string[] = [];
+  const cursor = new Date(startDate);
+  while (cursor <= endDate && result.length < Math.max(fallbackLength, 366)) {
+    result.push(formatLocalDate(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return result;
+};
+
+const getTrendPlotRect = (rect: DOMRect) => {
+  const gridLeft = 72;
+  const gridRight = 40;
+  const gridTop = 64;
+  const gridBottom = 56;
+  return {
+    left: gridLeft,
+    right: gridRight,
+    top: gridTop,
+    bottom: gridBottom,
+    width: Math.max(1, rect.width - gridLeft - gridRight),
+    height: Math.max(1, rect.height - gridTop - gridBottom)
+  };
+};
+
+const hideTrendTooltip = () => {
+  customTrendTooltip.visible = false;
+};
+
+const handleTrendChartMousemove = (event: MouseEvent) => {
+  const currentSeries = trendData.value.currentSeries || [];
+  if (!currentSeries.length || !chartRef.value) {
+    hideTrendTooltip();
+    return;
+  }
+  const rect = chartRef.value.getBoundingClientRect();
+  const plotRect = getTrendPlotRect(rect);
+  const index = getCategoryIndexByMouse(event, chartRef.value, currentSeries.length, { left: plotRect.left, right: 40 });
+  const ratio = Math.max(0, Math.min(1, index / Math.max(currentSeries.length - 1, 1)));
+  const current = currentSeries[index];
+  const compare = trendData.value.compareSeries?.[index];
+  if (!current) {
+    hideTrendTooltip();
+    return;
+  }
+
+  const allValues = [...currentSeries, ...(trendData.value.compareSeries || [])].map((item) => Number(item.value || 0));
+  const minValue = Math.min(...allValues, 0);
+  const maxValue = Math.max(...allValues, 1);
+  const valueRange = Math.max(1, maxValue - minValue);
+  const guideX = plotRect.left + ratio * plotRect.width;
+  const guideY = plotRect.top + (1 - (Number(current.value || 0) - minValue) / valueRange) * plotRect.height;
+  customTrendTooltip.guideX = guideX;
+  customTrendTooltip.guideY = guideY;
+  customTrendTooltip.currentDate = formatAxisDate(current.date);
+  customTrendTooltip.compareDate = formatAxisDate(compare?.date);
+  customTrendTooltip.current = `${formatNumber(current.value)}${trendData.value.unit || ''}`;
+  customTrendTooltip.compare = `${formatNumber(compare?.value)}${trendData.value.unit || ''}`;
+  showVueChartTooltip(customTrendTooltip, event, '', [], { width: 250, height: 134, offsetY: 78 });
+};
 
 const buildMetric = (
   metricKey: string,
@@ -545,15 +761,18 @@ const buildMetrics = (overview: DiagnosisOverviewResponse): CategoryDiagnosisMet
 });
 
 const buildTrendView = (payload: any, metricCode: string): CategoryDiagnosisTrendVO => {
+  const rows = Array.isArray(payload?.trends) ? payload.trends : [];
+  const currentDates = buildDateSeries(query.value.startDate, query.value.endDate, rows.length);
+  const compareDates = buildDateSeries(query.value.compareStartDate, query.value.compareEndDate, rows.length);
   const currentSeries = Array.isArray(payload?.trends)
-    ? payload.trends.map((item: any) => ({
-        date: item.pointDate,
+    ? rows.map((item: any, index: number) => ({
+        date: currentDates[index] || formatAxisDate(item.pointDate),
         value: Number(item.currentValue || 0)
       }))
     : [];
   const compareSeries = Array.isArray(payload?.trends)
-    ? payload.trends.map((item: any) => ({
-        date: item.pointDate,
+    ? rows.map((item: any, index: number) => ({
+        date: item.compareDate || item.comparisonDate || compareDates[index] || formatAxisDate(item.pointDate),
         value: Number(item.compareValue || 0)
       }))
     : [];
@@ -584,94 +803,137 @@ const applyOverview = (overview: DiagnosisOverviewResponse) => {
 };
 
 const initChart = () => {
-  if (!chartRef.value) return;
+  if (!chartRef.value) return false;
+  if (chartIns.value && chartIns.value.getDom() !== chartRef.value) {
+    chartIns.value.dispose();
+    chartIns.value = undefined;
+  }
   if (!chartIns.value) {
     chartIns.value = echarts.init(chartRef.value);
   }
+  return true;
 };
 
-const renderTrendChart = () => {
-  initChart();
+const renderTrendChart = async () => {
+  await nextTick();
+  if (!initChart()) return;
   if (!chartIns.value) return;
 
   const currentSeries = trendData.value.currentSeries || [];
   const compareSeries = trendData.value.compareSeries || [];
-  const xAxis = currentSeries.map((item) => item.date);
+  const currentAxisDates = currentSeries.map((item) => formatAxisDate(item.date));
+  const compareAxisDates = compareSeries.map((item) => formatAxisDate(item.date));
   const currentValues = currentSeries.map((item) => Number(item.value || 0));
   const compareValues = compareSeries.map((item) => Number(item.value || 0));
   const unit = trendData.value.unit || '';
+  const axisLabelInterval = Math.max(0, Math.ceil(currentAxisDates.length / 9) - 1);
 
   chartIns.value.setOption({
     tooltip: {
-      trigger: 'axis',
-      axisPointer: { type: 'line' },
-      backgroundColor: 'rgba(17, 24, 39, 0.92)',
-      borderWidth: 0,
-      textStyle: { color: '#fff' },
-      formatter: (params: any) => {
-        const rows = Array.isArray(params) ? params : [params];
-        const title = rows[0]?.axisValueLabel || rows[0]?.axisValue || '--';
-        const current = rows.find((item: any) => item.seriesName === '本期')?.value ?? 0;
-        const compare = rows.find((item: any) => item.seriesName === '对比日期')?.value ?? 0;
-        return [title, `${rows[0]?.marker || ''}本期：${formatNumber(current)}`, `${rows[1]?.marker || ''}对比日期：${formatNumber(compare)}`].join(
-          '<br/>'
-        );
-      }
+      show: false
     },
     legend: {
-      top: 8,
-      right: 12,
-      itemWidth: 12,
-      itemHeight: 8,
-      data: ['本期', '对比日期']
+      top: 6,
+      right: 24,
+      itemWidth: 34,
+      itemHeight: 14,
+      icon: 'path://M0,6 L28,6 M14,0 A6,6 0 1,0 14,12 A6,6 0 1,0 14,0',
+      textStyle: {
+        color: '#374151',
+        fontSize: 13,
+        fontWeight: 600
+      },
+      data: ['本期', '对比日期'],
+      selectedMode: false
     },
     grid: {
-      left: 56,
-      right: 28,
-      top: 56,
-      bottom: 32,
-      containLabel: true
+      left: 72,
+      right: 40,
+      top: 64,
+      bottom: 56,
+      containLabel: false
     },
-    xAxis: {
-      type: 'category',
-      data: xAxis,
-      boundaryGap: false,
-      axisTick: { alignWithLabel: true },
-      axisLine: { lineStyle: { color: '#d1d5db' } },
-      axisLabel: { color: '#6b7280' }
-    },
+    xAxis: [
+      {
+        type: 'category',
+        position: 'top',
+        data: compareAxisDates,
+        boundaryGap: false,
+        axisTick: {
+          show: true,
+          alignWithLabel: true,
+          length: 6,
+          lineStyle: { color: '#6b7280' }
+        },
+        axisLine: { lineStyle: { color: '#6b7280', width: 1 } },
+        axisLabel: {
+          color: '#6b7280',
+          fontSize: 13,
+          interval: axisLabelInterval,
+          margin: 10
+        },
+        splitLine: { show: false }
+      },
+      {
+        type: 'category',
+        position: 'bottom',
+        data: currentAxisDates,
+        boundaryGap: false,
+        axisTick: {
+          show: true,
+          alignWithLabel: true,
+          length: 6,
+          lineStyle: { color: '#6b7280' }
+        },
+        axisLine: { lineStyle: { color: '#6b7280', width: 1 } },
+        axisLabel: {
+          color: '#6b7280',
+          fontSize: 13,
+          interval: axisLabelInterval,
+          margin: 10
+        },
+        splitLine: { show: false }
+      }
+    ],
     yAxis: {
       type: 'value',
       name: unit,
-      nameTextStyle: { color: '#6b7280', padding: [0, 0, 0, 24] },
+      nameTextStyle: { color: '#6b7280', fontSize: 13, padding: [0, 0, 0, 12] },
       axisLabel: { color: '#6b7280', formatter: (value: number) => formatNumber(value, 2) },
-      splitLine: { lineStyle: { color: '#eef2f7' } }
+      axisLine: { show: false },
+      axisTick: { show: false },
+      splitLine: { lineStyle: { color: '#e5e7eb' } }
     },
     series: [
       {
         name: '本期',
         type: 'line',
+        xAxisIndex: 1,
         smooth: true,
         data: currentValues,
         symbol: 'circle',
         symbolSize: 7,
-        itemStyle: { color: '#3b82f6' },
-        lineStyle: { width: 3, color: '#3b82f6' },
-        emphasis: { focus: 'series' }
+        itemStyle: { color: '#37c8da', borderColor: '#fff', borderWidth: 2 },
+        lineStyle: { width: 3, color: '#37c8da' },
+        emphasis: { focus: 'series', scale: 1.2 },
+        z: 3
       },
       {
         name: '对比日期',
         type: 'line',
+        xAxisIndex: 0,
         smooth: true,
         data: compareValues,
         symbol: 'circle',
         symbolSize: 7,
-        itemStyle: { color: '#f59e0b' },
-        lineStyle: { width: 3, color: '#f59e0b' },
-        emphasis: { focus: 'series' }
+        itemStyle: { color: '#f45a2d', borderColor: '#fff', borderWidth: 2 },
+        lineStyle: { width: 3, color: '#f45a2d' },
+        emphasis: { focus: 'series', scale: 1.2 },
+        z: 2
       }
     ]
   });
+  chartIns.value.resize();
 };
 
 const clearPolling = () => {
@@ -689,12 +951,12 @@ const schedulePolling = () => {
 };
 
 const loadOverview = async () => {
-  if (!sessionId.value) return;
+  if (!sessionId.value || !sessionReady.value) return;
   await overviewRequest.run(sessionId.value);
 };
 
 const loadTrend = async () => {
-  if (!sessionId.value) return;
+  if (!sessionId.value || !sessionReady.value) return;
   await trendRequest.run({
     sessionId: sessionId.value,
     metricCode: activeTrendMetric.value,
@@ -703,6 +965,7 @@ const loadTrend = async () => {
 };
 
 const loadReadyData = async () => {
+  if (!sessionReady.value) return;
   await Promise.all([loadOverview(), loadTrend()]);
 };
 
@@ -750,6 +1013,7 @@ const handleMainNavClick = async (navKey: string, groupKey?: string) => {
   }
   writeNavState();
   if (navKey === 'performance') {
+    await nextTick();
     await refreshPerformanceView();
   }
 };
@@ -771,6 +1035,17 @@ const handleTrendMetricChange = async (metricKey: string) => {
 };
 
 const resizeChart = () => chartIns.value?.resize();
+
+watch(
+  [isPerformanceView, () => trendData.value.currentSeries.length, () => trendData.value.compareSeries.length],
+  async ([visible, currentCount, compareCount]) => {
+    if (!visible || (!currentCount && !compareCount)) {
+      return;
+    }
+    await renderTrendChart();
+  },
+  { flush: 'post' }
+);
 
 onMounted(async () => {
   syncNavState();
@@ -798,7 +1073,7 @@ onBeforeUnmount(() => {
 
 .core-line {
   display: grid;
-  grid-template-columns: 1.3fr 1fr 2fr;
+  grid-template-columns: minmax(0, 1.6fr) auto;
   gap: 12px;
   align-items: center;
   border-top: 1px solid var(--el-border-color-lighter);
@@ -814,21 +1089,26 @@ onBeforeUnmount(() => {
 .core-center {
   font-size: 14px;
   color: #1f2937;
-}
-
-.core-right {
-  font-size: 14px;
-  color: #1f2937;
+  justify-self: end;
 }
 
 .left-nav-card {
-  background: linear-gradient(180deg, #e9fbf7 0%, #f3fffc 100%);
-  border: 1px solid #cfeee7;
+  --diag-orange-900: #9a3412;
+  --diag-orange-800: #c2410c;
+  --diag-orange-700: #ea580c;
+  --diag-orange-500: #fb923c;
+  background:
+    linear-gradient(180deg, rgba(255, 168, 76, 0.16) 0%, rgba(255, 244, 228, 0.96) 36%, rgba(255, 249, 242, 1) 100%),
+    radial-gradient(circle at top right, rgba(251, 146, 60, 0.18), transparent 36%);
+  border: 1px solid rgba(251, 146, 60, 0.28);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.72),
+    0 14px 28px rgba(194, 65, 12, 0.08);
 }
 
 .left-nav-group {
   padding: 10px 0;
-  border-bottom: 1px solid rgba(15, 118, 110, 0.12);
+  border-bottom: 1px solid rgba(234, 88, 12, 0.12);
 }
 
 .left-nav-group:last-child {
@@ -851,20 +1131,20 @@ onBeforeUnmount(() => {
 .left-nav-group-title {
   font-size: 16px;
   font-weight: 700;
-  color: #0f766e;
+  color: var(--diag-orange-900);
   line-height: 1.3;
 }
 
 .left-nav-group-sub {
   margin-top: 4px;
   font-size: 12px;
-  color: #8a94a6;
+  color: rgba(154, 52, 18, 0.62);
   line-height: 1.4;
 }
 
 .left-nav-arrow {
   flex: 0 0 auto;
-  color: #0f766e;
+  color: var(--diag-orange-700);
   font-size: 22px;
   line-height: 1;
   transform: rotate(0deg);
@@ -887,20 +1167,28 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
-  border-radius: 8px;
-  color: #0f766e;
+  border-radius: 12px;
+  color: var(--diag-orange-800);
   cursor: pointer;
   margin-bottom: 8px;
-  transition: all 0.2s ease;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
 }
 
 .left-nav-item:hover {
-  background: rgba(13, 148, 136, 0.1);
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: inset 0 0 0 1px rgba(251, 146, 60, 0.18);
 }
 
 .left-nav-item.active {
-  background: rgba(15, 118, 110, 0.12);
-  color: #0b6b64;
+  background: linear-gradient(135deg, #fff7ed 0%, #ffffff 100%);
+  color: var(--diag-orange-900);
+  box-shadow:
+    inset 0 0 0 1px rgba(251, 146, 60, 0.34),
+    0 10px 22px rgba(234, 88, 12, 0.1);
 }
 
 .left-nav-icon {
@@ -913,22 +1201,29 @@ onBeforeUnmount(() => {
   gap: 8px;
   padding: 10px 12px 10px 24px;
   margin-bottom: 8px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.55);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.84) 0%, rgba(255, 250, 245, 0.98) 100%);
+  border: 1px solid transparent;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
 }
 
 .left-sub-item:hover {
-  background: rgba(255, 255, 255, 0.82);
-  transform: translateX(1px);
+  background: #fffdfb;
+  border-color: rgba(251, 146, 60, 0.22);
+  box-shadow: 0 8px 18px rgba(194, 65, 12, 0.08);
+  transform: translateX(2px);
 }
 
 .left-sub-item.active {
-  background: #ffffff;
+  background: linear-gradient(180deg, #ffffff 0%, #fff7ed 100%);
   box-shadow:
-    inset 0 0 0 1px rgba(15, 118, 110, 0.18),
-    0 8px 18px rgba(15, 118, 110, 0.08);
+    inset 0 0 0 1px rgba(234, 88, 12, 0.28),
+    0 12px 24px rgba(234, 88, 12, 0.12);
 }
 
 .left-sub-dot {
@@ -936,8 +1231,9 @@ onBeforeUnmount(() => {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #111827;
+  background: var(--diag-orange-700);
   margin-top: 8px;
+  box-shadow: 0 0 0 3px rgba(251, 146, 60, 0.12);
 }
 
 .left-sub-content {
@@ -947,14 +1243,14 @@ onBeforeUnmount(() => {
 
 .left-sub-title {
   font-size: 14px;
-  font-weight: 500;
-  color: #111827;
+  font-weight: 600;
+  color: #7c2d12;
   line-height: 1.4;
 }
 
 .left-sub-desc {
   font-size: 12px;
-  color: #8a94a6;
+  color: rgba(124, 45, 18, 0.56);
   margin-top: 3px;
   line-height: 1.4;
 }
@@ -963,7 +1259,7 @@ onBeforeUnmount(() => {
   margin-top: 6px;
   font-size: 12px;
   font-weight: 600;
-  color: #0f766e;
+  color: var(--diag-orange-800);
 }
 
 .nav-fold-enter-active,
@@ -1068,11 +1364,11 @@ onBeforeUnmount(() => {
 }
 
 .metric-compare.is-up {
-  color: #16a34a;
+  color: #dc2626;
 }
 
 .metric-compare.is-down {
-  color: #dc2626;
+  color: #16a34a;
 }
 
 .metric-compare.is-flat {
@@ -1104,23 +1400,122 @@ onBeforeUnmount(() => {
   padding: 7px 14px;
 }
 
-.trend-tabs :deep(.el-button.is-active),
-.trend-tabs :deep(.el-button--success) {
-  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+.trend-tabs :deep(.el-button:hover) {
+  border-color: rgba(249, 115, 22, 0.45);
+  color: #f97316;
+}
+
+.trend-tabs :deep(.el-button.is-brand-active) {
+  background: linear-gradient(135deg, #ff9f2d 0%, #ff6a00 100%);
   border-color: transparent;
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(249, 115, 22, 0.22);
+}
+
+.trend-tabs :deep(.el-button.is-brand-active:hover) {
   color: #fff;
 }
 
 .trend-chart-wrap {
+  position: relative;
   border: 1px solid #e5e7eb;
   border-radius: 12px;
   min-height: 380px;
   background: #fff;
+  overflow: hidden;
 }
 
 .trend-chart {
   width: 100%;
   height: 380px;
+}
+
+.custom-trend-tooltip {
+  position: absolute;
+  z-index: 20;
+  min-width: 226px;
+  padding: 14px 16px;
+  border-radius: 0;
+  background: rgba(255, 255, 255, 0.96);
+  color: #4b5563;
+  font-size: 15px;
+  line-height: 1.6;
+  pointer-events: none;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.16);
+  backdrop-filter: blur(4px);
+}
+
+.tooltip-section + .tooltip-section {
+  margin-top: 6px;
+}
+
+.tooltip-label {
+  font-size: 15px;
+  font-weight: 700;
+  color: #6b7280;
+}
+
+.tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+
+.tooltip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+}
+
+.tooltip-dot.current {
+  background: #37c8da;
+}
+
+.tooltip-dot.compare {
+  background: #f45a2d;
+}
+
+.trend-guide-line {
+  position: absolute;
+  z-index: 12;
+  pointer-events: none;
+}
+
+.trend-guide-line--vertical {
+  top: 64px;
+  bottom: 56px;
+  width: 0;
+  border-left: 1px dashed #94a3b8;
+}
+
+.trend-guide-line--horizontal {
+  left: 72px;
+  right: 40px;
+  height: 0;
+  border-top: 1px dashed #6b7280;
+}
+
+.trend-axis-tag {
+  position: absolute;
+  z-index: 13;
+  transform: translateX(-50%);
+  padding: 3px 9px;
+  border-radius: 4px;
+  background: #667783;
+  color: #fff;
+  font-size: 13px;
+  line-height: 1.4;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.trend-axis-tag--top {
+  top: 34px;
+}
+
+.trend-axis-tag--bottom {
+  bottom: 20px;
 }
 
 @media (max-width: 1600px) {

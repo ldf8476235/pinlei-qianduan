@@ -2,6 +2,8 @@ import request from '@/utils/request';
 import { AxiosPromise } from 'axios';
 import {
   CategoryFilterPayloadVO,
+  CategoryNodeConfigUpdateRequest,
+  CategoryNodeConfigUpdateResponse,
   CategorySankeyVO,
   CategoryTreeChildrenQuery,
   CategoryTreeQuery,
@@ -61,11 +63,22 @@ export const queryCategoryTreeChildren = (data: CategoryTreeChildrenQuery): Axio
   });
 };
 
+export const updateCategoryNodeConfig = (
+  data: CategoryNodeConfigUpdateRequest
+): AxiosPromise<CategoryNodeConfigUpdateResponse> => {
+  return request({
+    url: '/api/categories/node-config/update',
+    method: 'post',
+    data
+  });
+};
+
 export default {
   getCategoryFilterOptions,
   listCategoryRoles,
   findStore,
   queryCategoryClassTree,
   queryCategoryTree,
-  queryCategoryTreeChildren
+  queryCategoryTreeChildren,
+  updateCategoryNodeConfig
 };

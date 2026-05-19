@@ -31,7 +31,16 @@
           <span class="card-title">客户分析雷达</span>
         </div>
       </template>
-      <div ref="radarChartRef" class="radar-chart-box" />
+      <div class="vue-chart-tooltip-wrap" @mousemove="handleRadarTooltipMousemove" @mouseleave="hideRadarTooltip">
+        <div ref="radarChartRef" class="radar-chart-box" />
+        <div v-if="radarTooltip.visible" class="vue-chart-tooltip" :style="{ left: `${radarTooltip.x}px`, top: `${radarTooltip.y}px` }">
+          <div class="tooltip-title">{{ radarTooltip.title }}</div>
+          <div v-for="item in radarTooltip.rows" :key="item.name" class="tooltip-row">
+            <span v-if="item.color" class="tooltip-dot" :style="{ background: item.color }" />
+            <span>{{ item.name }}：{{ item.value }}</span>
+          </div>
+        </div>
+      </div>
     </el-card>
 
     <el-card shadow="hover" class="page-card table-card" v-loading="tableLoading">
@@ -120,6 +129,7 @@
 import * as echarts from 'echarts';
 import type { EChartsOption } from 'echarts';
 import { useRequest } from '@/hooks/useRequest';
+import { createVueChartTooltip, hideVueChartTooltip, showVueChartTooltip } from './useVueChartTooltip';
 import {
   getCategoryDiagnosisCustomerAgeBuckets,
   getCategoryDiagnosisCustomerDetails,
@@ -156,12 +166,12 @@ const ageGroups = [
 const ageGroupOrder = ageGroups.map((item) => item.label);
 
 const ageColorMap: Record<string, string> = {
-  '20岁及以下': '#3b82f6',
-  '21-30岁': '#22c55e',
+  '20岁及以下': '#f97316',
+  '21-30岁': '#fb923c',
   '31-40岁': '#f59e0b',
-  '41-50岁': '#ef4444',
-  '51-60岁': '#8b5cf6',
-  '61岁及以上': '#14b8a6'
+  '41-50岁': '#ea580c',
+  '51-60岁': '#fdba74',
+  '61岁及以上': '#c2410c'
 };
 
 const ageLabelAliasMap: Record<string, string[]> = {
@@ -176,6 +186,7 @@ const ageLabelAliasMap: Record<string, string[]> = {
 const route = useRoute();
 const radarChartRef = ref<HTMLDivElement>();
 const radarChartIns = ref<echarts.ECharts>();
+const radarTooltip = createVueChartTooltip();
 
 const query = computed<DiagnosisSubClassQuery>(() => ({
   sessionId: (route.query.sessionId as string) || ''
@@ -269,6 +280,10 @@ const getRadarDimensionValue = (item: CustomerSalesRadarItemResponse | undefined
   return toNumber(values[index], 2);
 };
 
+const hideRadarTooltip = () => {
+  hideVueChartTooltip(radarTooltip);
+};
+
 const matchesGender = (item: CustomerSalesRadarItemResponse) => {
   if (filters.gender === 'ALL') return true;
   return String(item.gender ?? '') === String(filters.gender);
@@ -285,11 +300,8 @@ const findRadarRowByAge = (ageName: string) => {
   return radarRows.value.find((item) => matchesGender(item) && aliases.includes(String(item.ageName || '')));
 };
 
-const renderRadarChart = () => {
-  if (!radarChartRef.value) return;
-  if (!radarChartIns.value) radarChartIns.value = echarts.init(radarChartRef.value);
-
-  const chartSeries: RadarSeriesItem[] = ageGroupOrder
+const visibleRadarSeries = computed<RadarSeriesItem[]>(() =>
+  ageGroupOrder
     .filter(matchesGroup)
     .map((ageName) => {
       const row = findRadarRowByAge(ageName);
@@ -298,7 +310,40 @@ const renderRadarChart = () => {
         value: metricLabels.map((_, index) => getRadarDimensionValue(row, index))
       };
     })
-    .filter((item) => item.value.some((value) => value > 0));
+    .filter((item) => item.value.some((value) => value > 0))
+);
+
+const handleRadarTooltipMousemove = (event: MouseEvent) => {
+  if (!radarChartRef.value || !radarChartIns.value || !visibleRadarSeries.value.length) {
+    hideRadarTooltip();
+    return;
+  }
+  const rect = radarChartRef.value.getBoundingClientRect();
+  const point = [event.clientX - rect.left, event.clientY - rect.top];
+  const index = visibleRadarSeries.value.findIndex((_, dataIndex) => radarChartIns.value?.containPixel({ seriesIndex: 0, dataIndex }, point));
+  const item = index >= 0 ? visibleRadarSeries.value[index] : null;
+  if (!item) {
+    hideRadarTooltip();
+    return;
+  }
+  showVueChartTooltip(
+    radarTooltip,
+    event,
+    item.name,
+    metricLabels.map((label, valueIndex) => ({
+      name: label,
+      value: formatAmount(item.value[valueIndex]),
+      color: ageColorMap[item.name]
+    })),
+    { width: 260, height: 150 }
+  );
+};
+
+const renderRadarChart = () => {
+  if (!radarChartRef.value) return;
+  if (!radarChartIns.value) radarChartIns.value = echarts.init(radarChartRef.value);
+
+  const chartSeries = visibleRadarSeries.value;
 
   const values = chartSeries.flatMap((item) => item.value);
   const radarMax = Math.max(1, ...values);
@@ -306,13 +351,7 @@ const renderRadarChart = () => {
 
   radarChartIns.value.setOption(
     {
-      tooltip: {
-        trigger: 'item',
-        formatter: (params: any) => {
-          const currentValues = Array.isArray(params?.value) ? params.value : [];
-          return [params.name, ...metricLabels.map((label, index) => `${label}：${formatAmount(currentValues[index])}`)].join('<br/>');
-        }
-      },
+      tooltip: { show: false },
       legend: {
         orient: 'vertical',
         right: 6,
@@ -499,6 +538,47 @@ onUnmounted(() => {
   height: 520px;
 }
 
+.vue-chart-tooltip-wrap {
+  position: relative;
+  width: 100%;
+  height: 520px;
+}
+
+.vue-chart-tooltip {
+  position: absolute;
+  z-index: 20;
+  min-width: 220px;
+  max-width: 300px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(17, 24, 39, 0.94);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1.6;
+  pointer-events: none;
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.24);
+}
+
+.tooltip-title {
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+
+.tooltip-dot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 999px;
+}
+
 .customer-table :deep(.el-table__header th) {
   background: #f8fafc;
   font-weight: 600;
@@ -530,6 +610,10 @@ onUnmounted(() => {
   }
 
   .radar-chart-box {
+    height: 420px;
+  }
+
+  .vue-chart-tooltip-wrap {
     height: 420px;
   }
 }

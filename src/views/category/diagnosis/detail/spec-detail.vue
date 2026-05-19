@@ -19,10 +19,14 @@
             clearable
             placeholder="全部 +2"
             style="width: 220px"
+            @change="handleFilterChange"
           >
-            <el-option label="标准规格" value="normal" />
-            <el-option label="大规格" value="large" />
-            <el-option label="小规格" value="small" />
+            <el-option
+              v-for="item in specTypeOptions"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
           </el-select>
         </el-form-item>
 
@@ -36,13 +40,14 @@
             clearable
             placeholder="全部 +1198"
             style="width: 260px"
+            @change="handleFilterChange"
           >
-            <el-option v-for="item in specOptions" :key="item" :label="item" :value="item" />
+            <el-option v-for="item in specOptions" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
         </el-form-item>
 
         <el-form-item label="新销规格">
-          <el-select v-model="queryForm.newSaleSpec" clearable placeholder="全部" style="width: 160px">
+          <el-select v-model="queryForm.newSaleSpec" clearable placeholder="全部" style="width: 160px" @change="handleFilterChange">
             <el-option label="全部" value="" />
             <el-option label="是" value="Y" />
             <el-option label="否" value="N" />
@@ -202,7 +207,11 @@
 </template>
 
 <script setup name="SpecAnalysisDetail" lang="ts">
+import type { Sort } from 'element-plus';
+import { getSpecDetails, getSpecFilterOptions } from '@/api/category/diagnosis/analysis';
+
 interface SpecRow {
+  [key: string]: unknown;
   specName: string;
   specType: string;
   specTypeLabel: string;
@@ -245,7 +254,15 @@ interface QueryForm {
 
 type SortOrder = 'ascending' | 'descending' | null;
 
-const specOptions = ['规格A', '规格B', '规格C', '规格D'];
+interface OptionItem {
+  label: string;
+  value: string;
+}
+
+const route = useRoute();
+const sessionId = computed(() => String(route.query.sessionId || ''));
+const specTypeOptions = ref<OptionItem[]>([]);
+const specOptions = ref<OptionItem[]>([]);
 
 const queryForm = reactive<QueryForm>({
   specType: [],
@@ -262,13 +279,71 @@ const sortState = reactive<{ prop: keyof SpecRow; order: SortOrder }>({
   order: 'descending'
 });
 
-const mockRows: SpecRow[] = [
-  { specName: '规格A', specType: 'normal', specTypeLabel: '标准规格', newSaleSpec: 'Y', newSaleSpecLabel: '是', skuTotal: 28, skuGrowth: 6.2, skuShare: 12.4, saleQtyTotal: 1820, saleQtyGrowth: 8.4, saleQtyShare: 14.7, saleQtyPsd: 9.2, salesAmountTotal: 86500, salesAmountGrowth: 11.8, salesAmountShare: 15.2, salesAmountPsd: 438.6, grossAmountTotal: 31620, grossAmountGrowth: 9.4, grossAmountShare: 13.8, grossAmountPsd: 160.2, grossRateTotal: 36.54, grossRateGrowth: 0.7, inventoryQty: 420, turnoverRate: 3.8, turnoverDays: 27.6, inventorySalesRatio: 0.88, grossContributionRate: 11.36, gmroi: 3.42, sellThroughRate: 82.4, promotionSkuCount: 8 },
-  { specName: '规格B', specType: 'large', specTypeLabel: '大规格', newSaleSpec: 'N', newSaleSpecLabel: '否', skuTotal: 16, skuGrowth: -2.1, skuShare: 8.6, saleQtyTotal: 1090, saleQtyGrowth: 4.2, saleQtyShare: 8.9, saleQtyPsd: 5.8, salesAmountTotal: 64820, salesAmountGrowth: 7.6, salesAmountShare: 11.5, salesAmountPsd: 345.6, grossAmountTotal: 18150, grossAmountGrowth: 3.1, grossAmountShare: 8.2, grossAmountPsd: 96.8, grossRateTotal: 28.0, grossRateGrowth: -0.6, inventoryQty: 510, turnoverRate: 1.4, turnoverDays: 43.8, inventorySalesRatio: 1.24, grossContributionRate: 6.29, gmroi: 1.86, sellThroughRate: 67.2, promotionSkuCount: 4 },
-  { specName: '规格C', specType: 'small', specTypeLabel: '小规格', newSaleSpec: 'Y', newSaleSpecLabel: '是', skuTotal: 11, skuGrowth: 1.3, skuShare: 6.1, saleQtyTotal: 1250, saleQtyGrowth: 12.8, saleQtyShare: 9.4, saleQtyPsd: 6.9, salesAmountTotal: 31800, salesAmountGrowth: 14.1, salesAmountShare: 7.2, salesAmountPsd: 177.7, grossAmountTotal: 4770, grossAmountGrowth: 1.8, grossAmountShare: 2.5, grossAmountPsd: 26.6, grossRateTotal: 15.0, grossRateGrowth: 0.4, inventoryQty: 860, turnoverRate: 3.2, turnoverDays: 54.9, inventorySalesRatio: 1.37, grossContributionRate: 1.65, gmroi: 1.27, sellThroughRate: 58.5, promotionSkuCount: 2 }
-];
+const orderFieldMap: Partial<Record<keyof SpecRow, string>> = {
+  skuTotal: 'sku',
+  skuGrowth: 'skuInc',
+  saleQtyTotal: 'saleQuantity',
+  saleQtyGrowth: 'saleQuantityInc',
+  salesAmountTotal: 'sales',
+  salesAmountGrowth: 'salesInc',
+  salesAmountShare: 'salesPer',
+  grossAmountTotal: 'gross',
+  grossAmountGrowth: 'grossInc',
+  grossRateTotal: 'grossRate',
+  grossRateGrowth: 'grossRateInc',
+  inventoryQty: 'stockQuantity'
+};
 
 const tableRows = ref<SpecRow[]>([]);
+
+const resolveNumber = (row: Record<string, unknown>, fields: string[]) => {
+  for (const field of fields) {
+    const value = Number(row[field]);
+    if (Number.isFinite(value)) return value;
+  }
+  return 0;
+};
+
+const resolveText = (row: Record<string, unknown>, fields: string[], fallback = '--') => {
+  for (const field of fields) {
+    const value = row[field];
+    if (value !== undefined && value !== null && String(value).trim() !== '') return String(value);
+  }
+  return fallback;
+};
+
+const normalizeSpecRow = (row: Record<string, unknown>): SpecRow => ({
+  specName: resolveText(row, ['specName', 'productSpec', 'spec']),
+  specType: resolveText(row, ['specType', 'type'], ''),
+  specTypeLabel: resolveText(row, ['specTypeName', 'specTypeLabel', 'specType']),
+  newSaleSpec: resolveText(row, ['newSpecType', 'newSaleSpec'], ''),
+  newSaleSpecLabel: resolveText(row, ['newSpecTypeName', 'newSaleSpecLabel', 'newSpecType']),
+  skuTotal: resolveNumber(row, ['sku', 'skuTotal']),
+  skuGrowth: resolveNumber(row, ['skuInc', 'skuGrowth', 'skuChange']),
+  skuShare: resolveNumber(row, ['skuPer', 'skuShare']),
+  saleQtyTotal: resolveNumber(row, ['saleQuantity', 'saleQtyTotal']),
+  saleQtyGrowth: resolveNumber(row, ['saleQuantityInc', 'saleQtyGrowth', 'saleQuantityChange']),
+  saleQtyShare: resolveNumber(row, ['saleQuantityPer', 'saleQtyShare']),
+  saleQtyPsd: resolveNumber(row, ['saleQuantityPsd', 'saleQtyPsd']),
+  salesAmountTotal: resolveNumber(row, ['sales', 'salesAmountTotal']),
+  salesAmountGrowth: resolveNumber(row, ['salesInc', 'salesAmountGrowth', 'salesChange']),
+  salesAmountShare: resolveNumber(row, ['salesPer', 'salesAmountShare']),
+  salesAmountPsd: resolveNumber(row, ['salesPsd', 'salesAmountPsd']),
+  grossAmountTotal: resolveNumber(row, ['gross', 'grossAmountTotal']),
+  grossAmountGrowth: resolveNumber(row, ['grossInc', 'grossAmountGrowth', 'grossChange']),
+  grossAmountShare: resolveNumber(row, ['grossPer', 'grossAmountShare']),
+  grossAmountPsd: resolveNumber(row, ['grossPsd', 'grossAmountPsd']),
+  grossRateTotal: resolveNumber(row, ['grossRate', 'grossRateTotal']),
+  grossRateGrowth: resolveNumber(row, ['grossRateInc', 'grossRateGrowth']),
+  inventoryQty: resolveNumber(row, ['stockQuantity', 'inventoryQty']),
+  turnoverRate: resolveNumber(row, ['turnoverRate']),
+  turnoverDays: resolveNumber(row, ['turnoverDays']),
+  inventorySalesRatio: resolveNumber(row, ['stockSalesRate', 'inventorySalesRatio']),
+  grossContributionRate: resolveNumber(row, ['contributionRate', 'grossContributionRate']),
+  gmroi: resolveNumber(row, ['gmroi']),
+  sellThroughRate: resolveNumber(row, ['salesRate', 'sellThroughRate']),
+  promotionSkuCount: resolveNumber(row, ['activitySku', 'promotionSkuCount'])
+});
 
 const formatNumber = (value: unknown, digits = 2) => {
   const num = Number(value ?? 0);
@@ -291,45 +366,56 @@ const formatGrowth = (value: unknown) => {
 const growthClass = (value: unknown) =>
   Number(value ?? 0) > 0 ? 'growth-text is-up' : Number(value ?? 0) < 0 ? 'growth-text is-down' : 'growth-text is-flat';
 
-const buildSortedRows = (rows: SpecRow[]) => {
-  if (!sortState.prop || !sortState.order) return rows;
-  const direction = sortState.order === 'ascending' ? 1 : -1;
-  return [...rows].sort((a, b) => {
-    const leftValue = a[sortState.prop];
-    const rightValue = b[sortState.prop];
-    const leftNumber = Number(leftValue ?? 0);
-    const rightNumber = Number(rightValue ?? 0);
-    if (Number.isFinite(leftNumber) && Number.isFinite(rightNumber)) {
-      return (leftNumber - rightNumber) * direction;
-    }
-    return String(leftValue ?? '').localeCompare(String(rightValue ?? ''), 'zh-CN') * direction;
-  });
-};
-
 const loadTable = async () => {
+  if (!sessionId.value) return;
   tableLoading.value = true;
   try {
-    await new Promise((resolve) => window.setTimeout(resolve, 180));
-    const filtered = mockRows.filter((item) => {
-      const matchType = !queryForm.specType.length || queryForm.specType.includes(item.specType);
-      const matchName = !queryForm.specName.length || queryForm.specName.includes(item.specName);
-      const matchNew = !queryForm.newSaleSpec || item.newSaleSpec === queryForm.newSaleSpec;
-      return matchType && matchName && matchNew;
+    const res = await getSpecDetails({
+      sessionId: sessionId.value,
+      page: queryForm.pageNum,
+      size: queryForm.pageSize,
+      specTypeList: queryForm.specType.length ? queryForm.specType : undefined,
+      specList: queryForm.specName.length ? queryForm.specName : undefined,
+      newSpecType: queryForm.newSaleSpec || undefined,
+      order: orderFieldMap[sortState.prop] || sortState.prop,
+      orderType: sortState.order === 'ascending' ? 'asc' : 'desc'
     });
-    const sorted = buildSortedRows(filtered);
-    total.value = sorted.length;
-    const start = (queryForm.pageNum - 1) * queryForm.pageSize;
-    tableRows.value = sorted.slice(start, start + queryForm.pageSize);
+    const payload = (res as any)?.data?.data || (res as any)?.data || {};
+    const records = Array.isArray(payload.records) ? payload.records : Array.isArray(payload.list) ? payload.list : [];
+    tableRows.value = records.map((item: Record<string, unknown>) => normalizeSpecRow(item));
+    total.value = Number(payload.total ?? tableRows.value.length);
   } finally {
     tableLoading.value = false;
   }
+};
+
+const loadFilterOptions = async () => {
+  if (!sessionId.value) return;
+  const res = await getSpecFilterOptions(sessionId.value);
+  const payload = (res as any)?.data?.data || (res as any)?.data || {};
+  const rows = Array.isArray(payload.specList) ? payload.specList : [];
+  const specTypeMap = new Map<string, string>();
+  const specMap = new Map<string, string>();
+  rows.forEach((row: Record<string, unknown>) => {
+    const type = resolveText(row, ['type'], '');
+    const specName = resolveText(row, ['specName'], '');
+    if (type) specTypeMap.set(type, type);
+    if (specName) specMap.set(specName, specName);
+  });
+  specTypeOptions.value = Array.from(specTypeMap.entries()).map(([value, label]) => ({ value, label }));
+  specOptions.value = Array.from(specMap.entries()).map(([value, label]) => ({ value, label }));
 };
 
 const handlePageChange = async () => {
   await loadTable();
 };
 
-const handleSortChange = async ({ prop, order }: { prop: string; order: 'ascending' | 'descending' | null }) => {
+const handleFilterChange = async () => {
+  queryForm.pageNum = 1;
+  await loadTable();
+};
+
+const handleSortChange = async ({ prop, order }: { prop: string; order: Sort['order'] }) => {
   sortState.prop = (prop as keyof SpecRow) || 'salesAmountTotal';
   sortState.order = order;
   await loadTable();
@@ -344,6 +430,13 @@ const handleProcess = (_row: SpecRow) => {
 };
 
 onMounted(async () => {
+  await loadFilterOptions();
+  await loadTable();
+});
+
+watch(() => route.query.sessionId, async () => {
+  queryForm.pageNum = 1;
+  await loadFilterOptions();
   await loadTable();
 });
 </script>
@@ -469,11 +562,11 @@ onMounted(async () => {
 }
 
 .growth-text.is-up {
-  color: #16a34a;
+  color: #dc2626;
 }
 
 .growth-text.is-down {
-  color: #dc2626;
+  color: #16a34a;
 }
 
 .growth-text.is-flat {

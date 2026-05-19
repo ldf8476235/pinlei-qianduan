@@ -7,10 +7,6 @@
             <span class="page-title-line" />
             <span class="page-title">ABC结构分析</span>
           </div>
-          <div class="page-subtitle">
-            <span>sessionId: {{ sessionId || '--' }}</span>
-            <span v-if="statusState?.dataVersion">版本: {{ statusState.dataVersion }}</span>
-          </div>
         </div>
         <div class="page-actions">
           <el-tabs v-model="activeAbcType" class="type-tabs" type="card" @tab-change="handleAbcTypeChange">
@@ -37,7 +33,7 @@
     />
 
     <el-row :gutter="12" class="chart-row">
-      <el-col :lg="12" :md="12" :sm="24" :xs="24">
+      <el-col :lg="10" :md="24" :sm="24" :xs="24">
         <el-card shadow="hover" class="page-card chart-card" v-loading="chartLoading">
           <template #header>
             <div class="card-header">
@@ -48,7 +44,7 @@
         </el-card>
       </el-col>
 
-      <el-col :lg="12" :md="12" :sm="24" :xs="24">
+      <el-col :lg="14" :md="24" :sm="24" :xs="24">
         <el-card shadow="hover" class="page-card chart-card" v-loading="matrixLoading">
           <template #header>
             <div class="card-header">
@@ -56,28 +52,40 @@
             </div>
           </template>
           <div class="matrix-wrap">
-            <el-table :data="matrixRows" border class="matrix-table">
-              <el-table-column label="对比日期" min-width="120" align="center" fixed="left">
-                <template #header>
-                  <div class="matrix-header-stack">
-                    <span>对比日期</span>
-                    <span>对比变化</span>
-                  </div>
-                </template>
-                <template #default="{ row }">
-                  <span class="matrix-row-label">{{ row.label }}</span>
-                </template>
-              </el-table-column>
-              <el-table-column label="本期" align="center">
-                <el-table-column v-for="column in matrixColumns" :key="column.key" :label="column.label" min-width="86" align="center">
-                  <template #default="{ row }">
-                    <div class="matrix-cell" :class="resolveMatrixClass(row.rowKey, column.key)">
-                      {{ formatNumber(row[column.key], 0) }}
-                    </div>
-                  </template>
-                </el-table-column>
-              </el-table-column>
-            </el-table>
+            <div class="matrix-table-wrap">
+              <table class="matrix-table">
+                <thead>
+                  <tr>
+                    <th class="matrix-head matrix-head--left" colspan="2" rowspan="2">对比变化</th>
+                    <th class="matrix-head matrix-head--top" colspan="3">本期</th>
+                  </tr>
+                  <tr>
+                    <th v-for="column in matrixColumns" :key="column.key" class="matrix-head matrix-head--sub">{{ column.label }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(row, rowIndex) in matrixRows" :key="row.rowKey">
+                    <th v-if="rowIndex === 0" class="matrix-side-title" :rowspan="matrixRows.length">对比日期</th>
+                    <th class="matrix-row-label">{{ row.label }}</th>
+                    <td v-for="column in matrixColumns" :key="`${row.rowKey}-${column.key}`" class="matrix-data-cell">
+                      <button
+                        type="button"
+                        class="matrix-value"
+                        :class="[
+                          resolveMatrixCellClass(row.rowKey, column.key, row[column.key]),
+                          { 'matrix-value--link': isMatrixCellClickable(row.rowKey, column.key, row[column.key]) }
+                        ]"
+                        :title="buildMatrixCellTitle(row.rowKey, column.key, row[column.key])"
+                        :disabled="!isMatrixCellClickable(row.rowKey, column.key, row[column.key])"
+                        @click="handleMatrixCellClick(row.rowKey, column.key, row[column.key])"
+                      >
+                        {{ formatNumber(row[column.key], 0) }}
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
             <div class="matrix-legend">
               <span><i class="legend-dot danger" />建议淘汰</span>
               <span><i class="legend-dot warning" />考虑淘汰</span>
@@ -117,7 +125,11 @@
         </el-table-column>
         <el-table-column label="本期分组" align="center">
           <el-table-column label="实际SKU" min-width="110" align="right">
-            <template #default="{ row }"><span class="sku-highlight">{{ formatNumber(row.currentSku, 2) }}</span></template>
+            <template #default="{ row }">
+              <button type="button" class="sku-link" @click="handleBucketSkuClick(row, 'current')">
+                {{ formatNumber(row.currentSku, 2) }}
+              </button>
+            </template>
           </el-table-column>
           <el-table-column label="占比" min-width="110" align="right">
             <template #default="{ row }">{{ formatPercent(row.currentSkuPer) }}</template>
@@ -134,7 +146,11 @@
             <template #default="{ row }">{{ formatNumber(row.compareSku, 2) }}</template>
           </el-table-column>
           <el-table-column label="实际SKU" min-width="110" align="right">
-            <template #default="{ row }"><span class="sku-highlight">{{ formatNumber(row.compareSku, 2) }}</span></template>
+            <template #default="{ row }">
+              <button type="button" class="sku-link" @click="handleBucketSkuClick(row, 'compare')">
+                {{ formatNumber(row.compareSku, 2) }}
+              </button>
+            </template>
           </el-table-column>
           <el-table-column label="占比" min-width="110" align="right">
             <template #default="{ row }">{{ formatPercent(row.compareSkuPer) }}</template>
@@ -156,10 +172,7 @@
       </template>
       <div class="summary-box">
         <ul class="summary-list">
-          <li>该品类A类品占比合理，请继续保持。</li>
-          <li>该品类B类品占比合理，请继续保持。</li>
-          <li>存在CC商品{{ formatInteger(summaryMetrics.ccCount) }}个，建议将其中近似品优先淘汰，可结合其他异常品项分析法及用户需求进行末位淘汰。</li>
-          <li>存在AC和BC品{{ formatInteger(summaryMetrics.acBcCount) }}个，需进一步分析确认是否需要淘汰。</li>
+          <li v-for="line in summaryLines" :key="line">{{ line }}</li>
         </ul>
       </div>
     </el-card>
@@ -244,6 +257,8 @@ import type {
 } from '@/api/category/abc/types';
 
 type ImageMetricType = 'sales' | 'sku';
+type MatrixColumnKey = 'a' | 'b' | 'c';
+type BucketDrillMode = 'current' | 'compare';
 
 interface MatrixRowVO {
   rowKey: string;
@@ -251,8 +266,6 @@ interface MatrixRowVO {
   a: number;
   b: number;
   c: number;
-  n: number;
-  t: number;
   total: number;
 }
 
@@ -314,47 +327,67 @@ const detailDisplayRows = computed(() => {
   }));
 });
 
-const summaryMetrics = computed(() => {
-  const rows = detailRows.value as Array<Record<string, any>>;
-  const getCode = (row: Record<string, any>, keys: string[]) => {
-    for (const key of keys) {
-      const value = row[key];
-      if (value != null && value !== '') return String(value).toUpperCase();
-    }
-    return '';
-  };
-  const ccCount = rows.filter((row) => {
-    const currentCode = getCode(row, ['currentAbc', 'curAbc', 'nowAbc', 'abcType']);
-    const compareCode = getCode(row, ['compareAbc', 'preAbc', 'lastAbc', 'oldAbc']);
-    return currentCode === 'C' && compareCode === 'C';
-  }).length;
-  const acBcCount = rows.filter((row) => {
-    const currentCode = getCode(row, ['currentAbc', 'curAbc', 'nowAbc', 'abcType']);
-    const compareCode = getCode(row, ['compareAbc', 'preAbc', 'lastAbc', 'oldAbc']);
-    return currentCode === 'C' && (compareCode === 'A' || compareCode === 'B');
-  }).length;
-  return { ccCount, acBcCount };
+const summaryLines = computed(() => {
+  const matrix = matrixState.value || {};
+  const ccCount = Number(matrix.ccNum || 0);
+  const acBcCount = Number(matrix.caNum || 0) + Number(matrix.cbNum || 0);
+  return [
+    buildSkuShareSummary('A'),
+    buildSkuShareSummary('B'),
+    `存在CC商品${formatInteger(ccCount)}个，建议将其中近似品优先淘汰，可结合其他异常品项分析法及用户需求进行末位淘汰。`,
+    `存在AC和BC品${formatInteger(acBcCount)}个，需进一步分析确认是否需要淘汰。`
+  ];
 });
 
 const matrixColumns = [
-  { key: 'a', label: 'A' },
-  { key: 'b', label: 'B' },
-  { key: 'c', label: 'C' }
+  { key: 'a', label: 'A类' },
+  { key: 'b', label: 'B类' },
+  { key: 'c', label: 'C类' }
 ] as const;
 
 const matrixRows = computed<MatrixRowVO[]>(() => {
   const matrix = matrixState.value || {};
-  const aTotal = Number(matrix.aaNum || 0) + Number(matrix.abNum || 0) + Number(matrix.acNum || 0);
-  const bTotal = Number(matrix.baNum || 0) + Number(matrix.bbNum || 0) + Number(matrix.bcNum || 0);
-  const cTotal = Number(matrix.caNum || 0) + Number(matrix.cbNum || 0) + Number(matrix.ccNum || 0);
-  const nTotal = Number(matrix.anNum || 0) + Number(matrix.bnNum || 0) + Number(matrix.cnNum || 0);
-  const tTotal = Number(matrix.atNum || 0) + Number(matrix.btNum || 0) + Number(matrix.ctNum || 0);
   return [
-    { rowKey: 'A', label: 'A类', a: Number(matrix.aaNum || 0), b: Number(matrix.abNum || 0), c: Number(matrix.acNum || 0), n: 0, t: 0, total: aTotal },
-    { rowKey: 'B', label: 'B类', a: Number(matrix.baNum || 0), b: Number(matrix.bbNum || 0), c: Number(matrix.bcNum || 0), n: 0, t: 0, total: bTotal },
-    { rowKey: 'C', label: 'C类', a: Number(matrix.caNum || 0), b: Number(matrix.cbNum || 0), c: Number(matrix.ccNum || 0), n: 0, t: 0, total: cTotal },
-    { rowKey: 'N', label: '/', a: Number(matrix.anNum || 0), b: Number(matrix.bnNum || 0), c: Number(matrix.cnNum || 0), n: 0, t: 0, total: nTotal },
-    { rowKey: 'TOTAL', label: '总计', a: Number(matrix.atNum || 0), b: Number(matrix.btNum || 0), c: Number(matrix.ctNum || 0), n: 0, t: 0, total: tTotal }
+    {
+      rowKey: 'A',
+      label: 'A类',
+      a: Number(matrix.aaNum || 0),
+      b: Number(matrix.baNum || 0),
+      c: Number(matrix.caNum || 0),
+      total: Number(matrix.atNum || 0)
+    },
+    {
+      rowKey: 'B',
+      label: 'B类',
+      a: Number(matrix.abNum || 0),
+      b: Number(matrix.bbNum || 0),
+      c: Number(matrix.cbNum || 0),
+      total: Number(matrix.btNum || 0)
+    },
+    {
+      rowKey: 'C',
+      label: 'C类',
+      a: Number(matrix.acNum || 0),
+      b: Number(matrix.bcNum || 0),
+      c: Number(matrix.ccNum || 0),
+      total: Number(matrix.ctNum || 0)
+    },
+    {
+      rowKey: 'N',
+      label: '/',
+      a: Number(matrix.anNum || 0),
+      b: Number(matrix.bnNum || 0),
+      c: Number(matrix.cnNum || 0),
+      total: Number(matrix.anNum || 0) + Number(matrix.bnNum || 0) + Number(matrix.cnNum || 0)
+    },
+    {
+      rowKey: 'TOTAL',
+      label: '总计',
+      a: Number(matrix.atNum || 0),
+      b: Number(matrix.btNum || 0),
+      c: Number(matrix.ctNum || 0),
+      total: Number(matrix.atNum || 0) + Number(matrix.btNum || 0) + Number(matrix.ctNum || 0)
+    }
   ];
 });
 
@@ -408,15 +441,59 @@ const renderImageChart = () => {
   const currentSalesCum = cumulative(salesValues);
   const compareSalesCum = cumulative(compareSalesValues);
   const setSalesCum = cumulative(setSalesValues);
+  const buildPoint = (
+    item: AbcImageItemVO | undefined,
+    skuPercent: number,
+    salesPercent: number,
+    categorySkuPercent: number,
+    categorySalesPercent: number
+  ) => ({
+    value: [skuPercent, salesPercent],
+    abcType: item?.abcType || '--',
+    skuPercent: categorySkuPercent,
+    salesPercent: categorySalesPercent
+  });
+  const formatTooltipPercent = (value: unknown) => `${Number(value || 0).toFixed(2)}%`;
   const option: EChartsOption = {
     tooltip: {
-      trigger: 'axis',
+      trigger: 'item',
+      triggerOn: 'mousemove|click',
+      appendToBody: true,
+      confine: true,
+      backgroundColor: 'rgba(255,255,255,0.96)',
+      borderColor: '#e5e7eb',
+      borderWidth: 1,
+      padding: [12, 14],
+      textStyle: {
+        color: '#4b5563',
+        fontSize: 14,
+        lineHeight: 22
+      },
+      extraCssText: 'box-shadow: 0 12px 30px rgba(15,23,42,.16); border-radius: 8px;',
       formatter: (params: any) => {
-        const idx = params?.[0]?.dataIndex ?? 0;
-        const item = source[idx] || {};
-        const sku = skuValues[idx] ?? 0;
-        const sales = salesValues[idx] ?? 0;
-        return [`日期：${item.abcType || '--'}`, `销售额占比：${sales.toFixed(2)}%`, `SKU占比：${sku.toFixed(2)}%`].join('<br/>');
+        const data = params?.data || {};
+        const value = Array.isArray(data.value) ? data.value : [0, 0];
+        const color = params?.color || '#f97316';
+        return [
+          `<div style="font-size:15px;font-weight:600;margin-bottom:8px;color:#6b7280;">${data.abcType || '--'}</div>`,
+          `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;"><span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;"></span><span>${params?.seriesName || '--'}</span></div>`,
+          `<div>销售额占比：${formatTooltipPercent(data.salesPercent)}</div>`,
+          `<div>SKU占比：${formatTooltipPercent(data.skuPercent)}</div>`,
+          `<div style="color:#9ca3af;margin-top:6px;">累计：${formatTooltipPercent(value[1])} / ${formatTooltipPercent(value[0])}</div>`
+        ].join('');
+      }
+    },
+    axisPointer: {
+      show: true,
+      type: 'cross',
+      lineStyle: {
+        type: 'dashed',
+        color: '#9ca3af'
+      },
+      label: {
+        show: true,
+        formatter: (params: any) => `${Number(params.value || 0).toFixed(2)}%`,
+        backgroundColor: '#6b7280'
       }
     },
     legend: { top: 0, data: ['本期', '对比日期', '设定基准'] },
@@ -434,9 +511,42 @@ const renderImageChart = () => {
       splitLine: { lineStyle: { type: 'dashed', color: '#dbe4ea' } }
     },
     series: [
-      { name: '本期', type: 'line', smooth: true, symbol: 'circle', symbolSize: 7, showSymbol: true, itemStyle: { color: '#1ca29b' }, lineStyle: { width: 2.5, color: '#1ca29b' }, data: xCurrent.map((x, i) => [x, currentSalesCum[i]]) },
-      { name: '对比日期', type: 'line', smooth: true, symbol: 'circle', symbolSize: 7, showSymbol: true, itemStyle: { color: '#f4c542' }, lineStyle: { width: 2.5, color: '#f4c542' }, data: xCompare.map((x, i) => [x, compareSalesCum[i]]) },
-      { name: '设定基准', type: 'line', smooth: false, symbol: 'circle', symbolSize: 6, showSymbol: true, itemStyle: { color: '#ef4444' }, lineStyle: { width: 2, type: 'dashed', color: '#ef4444' }, data: xSet.map((x, i) => [x, setSalesCum[i]]) }
+      {
+        name: '本期',
+        type: 'line',
+        smooth: true,
+        symbol: 'circle',
+        symbolSize: 7,
+        showSymbol: true,
+        itemStyle: { color: '#1ca29b' },
+        lineStyle: { width: 2.5, color: '#1ca29b' },
+        emphasis: { focus: 'series', scale: true },
+        data: xCurrent.map((x, i) => buildPoint(source[i], x, currentSalesCum[i], skuValues[i] ?? 0, salesValues[i] ?? 0))
+      },
+      {
+        name: '对比日期',
+        type: 'line',
+        smooth: true,
+        symbol: 'circle',
+        symbolSize: 7,
+        showSymbol: true,
+        itemStyle: { color: '#f4c542' },
+        lineStyle: { width: 2.5, color: '#f4c542' },
+        emphasis: { focus: 'series', scale: true },
+        data: xCompare.map((x, i) => buildPoint(source[i], x, compareSalesCum[i], compareSkuValues[i] ?? 0, compareSalesValues[i] ?? 0))
+      },
+      {
+        name: '设定基准',
+        type: 'line',
+        smooth: false,
+        symbol: 'circle',
+        symbolSize: 6,
+        showSymbol: true,
+        itemStyle: { color: '#ef4444' },
+        lineStyle: { width: 2, type: 'dashed', color: '#ef4444' },
+        emphasis: { focus: 'series', scale: true },
+        data: xSet.map((x, i) => buildPoint(source[i], x, setSalesCum[i], setSkuValues[i] ?? 0, setSalesValues[i] ?? 0))
+      }
     ]
   };
   imageChartIns.value.setOption(option, true);
@@ -597,11 +707,100 @@ const handleViewDetail = () => {
   });
 };
 
-const resolveMatrixClass = (rowKey: string, columnKey: string) => {
-  if (rowKey === 'SEP') return 'is-separator';
-  if (rowKey === 'TOTAL' || columnKey === 'total') return 'is-total';
-  if (rowKey === columnKey.toUpperCase()) return 'is-keep';
-  return 'is-shift';
+const normalizeBucketValue = (value?: string | null) => {
+  const code = String(value || '').trim().toUpperCase();
+  return code || 'NONE';
+};
+
+const matrixColumnToBucket = (columnKey: MatrixColumnKey) => {
+  const map: Record<MatrixColumnKey, string> = { a: 'A', b: 'B', c: 'C' };
+  return map[columnKey];
+};
+
+const matrixRowToBucket = (rowKey: string) => {
+  if (rowKey === 'N') return 'NONE';
+  if (rowKey === 'TOTAL') return '';
+  return rowKey;
+};
+
+const hasMatrixStrategyValue = (value: number | string | null | undefined) => Number(value || 0) > 0;
+
+const resolveMatrixCellClass = (rowKey: string, columnKey: MatrixColumnKey, value: number | string | null | undefined) => {
+  if (!hasMatrixStrategyValue(value) || rowKey === 'TOTAL') {
+    return '';
+  }
+  const currentAbc = matrixColumnToBucket(columnKey);
+  const compareAbc = matrixRowToBucket(rowKey);
+  if (compareAbc === 'NONE' && currentAbc === 'C') return 'is-stable';
+  if ((compareAbc === 'A' || compareAbc === 'B') && currentAbc === 'C') return 'is-warning';
+  if (compareAbc === 'C' && currentAbc === 'C') return 'is-danger';
+  if (compareAbc === 'C' && currentAbc === 'B') return 'is-stable';
+  return 'is-info';
+};
+
+const isMatrixCellClickable = (rowKey: string, _columnKey: MatrixColumnKey, value: number | string | null | undefined) => {
+  return hasMatrixStrategyValue(value) && rowKey !== 'TOTAL';
+};
+
+const buildMatrixCellTitle = (rowKey: string, columnKey: MatrixColumnKey, value: number | string | null | undefined) => {
+  const currentAbc = matrixColumnToBucket(columnKey);
+  const compareAbc = matrixRowToBucket(rowKey);
+  const compareLabel = compareAbc === 'NONE' ? '/' : compareAbc || '--';
+  return `本期: ${currentAbc}，对比: ${compareLabel}，SKU数: ${formatNumber(value, 0)}`;
+};
+
+const navigateToGoodsList = (currentAbc?: string, compareAbc?: string) => {
+  router.push({
+    path: '/abc/analysis/detail',
+    query: {
+      ...route.query,
+      sessionId: sessionId.value,
+      abcType: activeAbcType.value,
+      currentAbc: currentAbc || '',
+      compareAbc: compareAbc || ''
+    }
+  });
+};
+
+const handleMatrixCellClick = (rowKey: string, columnKey: MatrixColumnKey, value: number | string | null | undefined) => {
+  if (!isMatrixCellClickable(rowKey, columnKey, value)) return;
+  navigateToGoodsList(matrixColumnToBucket(columnKey), matrixRowToBucket(rowKey));
+};
+
+const handleBucketSkuClick = (row: AbcDetailsItemVO, mode: BucketDrillMode) => {
+  const bucket = normalizeBucketValue(row.abcType);
+  if (bucket === 'NONE') return;
+  if (mode === 'current') {
+    navigateToGoodsList(bucket, '');
+    return;
+  }
+  navigateToGoodsList('', bucket);
+};
+
+const findBucketDetail = (bucket: 'A' | 'B') => {
+  return detailRows.value.find((row) => {
+    const code = String(row.abcType || row.abcTypeName || '').trim().toUpperCase();
+    return code === bucket || code.includes(bucket);
+  });
+};
+
+const buildSkuShareSummary = (bucket: 'A' | 'B') => {
+  const row = findBucketDetail(bucket);
+  if (!row) {
+    return `该品类${bucket}类品暂无占比数据，请等待诊断结果生成后复核。`;
+  }
+
+  const currentSkuPer = percentValue(row.currentSkuPer);
+  const setSkuPer = percentValue(row.setSkuPer);
+  const diff = currentSkuPer - setSkuPer;
+  const tolerance = 2;
+  if (Math.abs(diff) <= tolerance) {
+    return `该品类${bucket}类品占比合理，本期SKU占比${formatPercent(row.currentSkuPer)}，设定占比${formatPercent(row.setSkuPer)}，请继续保持。`;
+  }
+  if (diff > 0) {
+    return `该品类${bucket}类品占比偏高，本期SKU占比${formatPercent(row.currentSkuPer)}，高于设定占比${formatPercent(row.setSkuPer)}，建议复核分组阈值和商品结构。`;
+  }
+  return `该品类${bucket}类品占比偏低，本期SKU占比${formatPercent(row.currentSkuPer)}，低于设定占比${formatPercent(row.setSkuPer)}，建议关注核心商品覆盖是否不足。`;
 };
 
 const formatNumber = (value: number | string | null | undefined, digits = 2) => {
@@ -716,15 +915,6 @@ onBeforeUnmount(() => {
   color: var(--el-text-color-primary);
 }
 
-.page-subtitle {
-  display: flex;
-  gap: 16px;
-  margin-top: 10px;
-  font-size: 13px;
-  color: var(--el-text-color-secondary);
-  flex-wrap: wrap;
-}
-
 .page-actions {
   display: flex;
   align-items: center;
@@ -767,95 +957,136 @@ onBeforeUnmount(() => {
   height: 360px;
 }
 
-.matrix-legend {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  align-items: flex-start;
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-  min-width: 116px;
-  padding-left: 10px;
-  border-left: 1px solid var(--el-border-color-light);
-  justify-content: center;
-}
-
 .legend-dot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
+  display: inline-flex;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   margin-right: 6px;
 }
 
-.legend-dot.stable { background: #60a5fa; }
-.legend-dot.warning { background: #f59e0b; }
-.legend-dot.danger { background: #ef4444; }
-.legend-dot.info { background: #0f766e; }
+.legend-dot.stable { background: #9fcef0; }
+.legend-dot.warning { background: #fde49c; }
+.legend-dot.danger { background: #f6a5b4; }
+.legend-dot.info {
+  background: #fff;
+  border: 1px solid #c7d2e5;
+}
 
 .matrix-wrap {
   display: flex;
-  align-items: stretch;
-  gap: 12px;
-}
-
-.matrix-wrap :deep(.el-table) {
-  flex: 1;
-  border-radius: 12px;
-  overflow: hidden;
-}
-
-.matrix-header-stack {
-  display: flex;
   flex-direction: column;
-  gap: 2px;
-  align-items: center;
-  line-height: 1.2;
+  gap: 16px;
+}
+
+.matrix-table-wrap {
+  overflow-x: auto;
+}
+
+.matrix-table {
+  width: 100%;
+  min-width: 500px;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.matrix-head,
+.matrix-row-label,
+.matrix-side-title,
+.matrix-data-cell {
+  border: 1px solid #d7deeb;
+}
+
+.matrix-head {
+  background: linear-gradient(180deg, #ffb35c 0%, #ff9738 100%);
+  color: #723417;
+  font-weight: 700;
+  text-align: center;
+  padding: 8px 6px;
+}
+
+.matrix-head--top {
+  font-size: 15px;
+}
+
+.matrix-head--left,
+.matrix-side-title {
+  width: 52px;
+}
+
+.matrix-head--sub,
+.matrix-row-label {
+  font-size: 12px;
+}
+
+.matrix-side-title {
+  background: linear-gradient(180deg, #ffb35c 0%, #ff9738 100%);
+  color: #723417;
+  font-weight: 700;
+  text-align: center;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  letter-spacing: 1px;
+  padding: 6px 2px;
 }
 
 .matrix-row-label {
-  font-weight: 600;
-  color: var(--el-text-color-primary);
+  background: linear-gradient(180deg, #ffb35c 0%, #ff9738 100%);
+  color: #723417;
+  font-weight: 700;
+  text-align: center;
+  padding: 8px 4px;
+  width: 48px;
 }
 
-.matrix-table :deep(.el-table__header th),
+.matrix-data-cell {
+  padding: 0;
+  background: #fff;
+  text-align: center;
+}
+
+.matrix-value {
+  width: 100%;
+  height: 100%;
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: default;
+  transition: background-color .2s ease, color .2s ease, box-shadow .2s ease;
+}
+
+.matrix-value:disabled {
+  opacity: 1;
+}
+
+.matrix-value.is-danger { background: #f8a9b6; color: #24334b; }
+.matrix-value.is-warning { background: #fde8a3; color: #24334b; }
+.matrix-value.is-stable { background: #a9d1ef; color: #24334b; }
+.matrix-value.is-info { background: #fff; color: #24334b; }
+
+.matrix-value--link {
+  cursor: pointer;
+  color: #ff6b00;
+}
+
+.matrix-value--link:hover {
+  box-shadow: inset 0 0 0 2px rgba(255, 107, 0, 0.18);
+}
+
+.matrix-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  font-size: 10px;
+  color: var(--el-text-color-secondary);
+}
+
 .detail-table :deep(.el-table__header th) {
   background: #f2f5f8;
-  font-weight: 600;
-}
-
-.matrix-table :deep(.el-table__header th) {
-  color: #475569;
-}
-
-.matrix-cell {
-  padding: 10px 4px;
-  border-radius: 6px;
-}
-
-.matrix-cell.is-keep {
-  background: #e8f4ff;
-}
-
-.matrix-cell.is-shift {
-  background: #fff8db;
-}
-
-.matrix-cell.is-total {
-  background: #ffe8e8;
-  font-weight: 700;
-}
-
-.matrix-cell.is-separator {
-  background: transparent;
-  color: transparent;
-  min-height: 20px;
-}
-
-.sku-highlight {
-  color: #0f766e;
-  text-decoration: underline;
-  text-underline-offset: 2px;
   font-weight: 600;
 }
 
@@ -930,15 +1161,28 @@ onBeforeUnmount(() => {
 }
 
 .change-text.is-up {
-  color: var(--el-color-success);
+  color: var(--el-color-danger);
 }
 
 .change-text.is-down {
-  color: var(--el-color-danger);
+  color: var(--el-color-success);
 }
 
 .change-text.is-flat {
   color: var(--el-text-color-secondary);
+}
+
+.sku-link {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: #0f766e;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sku-link:hover {
+  color: #0b5f5a;
 }
 
 @media (max-width: 992px) {
@@ -960,7 +1204,24 @@ onBeforeUnmount(() => {
   .chart-box {
     height: 320px;
   }
+
+  .matrix-table {
+    min-width: 460px;
+  }
+}
+
+@media (max-width: 1400px) {
+  .matrix-table {
+    min-width: 480px;
+  }
+
+  .matrix-head--top {
+    font-size: 14px;
+  }
+
+  .matrix-value {
+    min-height: 40px;
+    font-size: 11px;
+  }
 }
 </style>
-
-

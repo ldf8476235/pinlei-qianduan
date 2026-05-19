@@ -3,9 +3,14 @@
     <el-row :gutter="16" class="feature-row">
       <el-col v-for="item in featureCards" :key="item.title" :lg="6" :md="12" :sm="12" :xs="24">
         <el-card shadow="hover" class="feature-card">
-          <img :src="item.image" :alt="item.title" class="feature-image" />
+          <div class="feature-icon-wrap">
+            <el-icon class="feature-icon">
+              <component :is="item.icon" />
+            </el-icon>
+          </div>
           <div class="feature-title">{{ item.title }}</div>
           <div class="feature-subtitle">{{ item.subtitle }}</div>
+          <span class="feature-corner" />
         </el-card>
       </el-col>
     </el-row>
@@ -14,7 +19,7 @@
       <template #header>
         <div class="diagnosis-header">
           <span class="diagnosis-title">诊断对象</span>
-          <el-button type="primary" plain @click="handleHistory">历史诊断记录</el-button>
+          <el-button type="primary" plain class="history-btn" @click="handleHistory">历史诊断记录</el-button>
         </div>
       </template>
 
@@ -72,7 +77,7 @@
         </el-form-item>
 
         <div class="submit-wrap">
-          <el-button type="success" size="large" :loading="submitLoading" @click="handleSubmit">立即诊断</el-button>
+          <el-button type="primary" size="large" class="submit-btn" :loading="submitLoading" @click="handleSubmit">立即诊断</el-button>
         </div>
       </el-form>
     </el-card>
@@ -81,10 +86,7 @@
 
 <script setup name="CategoryDiagnosis" lang="ts">
 import type { FormInstance, FormRules } from 'element-plus';
-import aImage from '@/assets/images/a.png';
-import bImage from '@/assets/images/b.png';
-import cImage from '@/assets/images/c.png';
-import dImage from '@/assets/images/d.png';
+import { Aim, DataAnalysis, Goods, TrendCharts } from '@element-plus/icons-vue';
 import { findStore, queryCategoryClassTree } from '@/api/category/tree';
 import type { CategoryClassTreeNodeVO, OptionVO } from '@/api/category/tree/types';
 import { createDiagnosisSession } from '@/api/category/diagnosis';
@@ -106,17 +108,23 @@ interface CategoryTreeOption {
 }
 
 const featureCards = [
-  { title: '纵观品类整体', subtitle: '掌握品类整体情况和发力点', image: aImage },
-  { title: '定位异常品项', subtitle: '及时优化表现差的商品', image: bImage },
-  { title: '深究用户需求', subtitle: '助力品项优化与补充', image: cImage },
-  { title: '整合调整方向', subtitle: '指导品类优化与执行', image: dImage }
+  { title: '纵观品类整体', subtitle: '掌握品类整体情况和发力点', icon: DataAnalysis },
+  { title: '定位异常品项', subtitle: '及时优化表现差的商品', icon: Aim },
+  { title: '深究用户需求', subtitle: '助力品项优化与补充', icon: Goods },
+  { title: '整合调整方向', subtitle: '指导品类优化与执行', icon: TrendCharts }
 ];
 
 const formRef = ref<FormInstance>();
 const router = useRouter();
+const route = useRoute();
 const categoryTreeOptions = ref<CategoryTreeOption[]>([]);
 const storeOptions = ref<OptionVO[]>([]);
 const submitLoading = ref(false);
+
+const DEFAULT_DIAGNOSIS_CATEGORY_ID = '001';
+const DEFAULT_STORE_SCOPE = '0';
+const DEFAULT_CURRENT_DATE_RANGE = ['2026-04-01', '2026-04-30'];
+const DEFAULT_COMPARE_DATE_RANGE = ['2026-03-01', '2026-03-30'];
 
 const form = reactive<DiagnosisForm>({
   categoryId: undefined,
@@ -133,6 +141,27 @@ const rules: FormRules<DiagnosisForm> = {
 };
 
 const normalizeText = (value?: string | number | null) => String(value ?? '').trim();
+
+const firstRouteQueryValue = (...keys: string[]) => {
+  for (const key of keys) {
+    const rawValue = route.query[key];
+    const value = Array.isArray(rawValue) ? rawValue[0] : rawValue;
+    const text = normalizeText(value as string | number | null);
+    if (text) return text;
+  }
+  return '';
+};
+
+const resolveRouteStoreScope = () => {
+  const storeNo = firstRouteQueryValue('storeNo', 'storeScope');
+  return storeNo || DEFAULT_STORE_SCOPE;
+};
+
+const resolveRouteDateRange = (startKeys: string[], endKeys: string[], fallback: string[]) => {
+  const start = firstRouteQueryValue(...startKeys);
+  const end = firstRouteQueryValue(...endKeys);
+  return start && end ? [start, end] : [...fallback];
+};
 
 const normalizeLevel = (value?: string | number | null): number | undefined => {
   const level = Number(value);
@@ -290,6 +319,16 @@ const initOptions = async () => {
   await Promise.all([classTreeRequest.run(undefined as never), storeRequest.run(undefined as never)]);
 };
 
+const applyInitialFormValues = () => {
+  const routeCategoryId = firstRouteQueryValue('categoryId', 'classNo', 'classNos');
+  const defaultCategory = findCategoryOption(routeCategoryId || DEFAULT_DIAGNOSIS_CATEGORY_ID, categoryTreeOptions.value);
+  const fallbackCategory = categoryTreeOptions.value[0];
+  form.categoryId = defaultCategory?.value || fallbackCategory?.value;
+  form.storeScope = resolveRouteStoreScope();
+  form.currentDateRange = resolveRouteDateRange(['currentStartDate', 'startDate', 'periodStart'], ['currentEndDate', 'endDate', 'periodEnd'], DEFAULT_CURRENT_DATE_RANGE);
+  form.compareDateRange = resolveRouteDateRange(['compareStartDate', 'compareStart'], ['compareEndDate', 'compareEnd'], DEFAULT_COMPARE_DATE_RANGE);
+};
+
 const isCategoryActive = (data: CategoryTreeOption) => String(form.categoryId || '') === String(data.value);
 
 const handleHistory = () => {
@@ -352,13 +391,17 @@ const handleSubmit = async () => {
 };
 
 onMounted(() => {
-  initOptions();
+  initOptions().then(() => {
+    applyInitialFormValues();
+  });
 });
 </script>
 
 <style scoped lang="scss">
 .category-diagnosis-page {
-  background: #f5f7fa;
+  background:
+    radial-gradient(circle at 12% 6%, rgba(249, 115, 22, 0.1), transparent 28%),
+    linear-gradient(180deg, #fffaf5 0%, #f6f7fb 42%, #f5f7fa 100%);
   min-height: calc(100vh - 84px);
 }
 
@@ -367,42 +410,98 @@ onMounted(() => {
 }
 
 .feature-card {
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 86% 16%, rgba(251, 146, 60, 0.18), transparent 30%),
+    linear-gradient(180deg, #ffffff 0%, #fffaf5 100%);
+  border: 1px solid #fed7aa;
+  box-shadow: 0 12px 30px rgba(154, 52, 18, 0.08);
   text-align: center;
   min-height: 220px;
   display: flex;
   align-items: center;
   justify-content: center;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
 }
 
-.feature-image {
-  width: 100px;
-  height: 100px;
-  object-fit: contain;
-  margin: 4px auto 14px;
-  display: block;
+.feature-card:hover {
+  transform: translateY(-3px);
+  border-color: #fb923c;
+  box-shadow: 0 18px 42px rgba(249, 115, 22, 0.16);
+}
+
+.feature-card :deep(.el-card__body) {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.feature-icon-wrap {
+  width: 76px;
+  height: 76px;
+  margin: 0 auto 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 26px;
+  background:
+    linear-gradient(135deg, rgba(255, 237, 213, 0.96), rgba(255, 247, 237, 0.96)),
+    #fff7ed;
+  border: 1px solid rgba(251, 146, 60, 0.34);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 14px 28px rgba(249, 115, 22, 0.18);
+}
+
+.feature-icon {
+  font-size: 38px;
+  color: #f97316;
+}
+
+.feature-corner {
+  position: absolute;
+  right: -24px;
+  bottom: -24px;
+  width: 92px;
+  height: 92px;
+  border-radius: 999px;
+  background: rgba(249, 115, 22, 0.08);
 }
 
 .feature-title {
   font-size: 18px;
   font-weight: 700;
-  color: #111827;
+  color: #7c2d12;
   margin-bottom: 8px;
 }
 
 .feature-subtitle {
   font-size: 14px;
   font-weight: 400;
-  color: #111827;
+  color: #9a3412;
   line-height: 1.4;
 }
 
 .diagnosis-card {
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid #fed7aa;
+  box-shadow: 0 14px 32px rgba(154, 52, 18, 0.08);
+}
+
+.diagnosis-card :deep(.el-card__header) {
+  background: linear-gradient(90deg, #fff7ed 0%, #ffffff 100%);
+  border-bottom-color: #ffedd5;
 }
 
 .diagnosis-header {
@@ -413,8 +512,22 @@ onMounted(() => {
 
 .diagnosis-title {
   font-size: 16px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
+  font-weight: 800;
+  color: #7c2d12;
+}
+
+.history-btn {
+  border-radius: 999px;
+  color: #f97316;
+  border-color: #fdba74;
+  background: #fff7ed;
+}
+
+.history-btn:hover,
+.history-btn:focus {
+  color: #fff;
+  border-color: #f97316;
+  background: #f97316;
 }
 
 .diagnosis-form {
@@ -430,7 +543,8 @@ onMounted(() => {
 
 .diagnosis-form :deep(.el-form-item__label) {
   text-align: left;
-  color: #111827;
+  color: #7c2d12;
+  font-weight: 700;
 }
 
 .diagnosis-form :deep(.el-form-item__content) {
@@ -445,6 +559,15 @@ onMounted(() => {
 .full-input :deep(.el-input__wrapper),
 .full-input :deep(.el-range-editor.el-input__wrapper) {
   min-height: 40px;
+  border-radius: 10px;
+  box-shadow: 0 0 0 1px #e5e7eb inset;
+}
+
+.full-input :deep(.el-input__wrapper:hover),
+.full-input :deep(.el-range-editor.el-input__wrapper:hover),
+.full-input :deep(.el-input__wrapper.is-focus),
+.full-input :deep(.el-range-editor.el-input__wrapper.is-focus) {
+  box-shadow: 0 0 0 1px #f97316 inset;
 }
 
 .category-cascader :deep(.el-input__wrapper) {
@@ -525,11 +648,11 @@ onMounted(() => {
 }
 
 .category-radio-outer.active {
-  border-color: #20b2aa;
+  border-color: #f97316;
 }
 
 .category-radio-outer.active .category-radio-inner {
-  background: #20b2aa;
+  background: #f97316;
 }
 
 .category-option-label {
@@ -537,7 +660,7 @@ onMounted(() => {
 }
 
 :deep(.category-cascader-popper .el-cascader-node.is-active .category-option-label) {
-  color: #20b2aa;
+  color: #f97316;
   font-weight: 700;
 }
 
@@ -546,17 +669,19 @@ onMounted(() => {
   text-align: center;
 }
 
-.submit-wrap :deep(.el-button--success) {
+.submit-btn {
   min-width: 160px;
-  border-radius: 8px;
-  background: #20b2aa;
-  border-color: #20b2aa;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #ff8a1c 0%, #f97316 50%, #ea580c 100%);
+  border-color: #f97316;
+  box-shadow: 0 12px 28px rgba(249, 115, 22, 0.22);
 }
 
-.submit-wrap :deep(.el-button--success:hover),
-.submit-wrap :deep(.el-button--success:focus) {
-  background: #1ca29b;
-  border-color: #1ca29b;
+.submit-btn:hover,
+.submit-btn:focus {
+  background: linear-gradient(135deg, #fb923c 0%, #f97316 50%, #c2410c 100%);
+  border-color: #ea580c;
+  transform: translateY(-1px);
 }
 
 @media (max-width: 992px) {

@@ -1,5 +1,6 @@
 import axios, { AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 import { useUserStore } from '@/store/modules/user';
+import { useTagsViewStore } from '@/store/modules/tagsView';
 import { getToken } from '@/utils/auth';
 import { tansParams, blobValidate } from '@/utils/ruoyi';
 import cache from '@/plugins/cache';
@@ -16,6 +17,45 @@ const encryptHeader = 'encrypt-key';
 let downloadLoadingInstance: LoadingInstance;
 // 是否显示重新登录
 export const isRelogin = { show: false };
+let authFailurePromise: Promise<void> | null = null;
+
+const handleAuthFailure = async (message = '登录状态已失效，请重新登录') => {
+  if (authFailurePromise) {
+    return authFailurePromise;
+  }
+
+  authFailurePromise = (async () => {
+    isRelogin.show = true;
+
+    ElMessage.closeAll();
+    ElMessage({ message, type: 'error', duration: 3000 });
+
+    const currentFullPath = router.currentRoute.value.fullPath || '/';
+    const redirect = encodeURIComponent(currentFullPath);
+
+    useUserStore().clearAuth();
+    await useTagsViewStore().clearAllViews();
+
+    if (router.currentRoute.value.path !== '/login') {
+      await router
+        .replace({
+          path: '/login',
+          query: { redirect }
+        })
+        .catch(() => undefined);
+    }
+
+    if (router.currentRoute.value.path !== '/login') {
+      window.location.replace(`/login?redirect=${redirect}`);
+    }
+
+    isRelogin.show = false;
+  })().finally(() => {
+    authFailurePromise = null;
+  });
+
+  return authFailurePromise;
+};
 export const globalHeaders = () => {
   return {
     Authorization: 'Bearer ' + getToken(),
@@ -124,34 +164,13 @@ service.interceptors.response.use(
     const code = Number(res.data.code ?? HttpStatus.SUCCESS);
     const isSuccess = code === 0 || code === HttpStatus.SUCCESS;
     // 获取错误信息
-    const msg = errorCode[code] || res.data.msg || errorCode['default'];
+    const msg = errorCode[code] || res.data.msg || res.data.message || errorCode['default'];
     // 二进制数据则直接返回
     if (res.request.responseType === 'blob' || res.request.responseType === 'arraybuffer') {
       return res.data;
     }
-    if (code === 401) {
-      // prettier-ignore
-      if (!isRelogin.show) {
-        isRelogin.show = true;
-        ElMessageBox.confirm('登录状态已过期，您可以继续留在该页面，或者重新登录', '系统提示', {
-          confirmButtonText: '重新登录',
-          cancelButtonText: '取消',
-          type: 'warning'
-        }).then(() => {
-          isRelogin.show = false;
-          useUserStore().logout().then(() => {
-            router.replace({
-              path: '/login',
-              query: {
-                redirect: encodeURIComponent(router.currentRoute.value.fullPath || '/')
-              }
-            })
-          });
-        }).catch(() => {
-          isRelogin.show = false;
-        });
-      }
-      return Promise.reject('无效的会话，或者会话已过期，请重新登录。');
+    if (code === HttpStatus.UNAUTHORIZED) {
+      return handleAuthFailure(msg).then(() => Promise.reject('无效的会话，或者会话已过期，请重新登录。'));
     } else if (code === HttpStatus.SERVER_ERROR) {
       ElMessage({ message: msg, type: 'error' });
       return Promise.reject(new Error(msg));
@@ -159,20 +178,38 @@ service.interceptors.response.use(
       ElMessage({ message: msg, type: 'warning' });
       return Promise.reject(new Error(msg));
     } else if (!isSuccess) {
+      const error: any = new Error(msg);
+      error.response = res;
+      error.data = res.data;
+      error.code = res.data.code;
+      error.message = msg;
       ElNotification.error({ title: msg });
-      return Promise.reject('error');
+      return Promise.reject(error);
     } else {
       return Promise.resolve(res.data);
     }
   },
   (error: any) => {
     let { message } = error;
+    const responseData = error?.response?.data;
+    const responseStatus = Number(error?.response?.status);
+    const responseCode = Number(responseData?.code);
+    const isRecoverableDiagnosisSessionError =
+      responseData?.code === 'DIAG-400' &&
+      String(responseData?.message || responseData?.msg || '').includes('session not found or expired') &&
+      String(error?.config?.url || '').includes('/api/v1/diagnosis/sessions/');
+    if (responseStatus === HttpStatus.UNAUTHORIZED || responseCode === HttpStatus.UNAUTHORIZED) {
+      return handleAuthFailure(responseData?.message || responseData?.msg || errorCode[HttpStatus.UNAUTHORIZED]).then(() => Promise.reject(error));
+    }
     if (message == 'Network Error') {
       message = '后端接口连接异常';
     } else if (message.includes('timeout')) {
       message = '系统接口请求超时';
     } else if (message.includes('Request failed with status code')) {
-      message = '系统接口' + message.substr(message.length - 3) + '异常';
+      message = responseData?.message || responseData?.msg || '系统接口' + message.substr(message.length - 3) + '异常';
+    }
+    if (isRecoverableDiagnosisSessionError) {
+      return Promise.reject(error);
     }
     ElMessage({ message: message, type: 'error', duration: 5 * 1000 });
     return Promise.reject(error);

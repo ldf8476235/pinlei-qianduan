@@ -33,10 +33,6 @@ const getBreadcrumb = () => {
   } else {
     matched = route.matched.filter((item) => item.meta && item.meta.title);
   }
-  // 判断是否为首页
-  if (!isDashboard(matched[0])) {
-    matched = [{ path: '/index', meta: { title: '首页' } }].concat(matched);
-  }
   levelList.value = matched.filter((item) => item.meta && item.meta.title && item.meta.breadcrumb !== false);
 };
 const findPathNum = (str, char = '/') => {
@@ -52,13 +48,6 @@ const getMatched = (pathList, routeList, matched) => {
       getMatched(pathList, data.children, matched);
     }
   }
-};
-const isDashboard = (route: RouteLocationMatched) => {
-  const name = route && (route.name as string);
-  if (!name) {
-    return false;
-  }
-  return name.trim() === 'Index';
 };
 const handleLink = (item) => {
   const { redirect, path } = item;

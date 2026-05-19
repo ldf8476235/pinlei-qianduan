@@ -35,7 +35,7 @@
           </el-select>
         </el-form-item>
 
-        <el-form-item label="本期四象限">
+        <el-form-item label="本期GMROI角色">
           <el-select v-model="queryForm.currentGmroi" clearable placeholder="全部" style="width: 160px" @change="handleQuery">
             <el-option label="全部" value="" />
             <el-option label="成功商品" value="1" />
@@ -45,7 +45,7 @@
           </el-select>
         </el-form-item>
 
-        <el-form-item label="对比日期四象限">
+        <el-form-item label="对比期GMROI角色">
           <el-select v-model="queryForm.compareGmroi" clearable placeholder="全部" style="width: 180px" @change="handleQuery">
             <el-option label="全部" value="" />
             <el-option label="成功商品" value="1" />
@@ -71,7 +71,7 @@
       <template #header>
         <div class="card-header">
           <div class="card-title-wrap">
-            <span class="card-title">品类毛利贡献率商品清单</span>
+            <span class="card-title">GMROI商品清单</span>
           </div>
           <div class="card-actions">
             <span class="unit-text">*金额单位：元</span>
@@ -87,6 +87,7 @@
         stripe
         height="560"
         class="goods-table"
+        :empty-text="tableError || '暂无GMROI商品明细数据'"
         @sort-change="handleSortChange"
       >
         <el-table-column label="商品编码" prop="productNo" min-width="130" fixed="left" align="left" sortable="custom" show-overflow-tooltip />
@@ -111,7 +112,15 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="GMROI角色" align="center">
+        <el-table-column align="center">
+          <template #header>
+            <span class="metric-header">
+              GMROI角色
+              <el-tooltip content="按毛利率和库存周转率判定，与毛利贡献角色口径不同" placement="top">
+                <el-icon class="metric-help-icon"><QuestionFilled /></el-icon>
+              </el-tooltip>
+            </span>
+          </template>
           <el-table-column label="GMROI角色-本期" prop="currentGmroiRoleName" min-width="130" align="left" sortable="custom" show-overflow-tooltip>
             <template #default="{ row }">
               <span :class="['role-badge', `is-${resolveRoleClass(row.currentGmroiRole)}`]">
@@ -211,8 +220,8 @@
           layout="total, sizes, prev, pager, next, jumper"
           :page-sizes="[5, 10, 20, 50]"
           :total="total"
-          @size-change="handleQuery"
-          @current-change="handleQuery"
+          @size-change="handleSizeChange"
+          @current-change="handlePageChange"
         />
       </div>
     </el-card>
@@ -222,6 +231,7 @@
 
 <script setup lang="ts">
 import type { Sort } from 'element-plus';
+import { QuestionFilled } from '@element-plus/icons-vue';
 import { getGmroiSalesList } from '@/api/gmroi';
 import type { GmroiSalesListItemVO } from '@/api/gmroi/types';
 
@@ -240,6 +250,16 @@ const sessionId = computed(() => String(route.query.sessionId || ''));
 const resolveQueryValue = (value: string | string[] | null | undefined, fallback: string) => {
   if (Array.isArray(value)) return String(value[0] || fallback);
   return String(value || fallback);
+};
+
+const resolveQueryList = (value: unknown, fallback: string[]) => {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item)).filter(Boolean);
+  }
+  if (typeof value === 'string' && value) {
+    return value.split(',').map((item) => item.trim()).filter(Boolean);
+  }
+  return [...fallback];
 };
 
 const currentDateRangeText = computed(() => {
@@ -272,9 +292,9 @@ const categoryTitle = computed(() => {
 const queryForm = reactive({
   status: ['-1', '0', '1'] as string[],
   promotion: '',
-  currentGmroi: '',
-  compareGmroi: '',
-  gmroiRanges: ['0'] as string[],
+  currentGmroi: resolveQueryValue(route.query.currentGmroi as string | string[] | null | undefined, ''),
+  compareGmroi: resolveQueryValue(route.query.compareGmroi as string | string[] | null | undefined, ''),
+  gmroiRanges: resolveQueryList(route.query.gmroiList, ['0']),
   pageNum: 1,
   pageSize: 10
 });
@@ -285,6 +305,7 @@ const sortState = reactive<{ prop: string; order: SortOrder }>({
 });
 
 const tableLoading = ref(false);
+const tableError = ref('');
 const total = ref(0);
 const tableRows = ref<GoodsRow[]>([]);
 const loadTableList = async () => {
@@ -293,10 +314,9 @@ const loadTableList = async () => {
     return;
   }
   tableLoading.value = true;
+  tableError.value = '';
   try {
-    const statusList = queryForm.status.includes('-1')
-      ? queryForm.status.filter((item) => item !== '-1')
-      : queryForm.status;
+    const statusList = queryForm.status.includes('-1') ? [] : queryForm.status;
     const res = await getGmroiSalesList({
       sessionId: sessionId.value,
       status: statusList.length ? statusList : undefined,
@@ -312,12 +332,27 @@ const loadTableList = async () => {
     const page = (res as any)?.result || (res as any)?.data?.result || {};
     tableRows.value = Array.isArray(page.records) ? page.records : [];
     total.value = Number(page.total || 0);
+  } catch (error: any) {
+    tableRows.value = [];
+    total.value = 0;
+    tableError.value = error?.message || 'GMROI商品明细加载失败';
   } finally {
     tableLoading.value = false;
   }
 };
 
 const handleQuery = async () => {
+  queryForm.pageNum = 1;
+  await loadTableList();
+};
+
+const handlePageChange = async (page: number) => {
+  queryForm.pageNum = page;
+  await loadTableList();
+};
+
+const handleSizeChange = async (size: number) => {
+  queryForm.pageSize = size;
   queryForm.pageNum = 1;
   await loadTableList();
 };
@@ -499,6 +534,19 @@ onMounted(async () => {
 
 .goods-table :deep(.cell) {
   text-align: center;
+}
+
+.metric-header {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.metric-help-icon {
+  color: #94a3b8;
+  cursor: help;
+  font-size: 15px;
 }
 
 .goods-table :deep(.el-table__body tr:nth-child(2n)) td {

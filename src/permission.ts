@@ -8,10 +8,9 @@ import { isRelogin } from '@/utils/request';
 import { useUserStore } from '@/store/modules/user';
 import { useSettingsStore } from '@/store/modules/settings';
 import { usePermissionStore } from '@/store/modules/permission';
-import { ElMessage } from 'element-plus/es';
 
 NProgress.configure({ showSpinner: false });
-const whiteList = ['/login', '/register', '/social-callback', '/register*', '/register/*'];
+const whiteList = ['/login', '/social-callback'];
 
 const isWhiteList = (path: string) => {
   return whiteList.some((pattern) => isPathMatch(pattern, path));
@@ -33,9 +32,9 @@ router.beforeEach(async (to, from, next) => {
         // 判断当前用户是否已拉取完user_info信息
         const [err] = await tos(useUserStore().getInfo());
         if (err) {
-          await useUserStore().logout();
-          ElMessage.error(err);
-          next({ path: '/' });
+          useUserStore().clearAuth();
+          const redirect = encodeURIComponent(to.fullPath || '/');
+          next(`/login?redirect=${redirect}`);
         } else {
           isRelogin.show = false;
           const accessRoutes = await usePermissionStore().generateRoutes();

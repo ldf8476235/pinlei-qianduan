@@ -68,6 +68,7 @@ export interface CategorySalesChartItemVO {
   categoryName: string;
   growthRate: number;
   salesAmount: number;
+  compareSalesAmount?: number;
 }
 
 export interface CategoryCheckSalesQuery extends CategoryCheckQuery, PageQuery {}

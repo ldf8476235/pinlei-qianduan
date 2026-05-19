@@ -8,10 +8,6 @@
             <span class="page-title">GMROI(年毛利回报率)分析</span>
             <el-button link type="primary" class="detail-link" @click="handleViewDetail">详情 &gt;</el-button>
           </div>
-          <div class="page-subtitle">
-            <span>sessionId: {{ sessionId || '--' }}</span>
-            <span v-if="statusState?.dataVersion">版本: {{ statusState.dataVersion }}</span>
-          </div>
         </div>
         <div class="page-actions">
           <span class="unit-text">金额单位：元</span>
@@ -40,7 +36,15 @@
               <span class="card-title">本期GMROI四象限图</span>
             </div>
           </template>
-          <div ref="scatterChartRef" class="chart-box large-chart" />
+          <div class="gmroi-scatter-chart-wrap">
+            <div ref="scatterChartRef" class="chart-box large-chart" />
+            <div v-if="quadrantTooltip.visible" class="gmroi-quadrant-tooltip" :style="{ left: `${quadrantTooltip.x}px`, top: `${quadrantTooltip.y}px` }">
+              <div class="gmroi-quadrant-tooltip-title">{{ quadrantTooltip.title }}</div>
+              <ul class="gmroi-quadrant-tooltip-list">
+                <li v-for="item in quadrantTooltip.items" :key="item">{{ item }}</li>
+              </ul>
+            </div>
+          </div>
         </el-card>
       </el-col>
       <el-col :lg="10" :md="24" :sm="24" :xs="24">
@@ -60,9 +64,19 @@
           </template>
           <el-table :data="changeRows" border class="change-table">
             <el-table-column label="对比日期" prop="label" min-width="170" align="center" />
-            <el-table-column label="沉睡商品" prop="sleep" min-width="110" align="center" />
-            <el-table-column label="吸客商品" prop="attract" min-width="110" align="center" />
-            <el-table-column label="问题商品" prop="problem" min-width="110" align="center" />
+            <el-table-column v-for="column in changeColumns" :key="column.key" :label="column.label" :prop="column.key" min-width="110" align="center">
+              <template #default="{ row }">
+                <el-button
+                  link
+                  type="primary"
+                  class="change-count-link"
+                  :disabled="!isChangeCellClickable(row, column)"
+                  @click="handleChangeCellClick(row, column)"
+                >
+                  {{ formatInteger(row[column.key]) }}
+                </el-button>
+              </template>
+            </el-table-column>
           </el-table>
         </el-card>
       </el-col>
@@ -74,7 +88,17 @@
           <span class="card-title">四象限SKU占比变化统计</span>
         </div>
       </template>
-      <div ref="barChartRef" class="chart-box medium-chart" />
+      <div class="gmroi-bar-chart-wrap" @mousemove="handleBarTooltipMousemove" @mouseleave="hideBarTooltip">
+        <div ref="barChartRef" class="chart-box medium-chart" />
+        <div v-if="barTooltip.visible" class="gmroi-bar-tooltip" :style="{ left: `${barTooltip.x}px`, top: `${barTooltip.y}px` }">
+          <div class="gmroi-bar-tooltip-title">{{ barTooltip.title }}</div>
+          <div v-for="item in barTooltip.rows" :key="item.name" class="gmroi-bar-tooltip-row">
+            <span class="gmroi-bar-tooltip-dot" :style="{ background: item.color }" />
+            <span class="gmroi-bar-tooltip-name">{{ item.name }}</span>
+            <span class="gmroi-bar-tooltip-value">{{ item.value }}</span>
+          </div>
+        </div>
+      </div>
     </el-card>
 
     <el-card shadow="hover" class="page-card summary-card">
@@ -149,15 +173,57 @@ const skuNumState = ref<GmroiSkuNumState>({});
 const skuPerState = ref<GmroiSkuPerState>({});
 const skuChangeState = ref<GmroiSkuChangeState>({});
 const loading = ref(false);
+const barTooltip = reactive({
+  visible: false,
+  x: 0,
+  y: 0,
+  title: '',
+  rows: [] as Array<{ name: string; value: string; color: string }>
+});
+const quadrantTooltip = reactive({
+  visible: false,
+  x: 0,
+  y: 0,
+  title: '',
+  items: [] as string[]
+});
 
 const sessionReady = computed(() => Boolean(statusState.value?.ready));
 
-const quadrantPointColor = '#21b7a8';
+const quadrantPointColor = '#f97316';
 const quadrantLabels = [
-  { text: '沉睡商品\n(高毛低周转)', x: '18%', y: '12%' },
-  { text: '成功商品\n(高毛高周转)', x: '68%', y: '12%' },
-  { text: '问题商品\n(低毛低周转)', x: '18%', y: '72%' },
-  { text: '吸客商品\n(低毛高周转)', x: '68%', y: '72%' }
+  {
+    id: 'sleep',
+    text: '沉睡商品\n(高毛低周转)',
+    title: '沉睡商品(高毛低周转)',
+    x: '18%',
+    y: '12%',
+    tips: ['核查定价', '核查陈列', '增加促销', '增加关联销售']
+  },
+  {
+    id: 'success',
+    text: '成功商品\n(高毛高周转)',
+    title: '成功商品(高毛高周转)',
+    x: '68%',
+    y: '12%',
+    tips: ['保持销售优势', '维持重点陈列', '稳定库存供给', '关注竞争变化']
+  },
+  {
+    id: 'problem',
+    text: '问题商品\n(低毛低周转)',
+    title: '问题商品(低毛低周转)',
+    x: '18%',
+    y: '72%',
+    tips: ['核查定价', '核查陈列', '减少补货', '末位淘汰出局']
+  },
+  {
+    id: 'attract',
+    text: '吸客商品\n(低毛高周转)',
+    title: '吸客商品(低毛高周转)',
+    x: '68%',
+    y: '72%',
+    tips: ['核查定价', '优化毛利', '控制促销力度', '增加关联销售']
+  }
 ];
 
 const pieItems = computed(() => [
@@ -170,11 +236,18 @@ const pieItems = computed(() => [
 const changeRows = computed(() => [
   {
     label: '成功商品(对比日期)',
+    compareGmroi: '1',
     sleep: Number(skuChangeState.value.sku_2 || 0),
     attract: Number(skuChangeState.value.sku_4 || 0),
     problem: Number(skuChangeState.value.sku_3 || 0)
   }
 ]);
+
+const changeColumns = [
+  { key: 'sleep', label: '沉睡商品', currentGmroi: '2' },
+  { key: 'attract', label: '吸客商品', currentGmroi: '4' },
+  { key: 'problem', label: '问题商品', currentGmroi: '3' }
+] as const;
 
 const barSeriesData = computed(() => [
   { name: '成功商品', color: '#21b7a8', data: [Number(skuPerState.value.currentSkuPer_1 || 0), Number(skuPerState.value.compareSkuPer_1 || 0)] },
@@ -190,8 +263,59 @@ const formatInteger = (value: unknown) => {
 
 const formatPercent = (value: unknown) => `${Number(value || 0).toFixed(2)}%`;
 
+const hideBarTooltip = () => {
+  barTooltip.visible = false;
+};
+
+const hideQuadrantTooltip = () => {
+  quadrantTooltip.visible = false;
+};
+
+const showQuadrantTooltip = (event: any, item: (typeof quadrantLabels)[number]) => {
+  const chartWidth = scatterChartRef.value?.clientWidth || 0;
+  const chartHeight = scatterChartRef.value?.clientHeight || 0;
+  const tooltipWidth = 188;
+  const tooltipHeight = 168;
+  const offsetX = Number(event?.event?.offsetX ?? 0);
+  const offsetY = Number(event?.event?.offsetY ?? 0);
+
+  quadrantTooltip.visible = true;
+  quadrantTooltip.title = item.title;
+  quadrantTooltip.items = item.tips;
+  quadrantTooltip.x = Math.min(Math.max(12, offsetX + 14), Math.max(12, chartWidth - tooltipWidth - 12));
+  quadrantTooltip.y = Math.min(Math.max(12, offsetY + 14), Math.max(12, chartHeight - tooltipHeight - 12));
+};
+
+const handleBarTooltipMousemove = (event: MouseEvent) => {
+  const wrap = event.currentTarget as HTMLElement;
+  const rect = wrap.getBoundingClientRect();
+  const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / Math.max(rect.width, 1)));
+  const dataIndex = ratio < 0.5 ? 0 : 1;
+  const tooltipWidth = 220;
+  const tooltipHeight = 170;
+
+  barTooltip.visible = true;
+  barTooltip.title = dataIndex === 0 ? '本期' : '对比日期';
+  barTooltip.rows = barSeriesData.value.map((item) => ({
+    name: item.name,
+    value: formatPercent(item.data[dataIndex]),
+    color: item.color
+  }));
+  barTooltip.x = Math.min(Math.max(12, event.clientX - rect.left + 14), Math.max(12, rect.width - tooltipWidth - 12));
+  barTooltip.y = Math.min(Math.max(12, event.clientY - rect.top - 86), Math.max(12, rect.height - tooltipHeight - 12));
+};
+
 const formatPointLabel = (item: GmroiQuadrantItemVO) => {
   return item.productName || item.productNo || '--';
+};
+
+const resolveAxisRange = (values: number[], center: number) => {
+  const finiteValues = values.filter((value) => Number.isFinite(value));
+  const maxValue = Math.max(0, center, ...finiteValues);
+  return {
+    min: 0,
+    max: Math.max(1, Number((maxValue * 1.12).toFixed(2)))
+  };
 };
 
 const renderScatter = () => {
@@ -200,16 +324,22 @@ const renderScatter = () => {
   const points = (quadrantState.value.list || []).map((item) => [Number(item.turnoverRate || 0), Number(item.grossRate || 0), formatPointLabel(item)]);
   const xCenter = Number(quadrantState.value.turnoverRate || 0);
   const yCenter = Number(quadrantState.value.grossRate || 0);
+  const xRange = resolveAxisRange(points.map((item) => Number(item[0])), xCenter);
   scatterChartIns.value.setOption(
     {
       tooltip: {
         trigger: 'item',
+        appendToBody: true,
+        confine: false,
         formatter: (params: any) => `${params.data[2]}<br/>年库存周转率：${Number(params.data[0] || 0).toFixed(2)}<br/>毛利率%：${Number(params.data[1] || 0).toFixed(2)}`
       },
       grid: { left: 56, right: 30, top: 46, bottom: 48 },
       xAxis: {
         type: 'value',
         name: '年库存周转率',
+        min: xRange.min,
+        max: xRange.max,
+        splitNumber: 5,
         splitLine: { lineStyle: { color: '#e5e7eb', type: 'dashed' } },
         axisLine: { lineStyle: { color: '#cbd5e1' } },
         axisTick: { show: false }
@@ -222,9 +352,14 @@ const renderScatter = () => {
         axisTick: { show: false }
       },
       graphic: quadrantLabels.map((item) => ({
+        id: `gmroi-quadrant-${item.id}`,
         type: 'text',
         left: item.x,
         top: item.y,
+        cursor: 'help',
+        z: 10,
+        onmousemove: (event: any) => showQuadrantTooltip(event, item),
+        onmouseout: hideQuadrantTooltip,
         style: {
           text: item.text,
           fill: '#64748b',
@@ -238,7 +373,15 @@ const renderScatter = () => {
         {
           type: 'scatter',
           symbolSize: 12,
-          itemStyle: { color: quadrantPointColor },
+          itemStyle: { color: quadrantPointColor, opacity: 0.72 },
+          emphasis: {
+            itemStyle: {
+              color: '#ea580c',
+              opacity: 0.95,
+              borderColor: '#ffedd5',
+              borderWidth: 2
+            }
+          },
           data: points,
           markLine: {
             silent: true,
@@ -258,7 +401,7 @@ const renderPie = () => {
   pieChartIns.value ||= echarts.init(pieChartRef.value);
   pieChartIns.value.setOption(
     {
-      tooltip: { trigger: 'item', formatter: (params: any) => `${params.name}<br/>SKU：${formatInteger(params.value)}` },
+      tooltip: { trigger: 'item', appendToBody: true, confine: false, formatter: (params: any) => `${params.name}<br/>SKU：${formatInteger(params.value)}` },
       legend: { bottom: 0, icon: 'circle', itemWidth: 10, itemHeight: 10 },
       color: pieItems.value.map((item) => item.color),
       series: [
@@ -282,7 +425,7 @@ const renderBar = () => {
   barChartIns.value ||= echarts.init(barChartRef.value);
   barChartIns.value.setOption(
     {
-      tooltip: { trigger: 'axis' },
+      tooltip: { show: false },
       legend: { top: 0, icon: 'roundRect' },
       grid: { left: 48, right: 24, top: 48, bottom: 30 },
       xAxis: { type: 'category', data: ['本期', '对比日期'] },
@@ -332,8 +475,31 @@ const loadData = async () => {
   }
 };
 
+const goGmroiDetail = (extraQuery: Record<string, string> = {}) => {
+  if (!sessionId.value) {
+    ElMessage.error('缺少 sessionId，无法查看 GMROI 商品明细');
+    return;
+  }
+  router.push({ path: '/gmroi/analysis/detail', query: { ...route.query, ...extraQuery } });
+};
+
 const handleViewDetail = () => {
-  router.push({ path: '/gmroi/analysis/detail', query: { ...route.query } });
+  goGmroiDetail();
+};
+
+const isChangeCellClickable = (row: Record<string, unknown>, column: (typeof changeColumns)[number]) => {
+  const value = Number(row[column.key] || 0);
+  return Number.isFinite(value) && value > 0;
+};
+
+const handleChangeCellClick = (row: Record<string, unknown>, column: (typeof changeColumns)[number]) => {
+  if (!isChangeCellClickable(row, column)) {
+    return;
+  }
+  goGmroiDetail({
+    compareGmroi: String(row.compareGmroi || '1'),
+    currentGmroi: column.currentGmroi
+  });
 };
 
 const handleExport = () => {
@@ -445,6 +611,10 @@ onBeforeUnmount(() => {
   width: 100%;
 }
 
+.gmroi-scatter-chart-wrap {
+  position: relative;
+}
+
 .large-chart {
   height: 500px;
 }
@@ -455,6 +625,79 @@ onBeforeUnmount(() => {
 
 .medium-chart {
   height: 360px;
+}
+
+.gmroi-bar-chart-wrap {
+  position: relative;
+}
+
+.gmroi-bar-tooltip {
+  position: absolute;
+  z-index: 20;
+  min-width: 208px;
+  padding: 14px 16px;
+  border: 1px solid rgba(229, 231, 235, 0.92);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.16);
+  color: #555;
+  pointer-events: none;
+}
+
+.gmroi-bar-tooltip-title {
+  margin-bottom: 8px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.gmroi-bar-tooltip-row {
+  display: grid;
+  grid-template-columns: 12px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 26px;
+  font-size: 14px;
+}
+
+.gmroi-bar-tooltip-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+}
+
+.gmroi-bar-tooltip-value {
+  font-weight: 700;
+  color: #666;
+}
+
+.gmroi-quadrant-tooltip {
+  position: absolute;
+  z-index: 30;
+  width: 176px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: rgba(76, 76, 76, 0.78);
+  box-shadow: 0 14px 32px rgb(15 23 42 / 18%);
+  color: #fff;
+  pointer-events: none;
+}
+
+.gmroi-quadrant-tooltip-title {
+  margin-bottom: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.gmroi-quadrant-tooltip-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.gmroi-quadrant-tooltip-list li::marker {
+  color: #fff;
 }
 
 .change-table :deep(.el-table__header th) {

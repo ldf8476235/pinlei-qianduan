@@ -144,6 +144,18 @@ export const useTagsViewStore = defineStore('tagsView', () => {
       resolve([...cachedViews.value]);
     });
   };
+  const clearAllViews = (): Promise<{ visitedViews: RouteLocationNormalized[]; cachedViews: string[]; iframeViews: RouteLocationNormalized[] }> => {
+    return new Promise((resolve) => {
+      visitedViews.value = [];
+      cachedViews.value = [];
+      iframeViews.value = [];
+      resolve({
+        visitedViews: [],
+        cachedViews: [],
+        iframeViews: []
+      });
+    });
+  };
 
   const updateVisitedView = (view: RouteLocationNormalized): void => {
     for (let v of visitedViews.value) {
@@ -225,6 +237,7 @@ export const useTagsViewStore = defineStore('tagsView', () => {
     delAllViews,
     delAllVisitedViews,
     delAllCachedViews,
+    clearAllViews,
     delOthersViews,
     delRightTags,
     delLeftTags,

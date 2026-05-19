@@ -24,7 +24,47 @@
               <span class="card-title">本期销售占比</span>
             </div>
           </template>
-          <div ref="pieChartRef" class="chart-box" />
+          <div class="pie-chart-panel">
+            <div class="vue-chart-tooltip-wrap" @mousemove="handlePieTooltipMousemove" @mouseleave="hidePieTooltip">
+              <div ref="pieChartRef" class="pie-chart-box" />
+              <div v-if="pieTooltip.visible" class="subclass-trend-tooltip" :style="{ left: `${pieTooltip.x}px`, top: `${pieTooltip.y}px` }">
+                <div class="tooltip-title">{{ pieTooltip.title }}</div>
+                <div v-for="item in pieTooltip.rows" :key="item.name" class="tooltip-row">
+                  <span class="tooltip-dot" :style="{ background: item.color }" />
+                  <span>{{ item.name }}：{{ item.value }}</span>
+                </div>
+              </div>
+            </div>
+            <div class="pie-legend-card" aria-label="本期销售占比图例">
+              <div class="pie-legend-list">
+                <div v-for="item in visiblePieLegendItems" :key="item.displayName" class="pie-legend-item">
+                  <span class="pie-legend-dot" :style="{ background: item.color }" />
+                  <span class="pie-legend-text">{{ item.displayName }}</span>
+                </div>
+              </div>
+              <div v-if="pieLegendTotalPages > 1" class="pie-legend-pager">
+                <button
+                  class="pie-legend-arrow"
+                  :class="{ 'is-disabled': pieLegendPage <= 1 }"
+                  type="button"
+                  aria-label="上一页图例"
+                  @click="handlePieLegendPrev"
+                >
+                  ▲
+                </button>
+                <span class="pie-legend-page">{{ pieLegendPage }}/{{ pieLegendTotalPages }}</span>
+                <button
+                  class="pie-legend-arrow"
+                  :class="{ 'is-disabled': pieLegendPage >= pieLegendTotalPages }"
+                  type="button"
+                  aria-label="下一页图例"
+                  @click="handlePieLegendNext"
+                >
+                  ▼
+                </button>
+              </div>
+            </div>
+          </div>
         </el-card>
       </el-col>
       <el-col :lg="12" :md="12" :sm="24" :xs="24">
@@ -34,7 +74,24 @@
               <span class="card-title">本期销售趋势</span>
             </div>
           </template>
-          <div ref="trendChartRef" class="chart-box" />
+          <div
+            class="subclass-trend-chart-wrap"
+            @mousemove="handleSubclassTrendMousemove"
+            @mouseleave="hideSubclassTrendTooltip"
+          >
+            <div ref="trendChartRef" class="chart-box" />
+            <div
+              v-if="customTrendTooltip.visible"
+              class="subclass-trend-tooltip"
+              :style="{ left: `${customTrendTooltip.x}px`, top: `${customTrendTooltip.y}px` }"
+            >
+              <div class="tooltip-title">{{ customTrendTooltip.title }}</div>
+              <div v-for="item in customTrendTooltip.rows" :key="item.name" class="tooltip-row">
+                <span class="tooltip-dot" :style="{ background: item.color }" />
+                <span>{{ item.name }}：{{ item.value }}</span>
+              </div>
+            </div>
+          </div>
         </el-card>
       </el-col>
     </el-row>
@@ -175,6 +232,7 @@ import * as echarts from 'echarts';
 import type { EChartsOption } from 'echarts';
 import { download } from '@/utils/request';
 import { useRequest } from '@/hooks/useRequest';
+import { createVueChartTooltip, getCategoryIndexByMouse, hideVueChartTooltip, showVueChartTooltip } from './useVueChartTooltip';
 import {
   getCategoryDiagnosisSubClassPie,
   getCategoryDiagnosisSubClassTable,
@@ -224,6 +282,16 @@ const colorMap: Record<string, string> = {
 const pieData = ref<PieChartItem[]>([]);
 const trendData = ref<LegacySubclassSalesTrendResponse>({ legend: [], xdata: [], lineDate: [] });
 const tableRows = ref<SubClassTableViewRow[]>([]);
+const pieLegendPage = ref(1);
+const pieLegendPageSize = 5;
+const pieTooltip = createVueChartTooltip();
+const customTrendTooltip = reactive({
+  visible: false,
+  x: 0,
+  y: 0,
+  title: '',
+  rows: [] as Array<{ name: string; value: string; color: string }>
+});
 
 const query = computed<DiagnosisSubClassQuery>(() => ({
   sessionId: (route.query.sessionId as string) || '',
@@ -242,6 +310,11 @@ const query = computed<DiagnosisSubClassQuery>(() => ({
 }));
 
 const sessionId = computed(() => query.value.sessionId || '');
+const pieLegendTotalPages = computed(() => Math.max(1, Math.ceil(pieData.value.length / pieLegendPageSize)));
+const visiblePieLegendItems = computed(() => {
+  const start = (pieLegendPage.value - 1) * pieLegendPageSize;
+  return pieData.value.slice(start, start + pieLegendPageSize);
+});
 
 const toNumber = (value: unknown, digits?: number) => {
   const num = Number(value ?? 0);
@@ -333,6 +406,7 @@ const buildRequestBody = (): LegacySubclassContributionRequest => ({
 const pieRequest = useRequest(async (body: LegacySubclassContributionRequest) => await getCategoryDiagnosisSubClassPie(body), {
   onSuccess: async (res) => {
     pieData.value = normalizePieData(res?.result);
+    pieLegendPage.value = 1;
     await nextTick();
     renderPieChart();
   }
@@ -371,23 +445,72 @@ const formatAmount = (value: unknown, digits = 2) => {
 const formatInteger = (value: unknown) => formatAmount(value, 0);
 const formatPercent = (value: unknown) => `${toNumber(value, 2).toFixed(2)}%`;
 
+const hidePieTooltip = () => {
+  hideVueChartTooltip(pieTooltip);
+};
+
+const hideSubclassTrendTooltip = () => {
+  customTrendTooltip.visible = false;
+};
+
+const handlePieTooltipMousemove = (event: MouseEvent) => {
+  if (!pieData.value.length || !pieChartRef.value || !pieChartIns.value) {
+    hidePieTooltip();
+    return;
+  }
+  const rect = pieChartRef.value.getBoundingClientRect();
+  const point = [event.clientX - rect.left, event.clientY - rect.top];
+  const index = pieData.value.findIndex((_, dataIndex) => pieChartIns.value?.containPixel({ seriesIndex: 0, dataIndex }, point));
+  if (index < 0) {
+    hidePieTooltip();
+    return;
+  }
+  const item = pieData.value[index];
+  showVueChartTooltip(
+    pieTooltip,
+    event,
+    item.displayName || '--',
+    [
+      { name: '销售额', value: formatAmount(item.salesAmount), color: item.color },
+      { name: '占比', value: formatPercent(item.salesShare), color: item.color }
+    ],
+    { width: 230, height: 96 }
+  );
+};
+
+const handleSubclassTrendMousemove = (event: MouseEvent) => {
+  const dates = trendData.value.xdata || [];
+  const series = trendSeries.value || [];
+  if (!dates.length || !series.length || !trendChartRef.value) {
+    hideSubclassTrendTooltip();
+    return;
+  }
+
+  const index = getCategoryIndexByMouse(event, trendChartRef.value, dates.length, { left: 56, right: 24 });
+  const rows = series.map((item) => ({
+    name: item.displayName || item.classNo || '--',
+    value: formatAmount(item.values[index]),
+    color: item.color
+  }));
+
+  customTrendTooltip.title = dates[index] || '--';
+  customTrendTooltip.rows = rows;
+  showVueChartTooltip(customTrendTooltip, event, dates[index] || '--', rows, { width: 260, height: 120 });
+};
+
 const renderPieChart = () => {
   initPieChart();
   if (!pieChartIns.value) return;
   const option: EChartsOption = {
     color: pieData.value.map((item) => item.color),
-    tooltip: {
-      trigger: 'item',
-      formatter: (params: any) =>
-        `${params.name}<br/>销售额：${formatAmount(params.value)}<br/>占比：${toNumber(params.percent, 2).toFixed(2)}%`
-    },
+    tooltip: { show: false },
     legend: { show: false },
     series: [
       {
         name: '本期销售占比',
         type: 'pie',
-        radius: ['52%', '72%'],
-        center: ['34%', '50%'],
+        radius: ['48%', '70%'],
+        center: ['42%', '50%'],
         label: { show: false },
         labelLine: { show: false },
         data: pieData.value.map((item) => ({
@@ -401,21 +524,22 @@ const renderPieChart = () => {
   pieChartIns.value.setOption(option, true);
 };
 
+const handlePieLegendPrev = () => {
+  if (pieLegendPage.value <= 1) return;
+  pieLegendPage.value -= 1;
+};
+
+const handlePieLegendNext = () => {
+  if (pieLegendPage.value >= pieLegendTotalPages.value) return;
+  pieLegendPage.value += 1;
+};
+
 const renderTrendChart = () => {
   initTrendChart();
   if (!trendChartIns.value) return;
   const option: EChartsOption = {
     color: trendSeries.value.map((item) => item.color),
-    tooltip: {
-      trigger: 'axis',
-      axisPointer: { type: 'line' },
-      formatter: (params: any) => {
-        const rows = Array.isArray(params) ? params : [params];
-        const title = rows[0]?.axisValueLabel || rows[0]?.axisValue || '';
-        const lines = rows.map((item) => `${item.marker}${item.seriesName}：${formatAmount(item.value)}`);
-        return [title, ...lines].join('<br/>');
-      }
-    },
+    tooltip: { show: false },
     legend: {
       top: 0,
       left: 'center',
@@ -602,6 +726,120 @@ onUnmounted(() => {
   width: 100%;
   height: 360px;
 }
+.pie-chart-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 230px;
+  align-items: center;
+  gap: 18px;
+  min-height: 360px;
+  padding: 8px 20px 8px 8px;
+}
+.pie-chart-box {
+  width: 100%;
+  height: 360px;
+}
+.vue-chart-tooltip-wrap {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+.pie-legend-card {
+  min-height: 210px;
+  padding: 26px 24px 18px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.pie-legend-list {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.pie-legend-item {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 12px;
+}
+.pie-legend-dot {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  border-radius: 999px;
+}
+.pie-legend-text {
+  min-width: 0;
+  overflow: hidden;
+  color: #2f3a45;
+  font-size: 15px;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pie-legend-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 18px;
+  color: #2f3a45;
+  font-size: 15px;
+}
+.pie-legend-arrow {
+  border: 0;
+  background: transparent;
+  color: #34495e;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.pie-legend-arrow:first-child {
+  color: #b7b7b7;
+}
+.pie-legend-arrow.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+.pie-legend-page {
+  min-width: 34px;
+  text-align: center;
+}
+.subclass-trend-chart-wrap {
+  position: relative;
+  width: 100%;
+  height: 360px;
+}
+.subclass-trend-tooltip {
+  position: absolute;
+  z-index: 20;
+  min-width: 220px;
+  max-width: 300px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(17, 24, 39, 0.94);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1.6;
+  pointer-events: none;
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.24);
+}
+.tooltip-title {
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 800;
+}
+.tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+.tooltip-dot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 999px;
+}
 .category-cell {
   display: flex;
   align-items: center;
@@ -689,6 +927,19 @@ onUnmounted(() => {
     justify-content: space-between;
   }
   .chart-box {
+    height: 320px;
+  }
+  .pie-chart-panel {
+    grid-template-columns: 1fr;
+    padding: 0;
+  }
+  .pie-chart-box {
+    height: 300px;
+  }
+  .pie-legend-card {
+    min-height: auto;
+  }
+  .subclass-trend-chart-wrap {
     height: 320px;
   }
 }

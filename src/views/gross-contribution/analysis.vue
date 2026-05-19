@@ -37,8 +37,36 @@
             </div>
           </template>
           <div class="stack-chart-wrap">
-            <div ref="barChartRef" v-loading="pageLoading" class="chart-box stack-chart" />
-            <div ref="barChartRef2" v-loading="pageLoading" class="chart-box stack-chart" />
+            <div
+              class="stack-chart-item"
+              @mousemove="handleStackTooltipMousemove($event, 'sku')"
+              @mouseleave="hideStackTooltip"
+            >
+              <div ref="barChartRef" v-loading="pageLoading" class="chart-box stack-chart" />
+              <div v-if="stackTooltip.visible && stackTooltip.chart === 'sku'" class="stack-tooltip" :style="{ left: `${stackTooltip.x}px`, top: `${stackTooltip.y}px` }">
+                <div class="stack-tooltip-title">{{ stackTooltip.title }}</div>
+                <div v-for="item in stackTooltip.rows" :key="item.name" class="stack-tooltip-row">
+                  <span class="stack-tooltip-dot" :style="{ background: item.color }" />
+                  <span class="stack-tooltip-name">{{ item.name }}</span>
+                  <span class="stack-tooltip-value">{{ item.value }}</span>
+                </div>
+              </div>
+            </div>
+            <div
+              class="stack-chart-item"
+              @mousemove="handleStackTooltipMousemove($event, 'sales')"
+              @mouseleave="hideStackTooltip"
+            >
+              <div ref="barChartRef2" v-loading="pageLoading" class="chart-box stack-chart" />
+              <div v-if="stackTooltip.visible && stackTooltip.chart === 'sales'" class="stack-tooltip" :style="{ left: `${stackTooltip.x}px`, top: `${stackTooltip.y}px` }">
+                <div class="stack-tooltip-title">{{ stackTooltip.title }}</div>
+                <div v-for="item in stackTooltip.rows" :key="item.name" class="stack-tooltip-row">
+                  <span class="stack-tooltip-dot" :style="{ background: item.color }" />
+                  <span class="stack-tooltip-name">{{ item.name }}</span>
+                  <span class="stack-tooltip-value">{{ item.value }}</span>
+                </div>
+              </div>
+            </div>
           </div>
         </el-card>
       </el-col>
@@ -61,9 +89,15 @@
           <el-table-column label="本期" align="center">
             <el-table-column v-for="column in matrixColumns" :key="column.key" :label="column.label" min-width="140" align="center">
               <template #default="{ row }">
-                <span :class="['matrix-number', { 'is-total': row.isTotal || column.isTotal, 'is-highlight': true }]">{{
-                  formatCell(row[column.key])
-                }}</span>
+                <el-button
+                  link
+                  type="primary"
+                  :disabled="!isMatrixCellClickable(row, column)"
+                  :class="['matrix-number', { 'is-total': row.isTotal, 'is-highlight': true }]"
+                  @click="handleMatrixCellClick(row, column)"
+                >
+                  {{ formatCell(row[column.key]) }}
+                </el-button>
               </template>
             </el-table-column>
           </el-table-column>
@@ -81,7 +115,6 @@
       <ul class="advice-list">
         <li>该品类存在问题商品(低毛利率低周转){{ formatInteger(skuPer.currentSku_3 || 0) }}个，占比{{ formatPercent(skuPer.currentSkuPer_3 || 0) }}，建议重点关注，可结合其他异常分析及用户需求进行末位淘汰;</li>
         <li>存在由对比周期的第一象限降为本期较差象限的商品{{ formatInteger((skuChange.sku_2 || 0) + (skuChange.sku_3 || 0) + (skuChange.sku_4 || 0)) }}个，请加以关注和分析!</li>
-        <li>存在GMROI<=1的商品4,686个，该类商品具有经营风险，请加以关注!</li>
         <li>点击GMROI四象限名称可查看对应的商品策略!</li>
       </ul>
     </el-card>
@@ -105,14 +138,17 @@ interface MatrixRow {
   attracting: number | string;
   profit: number | string;
   problem: number | string;
+  compareGross: GrossRoleKey | '';
   isTotal?: boolean;
 }
 
 interface MatrixColumn {
-  key: string;
+  key: GrossRoleKey;
   label: string;
   highlight?: boolean;
 }
+
+type GrossRoleKey = 'leading' | 'attracting' | 'profit' | 'problem';
 
 const router = useRouter();
 const route = useRoute();
@@ -134,7 +170,27 @@ const skuCompare = reactive({
   current: { leading: 0, attracting: 0, profit: 0, problem: 0 },
   compare: { leading: 0, attracting: 0, profit: 0, problem: 0 }
 });
+const skuPer = reactive({
+  currentSku_3: 0,
+  currentSkuPer_3: 0
+});
 const skuChange = ref({ sku_2: 0, sku_3: 0, sku_4: 0 });
+const themeOrange = '#f97316';
+const quadrantColors = {
+  leading: '#27b0d6',
+  attracting: '#f06b4f',
+  profit: '#8b6ff6',
+  problem: '#e95570'
+};
+type StackChartType = 'sku' | 'sales';
+const stackTooltip = reactive({
+  visible: false,
+  chart: '' as StackChartType | '',
+  x: 0,
+  y: 0,
+  title: '',
+  rows: [] as Array<{ name: string; value: string; color: string }>
+});
 
 const matrixColumns = [
   { key: 'attracting', label: '本期-吸客商品', highlight: true },
@@ -143,28 +199,15 @@ const matrixColumns = [
 ];
 
 const matrixRows = computed<MatrixRow[]>(() => {
-  const leading = Math.max(0, Number(skuChange.value.sku_2 || 0));
-  const attracting = Math.max(0, Number(skuChange.value.sku_3 || 0));
-  const problem = Math.max(0, Number(skuChange.value.sku_4 || 0));
-  const profit = Math.max(0, Math.round((leading + attracting + problem) / 3));
+  const fromLeadingToAttracting = Math.max(0, Number(skuChange.value.sku_2 || 0));
+  const fromLeadingToProblem = Math.max(0, Number(skuChange.value.sku_3 || 0));
+  const fromLeadingToProfit = Math.max(0, Number(skuChange.value.sku_4 || 0));
   return [
-    { label: '领跑商品', leading: '-', attracting: leading, profit, problem },
-    { label: '吸客商品', leading: '-', attracting, profit: Math.max(0, Math.round(attracting / 2)), problem: Math.max(0, Math.round(problem / 2)) },
-    {
-      label: '利润商品',
-      leading: '-',
-      attracting: Math.max(0, Math.round(leading / 2)),
-      profit: Math.max(0, Math.round(profit * 1.4)),
-      problem: Math.max(0, Math.round(problem / 3))
-    },
-    {
-      label: '问题商品',
-      leading: '-',
-      attracting: Math.max(0, Math.round(leading / 3)),
-      profit: Math.max(0, Math.round(attracting / 3)),
-      problem: Math.max(0, Math.round(problem * 1.2))
-    },
-    { label: '总计', leading: '-', attracting: leading + attracting, profit: profit + leading, problem: problem + attracting, isTotal: true }
+    { label: '领跑商品', compareGross: 'leading', leading: '-', attracting: fromLeadingToAttracting, profit: fromLeadingToProfit, problem: fromLeadingToProblem },
+    { label: '吸客商品', compareGross: 'attracting', leading: '-', attracting: 0, profit: 0, problem: 0 },
+    { label: '利润商品', compareGross: 'profit', leading: '-', attracting: 0, profit: 0, problem: 0 },
+    { label: '问题商品', compareGross: 'problem', leading: '-', attracting: 0, profit: 0, problem: 0 },
+    { label: '总计', compareGross: '', leading: '-', attracting: fromLeadingToAttracting, profit: fromLeadingToProfit, problem: fromLeadingToProblem, isTotal: true }
   ];
 });
 
@@ -184,6 +227,34 @@ const formatPercent = (value: unknown) => {
   return Number.isFinite(num) ? `${num.toFixed(2)}%` : '0.00%';
 };
 
+const hideStackTooltip = () => {
+  stackTooltip.visible = false;
+  stackTooltip.chart = '';
+};
+
+const handleStackTooltipMousemove = (event: MouseEvent, type: StackChartType) => {
+  const wrap = event.currentTarget as HTMLElement;
+  const rect = wrap.getBoundingClientRect();
+  const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / Math.max(rect.width, 1)));
+  const period = ratio < 0.5 ? 'current' : 'compare';
+  const source = type === 'sku' ? skuCompare : salesCompare;
+  const title = period === 'current' ? '本期' : '对比日期';
+  const tooltipWidth = 210;
+  const tooltipHeight = 170;
+
+  stackTooltip.visible = true;
+  stackTooltip.chart = type;
+  stackTooltip.title = title;
+  stackTooltip.rows = [
+    { name: '领跑商品', value: formatPercent(source[period].leading), color: quadrantColors.leading },
+    { name: '吸客商品', value: formatPercent(source[period].attracting), color: quadrantColors.attracting },
+    { name: '利润商品', value: formatPercent(source[period].profit), color: quadrantColors.profit },
+    { name: '问题商品', value: formatPercent(source[period].problem), color: quadrantColors.problem }
+  ];
+  stackTooltip.x = Math.min(Math.max(12, event.clientX - rect.left + 14), Math.max(12, rect.width - tooltipWidth - 12));
+  stackTooltip.y = Math.min(Math.max(12, event.clientY - rect.top - 86), Math.max(12, rect.height - tooltipHeight - 12));
+};
+
 const sessionId = computed(() => String(route.query.sessionId || ''));
 
 const handleReload = async () => {
@@ -197,6 +268,28 @@ const handleViewDetail = () => {
       ...route.query
     }
   });
+};
+
+const handleMatrixCellClick = (row: MatrixRow, column: MatrixColumn) => {
+  if (!isMatrixCellClickable(row, column)) {
+    return;
+  }
+  router.push({
+    path: '/gross-contribution/analysis/detail',
+    query: {
+      ...route.query,
+      currentGross: column.key,
+      ...(row.compareGross ? { compareGross: row.compareGross } : {})
+    }
+  });
+};
+
+const isMatrixCellClickable = (row: MatrixRow, column: MatrixColumn) => {
+  if (row.isTotal || !row.compareGross) {
+    return false;
+  }
+  const value = Number(row[column.key]);
+  return Number.isFinite(value) && value > 0;
 };
 
 const loadAnalysisData = async () => {
@@ -226,28 +319,30 @@ const loadAnalysisData = async () => {
     salesCompare.current = {
       leading: Number(salesPer.currentSalesPer_1 || 0),
       attracting: Number(salesPer.currentSalesPer_2 || 0),
-      profit: Number(salesPer.currentSalesPer_3 || 0),
-      problem: Number(salesPer.currentSalesPer_4 || 0)
+      profit: Number(salesPer.currentSalesPer_4 || 0),
+      problem: Number(salesPer.currentSalesPer_3 || 0)
     };
     salesCompare.compare = {
       leading: Number(salesPer.compareSalesPer_1 || 0),
       attracting: Number(salesPer.compareSalesPer_2 || 0),
-      profit: Number(salesPer.compareSalesPer_3 || 0),
-      problem: Number(salesPer.compareSalesPer_4 || 0)
+      profit: Number(salesPer.compareSalesPer_4 || 0),
+      problem: Number(salesPer.compareSalesPer_3 || 0)
     };
 
-    const skuPer = skuPerRes?.result || {};
+    const skuPerData = skuPerRes?.result || {};
+    skuPer.currentSku_3 = Number(skuPerData.currentSku_3 || 0);
+    skuPer.currentSkuPer_3 = Number(skuPerData.currentSkuPer_3 || 0);
     skuCompare.current = {
-      leading: Number(skuPer.currentSkuPer_1 || 0),
-      attracting: Number(skuPer.currentSkuPer_2 || 0),
-      profit: Number(skuPer.currentSkuPer_3 || 0),
-      problem: Number(skuPer.currentSkuPer_4 || 0)
+      leading: Number(skuPerData.currentSkuPer_1 || 0),
+      attracting: Number(skuPerData.currentSkuPer_2 || 0),
+      profit: Number(skuPerData.currentSkuPer_4 || 0),
+      problem: Number(skuPerData.currentSkuPer_3 || 0)
     };
     skuCompare.compare = {
-      leading: Number(skuPer.compareSkuPer_1 || 0),
-      attracting: Number(skuPer.compareSkuPer_2 || 0),
-      profit: Number(skuPer.compareSkuPer_3 || 0),
-      problem: Number(skuPer.compareSkuPer_4 || 0)
+      leading: Number(skuPerData.compareSkuPer_1 || 0),
+      attracting: Number(skuPerData.compareSkuPer_2 || 0),
+      profit: Number(skuPerData.compareSkuPer_4 || 0),
+      problem: Number(skuPerData.compareSkuPer_3 || 0)
     };
 
     const change = skuChangeRes?.result || {};
@@ -299,6 +394,8 @@ const renderScatterChart = () => {
   const option: EChartsOption = {
     tooltip: {
       trigger: 'item',
+      appendToBody: true,
+      confine: false,
       formatter: (params: any) => {
         const data = params.data as [number, number, string];
         return `${data[2]}<br/>毛利率：${data[0].toFixed(2)}%<br/>销售额占比：${data[1].toFixed(2)}%`;
@@ -353,7 +450,16 @@ const renderScatterChart = () => {
         type: 'scatter',
         symbolSize: 12,
         itemStyle: {
-          color: '#27b0d6'
+          color: themeOrange,
+          opacity: 0.72
+        },
+        emphasis: {
+          itemStyle: {
+            color: '#ea580c',
+            opacity: 0.95,
+            borderColor: '#ffedd5',
+            borderWidth: 2
+          }
         },
         markLine: {
           symbol: 'none',
@@ -377,13 +483,6 @@ const renderBarChart = () => {
   initBarChart();
   if (!barChartIns.value) return;
 
-  const colors = {
-    leading: '#27b0d6',
-    attracting: '#f06b4f',
-    profit: '#b69cff',
-    problem: '#e53e3e'
-  };
-
   const option: EChartsOption = {
     legend: {
       orient: 'vertical',
@@ -396,6 +495,9 @@ const renderBarChart = () => {
     },
     tooltip: {
       trigger: 'axis',
+      triggerOn: 'mousemove|click',
+      appendToBody: true,
+      confine: false,
       axisPointer: { type: 'shadow' },
       formatter: (params: any) => {
         const rows = Array.isArray(params) ? params : [params];
@@ -425,28 +527,28 @@ const renderBarChart = () => {
         name: '领跑商品',
         type: 'bar',
         stack: 'sku',
-        itemStyle: { color: colors.leading },
+        itemStyle: { color: quadrantColors.leading },
         data: [skuCompare.current.leading, skuCompare.compare.leading]
       },
       {
         name: '吸客商品',
         type: 'bar',
         stack: 'sku',
-        itemStyle: { color: colors.attracting },
+        itemStyle: { color: quadrantColors.attracting },
         data: [skuCompare.current.attracting, skuCompare.compare.attracting]
       },
       {
         name: '利润商品',
         type: 'bar',
         stack: 'sku',
-        itemStyle: { color: colors.profit },
+        itemStyle: { color: quadrantColors.profit },
         data: [skuCompare.current.profit, skuCompare.compare.profit]
       },
       {
         name: '问题商品',
         type: 'bar',
         stack: 'sku',
-        itemStyle: { color: colors.problem },
+        itemStyle: { color: quadrantColors.problem },
         data: [skuCompare.current.problem, skuCompare.compare.problem]
       }
     ]
@@ -458,13 +560,6 @@ const renderBarChart = () => {
 const renderBarChart2 = () => {
   initBarChart2();
   if (!barChartIns2.value) return;
-
-  const colors = {
-    leading: '#27b0d6',
-    attracting: '#f06b4f',
-    profit: '#b69cff',
-    problem: '#e53e3e'
-  };
 
   const option: EChartsOption = {
     legend: {
@@ -478,6 +573,9 @@ const renderBarChart2 = () => {
     },
     tooltip: {
       trigger: 'axis',
+      triggerOn: 'mousemove|click',
+      appendToBody: true,
+      confine: false,
       axisPointer: { type: 'shadow' },
       formatter: (params: any) => {
         const rows = Array.isArray(params) ? params : [params];
@@ -507,28 +605,28 @@ const renderBarChart2 = () => {
         name: '领跑商品',
         type: 'bar',
         stack: 'sales2',
-        itemStyle: { color: colors.leading },
+        itemStyle: { color: quadrantColors.leading },
         data: [salesCompare.current.leading, salesCompare.compare.leading]
       },
       {
         name: '吸客商品',
         type: 'bar',
         stack: 'sales2',
-        itemStyle: { color: colors.attracting },
+        itemStyle: { color: quadrantColors.attracting },
         data: [salesCompare.current.attracting, salesCompare.compare.attracting]
       },
       {
         name: '利润商品',
         type: 'bar',
         stack: 'sales2',
-        itemStyle: { color: colors.profit },
+        itemStyle: { color: quadrantColors.profit },
         data: [salesCompare.current.profit, salesCompare.compare.profit]
       },
       {
         name: '问题商品',
         type: 'bar',
         stack: 'sales2',
-        itemStyle: { color: colors.problem },
+        itemStyle: { color: quadrantColors.problem },
         data: [salesCompare.current.problem, salesCompare.compare.problem]
       }
     ]
@@ -643,8 +741,53 @@ onUnmounted(() => {
   gap: 12px;
 }
 
+.stack-chart-item {
+  position: relative;
+  min-width: 0;
+}
+
 .stack-chart {
   height: 360px;
+}
+
+.stack-tooltip {
+  position: absolute;
+  z-index: 20;
+  min-width: 198px;
+  padding: 14px 16px;
+  border: 1px solid rgba(229, 231, 235, 0.92);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.16);
+  color: #555;
+  pointer-events: none;
+}
+
+.stack-tooltip-title {
+  margin-bottom: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #555;
+}
+
+.stack-tooltip-row {
+  display: grid;
+  grid-template-columns: 12px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 26px;
+  font-size: 14px;
+}
+
+.stack-tooltip-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+}
+
+.stack-tooltip-value {
+  font-weight: 700;
+  color: #666;
 }
 
 .matrix-table-wrap {

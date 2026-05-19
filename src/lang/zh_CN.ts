@@ -1,7 +1,7 @@
 export default {
   // 路由国际化
   route: {
-    dashboard: '首页',
+    dashboard: '品类树',
     document: '项目文档'
   },
   // 登录页面国际化
@@ -9,9 +9,17 @@ export default {
     selectPlaceholder: '请选择/输入公司名称',
     username: '用户名',
     password: '密码',
+    usernamePlaceholder: '请输入账号',
+    passwordPlaceholder: '请输入密码',
     login: '登 录',
     logging: '登 录 中...',
     code: '验证码',
+    mode: '普通登录',
+    headline: '使用账号密码登录品类罗盘',
+    description: '登录后即可进入品类经营分析工作台，查看诊断结果与经营洞察。',
+    visualSlogan: '让所有商品发挥最大的价值',
+    tenantLoading: '正在加载租户信息...',
+    tenantLoadFailed: '租户信息加载失败，请刷新页面后重试',
     rememberPassword: '记住我',
     switchRegisterPage: '立即注册',
     rule: {
@@ -73,7 +81,7 @@ export default {
   navbar: {
     full: '全屏',
     language: '语言',
-    dashboard: '首页',
+    dashboard: '品类树',
     document: '项目文档',
     message: '消息',
     layoutSize: '布局大小',

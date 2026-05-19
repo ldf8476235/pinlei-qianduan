@@ -4,7 +4,7 @@
       <div class="page-header">
         <div class="title-wrap">
           <h2 class="page-title">建议引品方向</h2>
-          <button class="ai-link" type="button">AI选品 &gt;</button>
+          <button class="ai-link" type="button" :disabled="!tableRows.length" @click="openAiSelector">AI选品 &gt;</button>
         </div>
         <div class="header-actions">
           <el-button circle class="icon-btn">
@@ -54,20 +54,36 @@
       </section>
 
       <section class="table-section">
-        <el-table :data="tableRows" border stripe class="introduce-table">
-          <el-table-column label="顺序" prop="orderNo" min-width="80" align="center" sortable />
-          <el-table-column label="价格区间" prop="priceBand" min-width="130" align="center" sortable />
-          <el-table-column label="品牌" prop="brand" min-width="120" align="center" sortable />
-          <el-table-column label="规格" prop="spec" min-width="120" align="center" sortable />
-          <el-table-column label="产品形态" prop="form" min-width="120" align="center" sortable />
-          <el-table-column label="原料" prop="ingredient" min-width="120" align="center" sortable />
-          <el-table-column label="功效" prop="effect" min-width="120" align="center" sortable />
-          <el-table-column label="香型" prop="fragrance" min-width="120" align="center" sortable />
-          <el-table-column label="包装" prop="packageType" min-width="120" align="center" sortable />
-          <el-table-column label="人群" prop="targetGroup" min-width="120" align="center" sortable />
-          <el-table-column label="产地" prop="origin" min-width="120" align="center" sortable />
-          <el-table-column label="供应商" prop="supplier" min-width="150" align="center" sortable />
-          <el-table-column label="小分类" prop="subCategory" min-width="130" align="center" sortable />
+        <el-alert
+          v-if="errorMessage"
+          class="table-alert"
+          type="error"
+          :closable="false"
+          show-icon
+          :title="errorMessage"
+        />
+        <el-table
+          v-loading="loading"
+          :data="tableRows"
+          border
+          stripe
+          class="introduce-table"
+          empty-text="暂无建议引品方向数据"
+        >
+          <el-table-column
+            v-for="column in tableColumns"
+            :key="column.value"
+            :label="column.label"
+            :prop="column.value"
+            :min-width="column.value === 'index' ? 72 : column.value === 'vendor' ? 170 : 126"
+            align="center"
+            sortable
+            show-overflow-tooltip
+          >
+            <template #default="{ row }">
+              <span>{{ row[column.value] || '--' }}</span>
+            </template>
+          </el-table-column>
         </el-table>
       </section>
     </div>
@@ -83,54 +99,71 @@
 
 <script setup lang="ts">
 import { Download, Grid } from '@element-plus/icons-vue';
+import { ElMessage } from 'element-plus';
+import { getCategoryDiagnosisIntroduceDirection } from '@/api/category/diagnosis/detail';
+import type { DiagnosisIntroduceDirectionColumn } from '@/api/category/diagnosis/detail/types';
+import { useRequest } from '@/hooks/useRequest';
 
-const tableRows = [
-  {
-    orderNo: 1,
-    priceBand: '24.81-39.72',
-    brand: '立白',
-    spec: '500g/瓶',
-    form: '液体',
-    ingredient: '植物洁净因子',
-    effect: '去渍洁净',
-    fragrance: '清新花香',
-    packageType: '按压瓶',
-    targetGroup: '家庭通用',
-    origin: '广东',
-    supplier: '广州立白企业集团',
-    subCategory: '洗衣液'
-  },
-  {
-    orderNo: 2,
-    priceBand: '39.72-54.63',
-    brand: '云南白药',
-    spec: '180g/支',
-    form: '膏体',
-    ingredient: '草本精华',
-    effect: '清新护龈',
-    fragrance: '薄荷香型',
-    packageType: '软管装',
-    targetGroup: '成人',
-    origin: '云南',
-    supplier: '云南白药集团',
-    subCategory: '牙膏'
-  },
-  {
-    orderNo: 3,
-    priceBand: '54.63-69.54',
-    brand: '心相印',
-    spec: '4层*10包',
-    form: '抽纸',
-    ingredient: '原生木浆',
-    effect: '柔韧亲肤',
-    fragrance: '无香',
-    packageType: '家庭分享装',
-    targetGroup: '母婴家庭',
-    origin: '福建',
-    supplier: '恒安集团',
-    subCategory: '面巾纸'
-  }
+const route = useRoute();
+
+const defaultColumns: DiagnosisIntroduceDirectionColumn[] = [
+  { label: '顺序', value: 'index' },
+  { label: '价格区间', value: 'priceBand' },
+  { label: '品牌', value: 'brand' },
+  { label: '规格', value: 'spec' },
+  { label: '供应商', value: 'vendor' },
+  { label: '小分类', value: 'minClass' }
 ];
+
+const tableColumns = ref<DiagnosisIntroduceDirectionColumn[]>(defaultColumns);
+const tableRows = ref<Array<Record<string, string>>>([]);
+const errorMessage = ref('');
+
+const sessionId = computed(() => String(route.query.sessionId || ''));
+
+const directionRequest = useRequest(async (id: string) => await getCategoryDiagnosisIntroduceDirection(id), {
+  onSuccess: (res: any) => {
+    const data = res?.data?.columns ? res.data : res?.data?.data?.columns ? res.data.data : res?.data;
+    tableColumns.value = Array.isArray(data?.columns) && data.columns.length ? data.columns : defaultColumns;
+    tableRows.value = Array.isArray(data?.rows) ? data.rows : [];
+    errorMessage.value = '';
+  },
+  onError: (err) => {
+    tableRows.value = [];
+    tableColumns.value = defaultColumns;
+    errorMessage.value = err?.response?.data?.message || err?.message || '建议引品方向加载失败';
+  }
+});
+
+const loading = computed(() => directionRequest.loading.value);
+
+const loadDirection = () => {
+  if (!sessionId.value) {
+    tableRows.value = [];
+    tableColumns.value = defaultColumns;
+    errorMessage.value = '缺少诊断 sessionId，无法加载建议引品方向';
+    return;
+  }
+  directionRequest.run(sessionId.value);
+};
+
+const openAiSelector = () => {
+  if (!tableRows.value.length) {
+    ElMessage.warning('暂无建议引品方向数据');
+    return;
+  }
+  const parts = tableColumns.value
+    .filter((column) => !['index', 'vendor', 'minClass'].includes(column.value))
+    .map((column) => {
+      const values = tableRows.value.map((row) => row[column.value]).filter(Boolean);
+      return values.length ? `${column.label}为${values.join('、')}` : '';
+    })
+    .filter(Boolean);
+  ElMessage.info(`推荐${parts.join('，')}的商品。`);
+};
+
+watch(sessionId, loadDirection);
+onMounted(loadDirection);
 </script>
 
 <style scoped lang="scss">
@@ -139,10 +172,10 @@ const tableRows = [
   min-height: 100%;
   border-radius: 20px;
   background:
-    radial-gradient(circle at 18% 20%, rgba(111, 244, 220, 0.22) 0, rgba(111, 244, 220, 0) 28%),
-    radial-gradient(circle at 86% 18%, rgba(255, 212, 122, 0.2) 0, rgba(255, 212, 122, 0) 24%),
-    radial-gradient(circle at 50% 100%, rgba(113, 234, 255, 0.14) 0, rgba(113, 234, 255, 0) 28%),
-    linear-gradient(180deg, #eefcf8 0%, #f8fffd 52%, #f2fbf8 100%);
+    radial-gradient(circle at 18% 20%, rgba(255, 126, 24, 0.2) 0, rgba(255, 126, 24, 0) 28%),
+    radial-gradient(circle at 86% 18%, rgba(255, 186, 91, 0.22) 0, rgba(255, 186, 91, 0) 24%),
+    radial-gradient(circle at 50% 100%, rgba(255, 111, 15, 0.12) 0, rgba(255, 111, 15, 0) 28%),
+    linear-gradient(180deg, #fff3e8 0%, #fffaf4 52%, #fff1e3 100%);
   overflow: hidden;
 }
 
@@ -152,7 +185,7 @@ const tableRows = [
   inset: auto;
   content: '';
   border-radius: 50%;
-  border: 1px solid rgba(32, 170, 150, 0.08);
+  border: 1px solid rgba(255, 126, 24, 0.1);
   pointer-events: none;
 }
 
@@ -200,15 +233,20 @@ const tableRows = [
   border: 0;
   padding: 0;
   background: transparent;
-  color: #18b6a0;
+  color: #f97316;
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
 }
 
+.ai-link:disabled {
+  color: #cbd5e1;
+  cursor: not-allowed;
+}
+
 .icon-btn {
-  border-color: rgba(24, 182, 160, 0.18);
-  color: #18b6a0;
+  border-color: rgba(249, 115, 22, 0.2);
+  color: #f97316;
   background: rgba(255, 255, 255, 0.78);
 }
 
@@ -223,7 +261,7 @@ const tableRows = [
 .hero-orbit {
   position: absolute;
   border-radius: 50%;
-  border: 1px dashed rgba(24, 182, 160, 0.12);
+  border: 1px dashed rgba(249, 115, 22, 0.14);
 }
 
 .orbit-one {
@@ -256,7 +294,7 @@ const tableRows = [
 .outer-ring {
   width: 210px;
   height: 210px;
-  background: linear-gradient(180deg, rgba(24, 182, 160, 0.18) 0%, rgba(24, 182, 160, 0.08) 100%);
+  background: linear-gradient(180deg, rgba(249, 115, 22, 0.18) 0%, rgba(249, 115, 22, 0.08) 100%);
   box-shadow: inset 0 0 0 18px rgba(255, 255, 255, 0.88);
 }
 
@@ -265,8 +303,8 @@ const tableRows = [
   height: 138px;
   background: linear-gradient(180deg, #ffffff 0%, #f3fbf8 100%);
   box-shadow:
-    inset 0 0 0 10px rgba(24, 182, 160, 0.14),
-    0 16px 34px rgba(24, 182, 160, 0.15);
+    inset 0 0 0 10px rgba(249, 115, 22, 0.14),
+    0 16px 34px rgba(249, 115, 22, 0.15);
   color: #152133;
   font-size: 24px;
   font-weight: 700;
@@ -311,7 +349,7 @@ const tableRows = [
 }
 
 .teal-ball {
-  background: linear-gradient(180deg, #1ad0bb 0%, #0ea897 100%);
+  background: linear-gradient(180deg, #ff9b32 0%, #f97316 100%);
   color: #ffffff;
 }
 
@@ -348,7 +386,7 @@ const tableRows = [
   position: absolute;
   z-index: 1;
   border-radius: 999px;
-  background: linear-gradient(90deg, rgba(24, 182, 160, 0.08) 0%, rgba(24, 182, 160, 0.28) 50%, rgba(24, 182, 160, 0.08) 100%);
+  background: linear-gradient(90deg, rgba(249, 115, 22, 0.08) 0%, rgba(249, 115, 22, 0.28) 50%, rgba(249, 115, 22, 0.08) 100%);
 }
 
 .connector-left,
@@ -372,7 +410,7 @@ const tableRows = [
   height: 84px;
   left: 50%;
   transform: translateX(-50%);
-  background: linear-gradient(180deg, rgba(24, 182, 160, 0.08) 0%, rgba(24, 182, 160, 0.28) 50%, rgba(24, 182, 160, 0.08) 100%);
+  background: linear-gradient(180deg, rgba(249, 115, 22, 0.08) 0%, rgba(249, 115, 22, 0.28) 50%, rgba(249, 115, 22, 0.08) 100%);
 }
 
 .table-section {
@@ -380,6 +418,10 @@ const tableRows = [
   background: rgba(255, 255, 255, 0.88);
   box-shadow: 0 16px 34px rgba(15, 23, 42, 0.05);
   padding: 18px 18px 14px;
+}
+
+.table-alert {
+  margin-bottom: 12px;
 }
 
 .introduce-table :deep(.el-table__header th) {
@@ -418,14 +460,14 @@ const tableRows = [
   border-radius: 50%;
   background: #ffffff;
   box-shadow: 0 14px 28px rgba(15, 23, 42, 0.1);
-  color: #18b6a0;
+  color: #f97316;
   font-size: 20px;
   cursor: pointer;
 }
 
 .help-btn {
   color: #ffffff;
-  background: linear-gradient(180deg, #1ad0bb 0%, #12aa98 100%);
+  background: linear-gradient(180deg, #ff9b32 0%, #f97316 100%);
   font-size: 22px;
   font-weight: 700;
 }

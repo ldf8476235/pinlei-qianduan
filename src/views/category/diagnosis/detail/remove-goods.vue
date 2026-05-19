@@ -25,14 +25,17 @@
         class="tip-alert"
         title="淘汰依据: 查询日期范围下, 商品状态异常(每日无库存、无销量) 或业绩贡献低等维度"
       />
+      <el-alert v-if="loadError" type="error" :closable="false" class="tip-alert" :title="loadError" />
 
       <div class="table-title">建议淘汰商品清单</div>
 
       <el-table
-        :data="displayRows"
+        v-loading="loading"
+        :data="tableRows"
         border
         stripe
         class="goods-table"
+        empty-text="暂无建议淘汰商品数据"
         @sort-change="handleSortChange"
       >
         <el-table-column label="商品信息" align="center">
@@ -166,6 +169,8 @@
           layout="total, sizes, prev, pager, next, jumper"
           :page-sizes="[10, 20, 50, 100]"
           :total="pagination.total"
+          @current-change="handlePageChange"
+          @size-change="handlePageSizeChange"
         />
       </div>
     </el-card>
@@ -211,6 +216,7 @@
                 v-model="modelForm.firstSaleDateBefore"
                 class="control-full"
                 type="date"
+                value-format="YYYY-MM-DD"
                 placeholder="选择日期"
                 :prefix-icon="Calendar"
               />
@@ -315,7 +321,92 @@
             <div class="logic-card user-demand-card" :class="{ 'is-disabled': !modelForm.userDemandEnabled }">
               <div class="logic-head">
                 <el-checkbox v-model="modelForm.userDemandEnabled">用户需求维度</el-checkbox>
-                <el-icon class="help-icon"><QuestionFilled /></el-icon>
+                <el-tooltip content="选择此维度后，价格区间、品牌、规格、标签中至少选择一组，否则无法提交。" placement="top">
+                  <el-icon class="help-icon"><QuestionFilled /></el-icon>
+                </el-tooltip>
+              </div>
+              <div class="logic-hint" :class="{ 'is-error': modelForm.userDemandEnabled }">
+                选择此维度，则四组需求条件中至少已选择一组，否则无法提交。
+              </div>
+              <div class="logic-fields user-demand-fields">
+                <div class="logic-field">
+                  <div class="field-label">所属价格区间</div>
+                  <el-select
+                    v-model="modelForm.priceBandList"
+                    class="control-full"
+                    multiple
+                    collapse-tags
+                    collapse-tags-tooltip
+                    clearable
+                    filterable
+                    placeholder="请选择所属价格区间"
+                    :disabled="!modelForm.userDemandEnabled"
+                  >
+                    <el-option v-for="item in priceBandOptions" :key="item.value" :label="item.label" :value="item.value" />
+                  </el-select>
+                </div>
+                <div class="logic-field">
+                  <div class="field-label">所属品牌</div>
+                  <el-select
+                    v-model="modelForm.brandList"
+                    class="control-full"
+                    multiple
+                    collapse-tags
+                    collapse-tags-tooltip
+                    clearable
+                    filterable
+                    placeholder="请选择所属品牌"
+                    :disabled="!modelForm.userDemandEnabled"
+                  >
+                    <el-option v-for="item in brandOptions" :key="item.value" :label="item.label" :value="item.value" />
+                  </el-select>
+                </div>
+                <div class="logic-field">
+                  <div class="field-label">所属规格</div>
+                  <el-select
+                    v-model="modelForm.specList"
+                    class="control-full"
+                    multiple
+                    collapse-tags
+                    collapse-tags-tooltip
+                    clearable
+                    filterable
+                    placeholder="请选择所属规格"
+                    :disabled="!modelForm.userDemandEnabled"
+                  >
+                    <el-option v-for="item in specOptions" :key="item.value" :label="item.label" :value="item.value" />
+                  </el-select>
+                </div>
+                <div class="logic-field">
+                  <div class="field-label">所属标签</div>
+                  <el-select
+                    v-model="modelForm.tagType"
+                    class="control-full"
+                    clearable
+                    filterable
+                    placeholder="请选择标签类型"
+                    :disabled="!modelForm.userDemandEnabled"
+                    @change="handleTagTypeChange"
+                  >
+                    <el-option v-for="item in tagTypeOptions" :key="item.value" :label="item.label" :value="item.value" />
+                  </el-select>
+                </div>
+                <div class="logic-field">
+                  <div class="field-label">标签明细</div>
+                  <el-select
+                    v-model="modelForm.tagList"
+                    class="control-full"
+                    multiple
+                    collapse-tags
+                    collapse-tags-tooltip
+                    clearable
+                    filterable
+                    placeholder="请选择标签"
+                    :disabled="!modelForm.userDemandEnabled || !modelForm.tagType"
+                  >
+                    <el-option v-for="item in currentTagOptions" :key="item.value" :label="item.label" :value="item.value" />
+                  </el-select>
+                </div>
               </div>
             </div>
           </div>
@@ -359,6 +450,8 @@
 <script setup lang="ts">
 import type { Sort } from 'element-plus';
 import { Calendar, Close, QuestionFilled } from '@element-plus/icons-vue';
+import { getBrandFilterOptions, getPriceBandRangeSummary, getSpecFilterOptions, getTagTypes } from '@/api/category/diagnosis/analysis';
+import { queryObsoleteGoodsList } from '@/api/category/diagnosis/detail';
 import { getCategoryFilterOptions } from '@/api/category/tree';
 import type { OptionVO } from '@/api/category/tree/types';
 
@@ -408,6 +501,14 @@ interface RemoveGoodsRow {
 
 const tableRows = ref<RemoveGoodsRow[]>([]);
 const statusOptions = ref<OptionVO[]>([]);
+const priceBandOptions = ref<OptionVO[]>([]);
+const brandOptions = ref<OptionVO[]>([]);
+const specOptions = ref<OptionVO[]>([]);
+const tagTypeOptions = ref<OptionVO[]>([]);
+const tagOptionMap = ref<Record<string, OptionVO[]>>({});
+const route = useRoute();
+const loading = ref(false);
+const loadError = ref('');
 const modelDialogVisible = ref(false);
 const processDialogVisible = ref(false);
 const modelStatusOptions = [
@@ -431,7 +532,7 @@ const gmroiRoleOptions = [{ label: '问题商品(低毛低周转)', value: '3' }
 
 const sortState = reactive<{ prop: string; order: SortOrder }>({
   prop: 'sales',
-  order: 'descending'
+  order: 'ascending'
 });
 
 const pagination = reactive({
@@ -455,7 +556,12 @@ const initialModelForm = () => ({
   grossReturnEnabled: true,
   currentGmroiRole: '3',
   compareGmroiRole: '3',
-  userDemandEnabled: false
+  userDemandEnabled: false,
+  priceBandList: [] as string[],
+  brandList: [] as string[],
+  specList: [] as string[],
+  tagType: '',
+  tagList: [] as string[]
 });
 
 const modelForm = reactive(initialModelForm());
@@ -466,23 +572,8 @@ const processForm = reactive({
   row: null as RemoveGoodsRow | null
 });
 
-const getSortValue = (row: RemoveGoodsRow, prop: string) => (row as Record<string, unknown>)[prop];
-
-const displayRows = computed(() => {
-  const rows = [...tableRows.value];
-  if (!sortState.prop || !sortState.order) return rows;
-  const direction = sortState.order === 'ascending' ? 1 : -1;
-  return rows.sort((left, right) => {
-    const leftValue = getSortValue(left, sortState.prop);
-    const rightValue = getSortValue(right, sortState.prop);
-    const leftNumber = Number(leftValue);
-    const rightNumber = Number(rightValue);
-    if (Number.isFinite(leftNumber) && Number.isFinite(rightNumber)) {
-      return (leftNumber - rightNumber) * direction;
-    }
-    return String(leftValue ?? '').localeCompare(String(rightValue ?? ''), 'zh-CN') * direction;
-  });
-});
+const sessionId = computed(() => String(route.query.sessionId || ''));
+const currentTagOptions = computed(() => tagOptionMap.value[modelForm.tagType] || []);
 
 const loadStatusOptions = async () => {
   const res: any = await getCategoryFilterOptions();
@@ -494,9 +585,72 @@ const loadStatusOptions = async () => {
     : [];
 };
 
+const toOption = (value: unknown, label?: unknown): OptionVO | null => {
+  const optionValue = String(value ?? '').trim();
+  const optionLabel = String(label ?? value ?? '').trim();
+  if (!optionValue || !optionLabel) return null;
+  return { value: optionValue, label: optionLabel };
+};
+
+const compactOptions = (items: Array<OptionVO | null>) => {
+  const optionMap = new Map<string, OptionVO>();
+  items.forEach((item) => {
+    if (!item) return;
+    optionMap.set(String(item.value), item);
+  });
+  return Array.from(optionMap.values());
+};
+
+const readPayload = (res: any) => res?.data?.data || res?.data || {};
+
+const loadUserDemandOptions = async () => {
+  if (!sessionId.value) return;
+  const [priceRes, brandRes, specRes, tagRes] = await Promise.allSettled([
+    getPriceBandRangeSummary(sessionId.value),
+    getBrandFilterOptions(sessionId.value),
+    getSpecFilterOptions(sessionId.value),
+    getTagTypes(sessionId.value)
+  ]);
+
+  if (priceRes.status === 'fulfilled') {
+    const payload = readPayload(priceRes.value);
+    const rows = Array.isArray(payload.list) ? payload.list : [];
+    priceBandOptions.value = compactOptions(rows.map((row: any) => toOption(row.priceBand, row.priceBand)));
+  }
+
+  if (brandRes.status === 'fulfilled') {
+    const payload = readPayload(brandRes.value);
+    const rows = Array.isArray(payload.brandList) ? payload.brandList : [];
+    brandOptions.value = compactOptions(rows.map((row: any) => toOption(row.brandName || row.brandNo, row.brandName || row.brandNo)));
+  }
+
+  if (specRes.status === 'fulfilled') {
+    const payload = readPayload(specRes.value);
+    const rows = Array.isArray(payload.specList) ? payload.specList : [];
+    specOptions.value = compactOptions(rows.map((row: any) => toOption(row.specName || row.specNo, row.specName || row.specNo)));
+  }
+
+  if (tagRes.status === 'fulfilled') {
+    const rows = Array.isArray(readPayload(tagRes.value)) ? readPayload(tagRes.value) : [];
+    const nextTagOptionMap: Record<string, OptionVO[]> = {};
+    tagTypeOptions.value = compactOptions(
+      rows.map((row: any) => {
+        const tagType = String(row.tagType || '').trim();
+        nextTagOptionMap[tagType] = compactOptions(
+          (Array.isArray(row.tagList) ? row.tagList : []).map((tag: any) => toOption(tag.tagNo || tag.tagName, tag.tagName || tag.tagNo))
+        );
+        return toOption(tagType, row.tagTypeName || tagType);
+      })
+    );
+    tagOptionMap.value = nextTagOptionMap;
+  }
+};
+
 const handleSortChange = ({ prop, order }: { prop: string; order: Sort['order'] }) => {
   sortState.prop = prop || 'sales';
-  sortState.order = (order as SortOrder) || 'descending';
+  sortState.order = (order as SortOrder) || 'ascending';
+  pagination.pageNum = 1;
+  void loadObsoleteGoods();
 };
 
 const normalizeTags = (value: string[] | string | undefined) => {
@@ -538,7 +692,13 @@ const handleConfirmModel = () => {
     ElMessage.error('请先完善毛利回报率维度必填项');
     return;
   }
+  if (modelForm.userDemandEnabled && !hasUserDemandSelection()) {
+    ElMessage.error('用户需求维度至少选择一组价格区间、品牌、规格或标签');
+    return;
+  }
   modelDialogVisible.value = false;
+  pagination.pageNum = 1;
+  void loadObsoleteGoods();
   ElMessage.success('淘汰模型设置已暂存');
 };
 
@@ -554,6 +714,94 @@ const handleDispatchProcess = () => {
 
 const handleExport = () => {
   ElMessage.info('导出功能待接入真实接口');
+};
+
+const getEnabledObsoleteTypes = () => {
+  const types: string[] = [];
+  if (modelForm.abcEnabled) types.push('abc');
+  if (modelForm.grossContributionEnabled) types.push('gross');
+  if (modelForm.grossReturnEnabled) types.push('gmroi');
+  if (modelForm.userDemandEnabled) types.push('userDemand');
+  return types;
+};
+
+const hasUserDemandSelection = () =>
+  modelForm.priceBandList.length > 0 || modelForm.brandList.length > 0 || modelForm.specList.length > 0 || modelForm.tagList.length > 0;
+
+const handleTagTypeChange = () => {
+  modelForm.tagList = [];
+};
+
+const normalizeResponseRows = (records: any[]) =>
+  records.map((row) => ({
+    ...row,
+    handleStatus: row.dealStatusName || row.handleStatus || '未处理',
+    currentContributionRole: row.currentGrossRoleName || row.currentContributionRole || row.currentGrossRole || '--',
+    compareContributionRole: row.compareGrossRoleName || row.compareContributionRole || row.compareGrossRole || '--',
+    currentGmroiRole: row.currentGmroiRoleName || row.currentGmroiRole || '--',
+    compareGmroiRole: row.compareGmroiRoleName || row.compareGmroiRole || '--',
+    activitySku: row.activitySku ?? row.activity,
+    productTags: row.allTagName || row.productTags
+  }));
+
+const buildQueryPayload = () => ({
+  sessionId: sessionId.value,
+  productStatus: modelForm.productStatus && modelForm.productStatus !== 'all' ? [modelForm.productStatus] : [],
+  firstSaleDate: modelForm.firstSaleDateBefore || '',
+  obsoleteProductType: modelForm.excludeGoods ? [modelForm.excludeGoods] : [],
+  obsoleteSku: modelForm.maxRemoveCount || 0,
+  obsoleteType: getEnabledObsoleteTypes(),
+  abcType: modelForm.abcType,
+  currentAbc: modelForm.currentAbc,
+  compareAbc: modelForm.compareAbc,
+  currentGrossRole: modelForm.currentGrossRole,
+  compareGrossRole: modelForm.compareGrossRole,
+  currentGmroiRole: modelForm.currentGmroiRole,
+  compareGmroiRole: modelForm.compareGmroiRole,
+  priceBandList: modelForm.userDemandEnabled ? modelForm.priceBandList : [],
+  brandList: modelForm.userDemandEnabled ? modelForm.brandList : [],
+  specList: modelForm.userDemandEnabled ? modelForm.specList : [],
+  tagType: modelForm.userDemandEnabled ? modelForm.tagType : '',
+  tagList: modelForm.userDemandEnabled ? modelForm.tagList : [],
+  page: pagination.pageNum,
+  size: pagination.pageSize,
+  order: sortState.prop || 'sales',
+  orderType: sortState.order === 'descending' ? 'desc' : 'asc'
+});
+
+const loadObsoleteGoods = async () => {
+  if (!sessionId.value) {
+    loadError.value = '缺少 sessionId，无法加载建议淘汰商品';
+    return;
+  }
+  loading.value = true;
+  loadError.value = '';
+  try {
+    const res: any = await queryObsoleteGoodsList(buildQueryPayload());
+    const data = res?.data?.data || res?.data || {};
+    const records = Array.isArray(data.records) ? data.records : [];
+    tableRows.value = normalizeResponseRows(records);
+    pagination.total = Number(data.total || 0);
+    pagination.pageNum = Number(data.current || pagination.pageNum);
+    pagination.pageSize = Number(data.size || pagination.pageSize);
+  } catch (error: any) {
+    tableRows.value = [];
+    pagination.total = 0;
+    loadError.value = error?.message || '建议淘汰商品加载失败';
+  } finally {
+    loading.value = false;
+  }
+};
+
+const handlePageChange = (page: number) => {
+  pagination.pageNum = page;
+  void loadObsoleteGoods();
+};
+
+const handlePageSizeChange = (size: number) => {
+  pagination.pageSize = size;
+  pagination.pageNum = 1;
+  void loadObsoleteGoods();
 };
 
 const formatNumber = (value: number | string | null | undefined, digits = 2) => {
@@ -574,7 +822,30 @@ const formatPercent = (value: number | string | null | undefined) => {
 
 onMounted(async () => {
   await loadStatusOptions();
+  await loadUserDemandOptions();
+  await loadObsoleteGoods();
 });
+
+watch(
+  () => route.query.sessionId,
+  async () => {
+    pagination.pageNum = 1;
+    await loadUserDemandOptions();
+    await loadObsoleteGoods();
+  }
+);
+
+watch(
+  () => modelForm.userDemandEnabled,
+  (enabled) => {
+    if (enabled) return;
+    modelForm.priceBandList = [];
+    modelForm.brandList = [];
+    modelForm.specList = [];
+    modelForm.tagType = '';
+    modelForm.tagList = [];
+  }
+);
 </script>
 
 <style scoped lang="scss">
@@ -610,8 +881,8 @@ onMounted(async () => {
 .dimension-tag {
   border-radius: 999px;
   padding: 6px 14px;
-  background: rgba(15, 118, 110, 0.08);
-  color: #0f766e;
+  background: rgba(249, 115, 22, 0.12);
+  color: #c2410c;
   font-size: 13px;
   font-weight: 600;
 }
@@ -722,6 +993,8 @@ onMounted(async () => {
   }
 
   :deep(.el-dialog__body) {
+    max-height: calc(100vh - 190px);
+    overflow-y: auto;
     padding: 0 28px 24px;
   }
 
@@ -885,7 +1158,22 @@ onMounted(async () => {
 }
 
 .user-demand-card {
-  padding-bottom: 14px;
+  padding-bottom: 18px;
+}
+
+.logic-hint {
+  margin: -4px 0 14px;
+  color: #94a3b8;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.logic-hint.is-error {
+  color: #ef4444;
+}
+
+.user-demand-fields {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 :deep(.el-checkbox__input.is-checked .el-checkbox__inner),

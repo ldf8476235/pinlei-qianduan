@@ -49,7 +49,7 @@ export const constantRoutes: RouteRecordRaw[] = [
   },
   {
     path: '/register',
-    component: () => import('@/views/register.vue'),
+    redirect: '/login',
     hidden: true
   },
   {
@@ -63,17 +63,8 @@ export const constantRoutes: RouteRecordRaw[] = [
     hidden: true
   },
   {
-    path: '',
-    component: Layout,
-    redirect: '/index',
-    children: [
-      {
-        path: '/index',
-        component: () => import('@/views/index.vue'),
-        name: 'Index',
-        meta: { title: '首页', icon: 'dashboard', affix: true }
-      }
-    ]
+    path: '/',
+    redirect: '/category/tree'
   },
   {
     path: '/user',
@@ -104,6 +95,12 @@ export const constantRoutes: RouteRecordRaw[] = [
         path: 'analysis/detail',
         component: () => import('@/views/abc/goods-list.vue'),
         name: 'AbcGoodsList',
+        meta: { title: '品类ABC商品清单', activeMenu: '/category/diagnosis/detail' }
+      },
+      {
+        path: 'goods-list',
+        component: () => import('@/views/abc/goods-list.vue'),
+        name: 'AbcGoodsListLegacy',
         meta: { title: '品类ABC商品清单', activeMenu: '/category/diagnosis/detail' }
       }
     ]
@@ -232,6 +229,12 @@ export const constantRoutes: RouteRecordRaw[] = [
         component: () => import('@/views/category/diagnosis/detail/index.vue'),
         name: 'CategoryDiagnosisDetail',
         meta: { title: '品类诊断详情', activeMenu: '/category/diagnosis' }
+      },
+      {
+        path: 'check/detail',
+        component: () => import('@/views/category/diagnosis/detail/all-class-check.vue'),
+        name: 'CategoryCheckDetail',
+        meta: { title: '全类检测详情', activeMenu: '/category/check' }
       }
     ]
   }

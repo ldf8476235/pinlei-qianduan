@@ -34,7 +34,7 @@
           </el-select>
         </el-form-item>
 
-        <el-form-item label="本期四象限">
+        <el-form-item label="本期毛利角色">
           <el-select v-model="queryForm.currentGross" clearable placeholder="全部" style="width: 160px" @change="handleQuery">
             <el-option label="全部" value="" />
             <el-option label="领跑商品" value="leading" />
@@ -44,7 +44,7 @@
           </el-select>
         </el-form-item>
 
-        <el-form-item label="对比日期四象限">
+        <el-form-item label="对比期毛利角色">
           <el-select v-model="queryForm.compareGross" clearable placeholder="全部" style="width: 180px" @change="handleQuery">
             <el-option label="全部" value="" />
             <el-option label="领跑商品" value="leading" />
@@ -107,7 +107,15 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="毛利贡献率角色" align="center">
+        <el-table-column align="center">
+          <template #header>
+            <span class="metric-header">
+              毛利贡献角色
+              <el-tooltip content="按毛利率和销售增长率判定，不等同于库存周转角色" placement="top">
+                <el-icon class="metric-help-icon"><QuestionFilled /></el-icon>
+              </el-tooltip>
+            </span>
+          </template>
           <el-table-column label="本期" prop="currentGrossRoleName" min-width="150" align="center" show-overflow-tooltip>
             <template #default="{ row }">
               <span v-if="row.__isSummary">--</span>
@@ -217,8 +225,8 @@
           layout="total, sizes, prev, pager, next, jumper"
           :page-sizes="[5, 10, 20, 50]"
           :total="total"
-          @size-change="handleQuery"
-          @current-change="handleQuery"
+          @size-change="handleSizeChange"
+          @current-change="handlePageChange"
         />
       </div>
     </el-card>
@@ -234,6 +242,7 @@
 <script setup name="GrossContributionGoodsList" lang="ts">
 import GoodsProcessDialog from '@/components/GoodsProcessDialog/index.vue';
 import type { Sort } from 'element-plus';
+import { QuestionFilled } from '@element-plus/icons-vue';
 import { getGrossSalesList } from '@/api/gross-contribution';
 
 interface GoodsRow {
@@ -320,8 +329,8 @@ const categoryTitle = computed(() => {
 const queryForm = reactive<QueryForm>({
   status: ['-1', '0', '1'],
   promotion: '',
-  currentGross: '',
-  compareGross: '',
+  currentGross: resolveQueryValue(route.query.currentGross as string | string[] | null | undefined, ''),
+  compareGross: resolveQueryValue(route.query.compareGross as string | string[] | null | undefined, ''),
   pageNum: 1,
   pageSize: 10
 });
@@ -396,9 +405,7 @@ const loadTableList = async () => {
   }
   tableLoading.value = true;
   try {
-    const statusList = queryForm.status.includes('-1')
-      ? queryForm.status.filter((item) => item !== '-1')
-      : queryForm.status;
+    const statusList = queryForm.status.includes('-1') ? [] : queryForm.status;
     const res = await getGrossSalesList({
       sessionId: sessionId.value,
       status: statusList.length ? statusList : undefined,
@@ -419,6 +426,17 @@ const loadTableList = async () => {
 };
 
 const handleQuery = async () => {
+  queryForm.pageNum = 1;
+  await loadTableList();
+};
+
+const handlePageChange = async (page: number) => {
+  queryForm.pageNum = page;
+  await loadTableList();
+};
+
+const handleSizeChange = async (size: number) => {
+  queryForm.pageSize = size;
   queryForm.pageNum = 1;
   await loadTableList();
 };
@@ -636,6 +654,19 @@ onMounted(async () => {
 
 .goods-table :deep(.cell) {
   font-size: 13px;
+}
+
+.metric-header {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.metric-help-icon {
+  color: #94a3b8;
+  cursor: help;
+  font-size: 15px;
 }
 
 .goods-table :deep(.el-table__body td) {

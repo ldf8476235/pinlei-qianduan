@@ -10,16 +10,20 @@
           </div>
         </div>
         <div class="page-actions">
-          <span class="unit-text">金额单位：元</span>
+          <span class="unit-text">数据来源：静态标签 Excel</span>
         </div>
       </div>
     </el-card>
 
     <el-card shadow="hover" class="page-card tab-card">
+      <div class="source-line">
+        <span class="source-label">当前标签范围</span>
+        <el-tag v-for="item in activeCategoryNames" :key="item" size="small" effect="plain">{{ item }}</el-tag>
+      </div>
       <div class="tag-tabs">
         <el-button
           v-for="item in tabItems"
-          :key="item.value"d
+          :key="item.value"
           :type="activeTagType === item.value ? 'primary' : 'default'"
           :plain="activeTagType !== item.value"
           class="tag-tab-btn"
@@ -33,7 +37,8 @@
     <el-card shadow="hover" class="page-card cloud-card" v-loading="cloudLoading">
       <template #header>
         <div class="card-header">
-          <span class="card-title">本期各标签销售贡献</span>
+          <span class="card-title">本期各标签覆盖贡献</span>
+          <span class="card-subtitle">按 Excel 商品标签覆盖 SKU 数计算</span>
         </div>
       </template>
       <div class="cloud-wrap">
@@ -58,18 +63,12 @@
           <span class="card-title">标签明细</span>
         </div>
       </template>
-      <el-table :data="detailRows" border stripe>
+      <el-table :data="detailRows" border stripe empty-text="暂无标签明细数据">
         <el-table-column label="标签名称" prop="tagName" min-width="180" />
-        <el-table-column label="销售额" prop="sales" min-width="120" align="right">
-          <template #default="{ row }">{{ formatAmount(row.sales) }}</template>
-        </el-table-column>
-        <el-table-column label="销售占比" prop="salesPer" min-width="120" align="right">
-          <template #default="{ row }">{{ formatPercent(row.salesPer) }}</template>
-        </el-table-column>
-        <el-table-column label="SKU" prop="sku" min-width="100" align="right">
+        <el-table-column label="覆盖SKU数" prop="sku" min-width="120" align="right">
           <template #default="{ row }">{{ formatAmount(row.sku, 0) }}</template>
         </el-table-column>
-        <el-table-column label="SKU占比" prop="skuPer" min-width="120" align="right">
+        <el-table-column label="覆盖占比" prop="skuPer" min-width="120" align="right">
           <template #default="{ row }">{{ formatPercent(row.skuPer) }}</template>
         </el-table-column>
       </el-table>
@@ -89,9 +88,8 @@
 </template>
 
 <script setup name="TagAnalysis" lang="ts">
-import { getCategoryDiagnosisTagList, getCategoryDiagnosisTagSalesShare, getCategoryDiagnosisTagTypes } from '@/api/category/diagnosis/detail';
 import type { TagDetailItemResponse, TagSalesSkuItemResponse, TagTypeGroupResponse } from '@/api/category/diagnosis/detail/types';
-import { useRequest } from '@/hooks/useRequest';
+import { STATIC_TAG_ANALYSIS_DATA, STATIC_TAG_CATEGORY_ALIASES, type StaticTagMetric } from './data/staticTagAnalysisData';
 
 interface CloudWordItem {
   key: string;
@@ -101,18 +99,18 @@ interface CloudWordItem {
 }
 
 const handleDetail = () => {
-  ElMessage.info('当前为内嵌页，详情入口保持在页面内展示');
+  ElMessage.info('当前为静态标签分析，明细已在下方表格展示');
 };
 
 const tabGroups = ref<TagTypeGroupResponse[]>([]);
 const activeTagType = ref('');
 const cloudWords = ref<CloudWordItem[]>([]);
 const detailRows = ref<TagDetailItemResponse[]>([]);
+const cloudLoading = ref(false);
+const detailLoading = ref(false);
 
-const summaryItems = [
-  '标签为植物精华、熏香配方、自然配方、天然配方、香氛配方的商品销售额相对较好，客户购买意向高。',
-  '标签为小苍兰香氛、杀菌留香珠、玫瑰留香技术、母婴酵素配方、运动型配方的商品销售额相对较差，客户购买意向低。'
-];
+const route = useRoute();
+const colorPool = ['#f97316', '#fb923c', '#f59e0b', '#ea580c', '#fdba74', '#c2410c', '#fbbf24'];
 
 const tabItems = computed(() =>
   tabGroups.value
@@ -123,66 +121,134 @@ const tabItems = computed(() =>
     }))
 );
 
-const typesRequest = useRequest(async (sessionId: string) => await getCategoryDiagnosisTagTypes(sessionId), {
-  onSuccess: (res) => {
-    tabGroups.value = Array.isArray(res?.data) ? res.data.filter((item) => Boolean(item?.tagType)) : [];
-    activeTagType.value = tabGroups.value[0]?.tagType || '';
-    cloudWords.value = [];
-    detailRows.value = [];
-    if (activeTagType.value) {
-      void loadCloud();
-    }
+const activeCategoryNames = computed(() => resolveCategoryNames(String(route.query.categoryName || '')));
+
+const summaryItems = computed(() => {
+  if (!detailRows.value.length) {
+    return ['当前标签范围暂无可分析数据，请检查 Excel 标签字段或品类映射。'];
   }
+  const topTags = detailRows.value.slice(0, 5).map((item) => item.tagName).filter(Boolean);
+  const weakTags = detailRows.value.slice(-5).reverse().map((item) => item.tagName).filter(Boolean);
+  return [
+    `标签为 ${topTags.join('、')} 的商品覆盖 SKU 数较高，可作为当前品类的主推卖点或筛选维度。`,
+    `标签为 ${weakTags.join('、')} 的商品覆盖 SKU 数较低，建议结合真实销售额判断是否需要补充商品或弱化该标签。`
+  ];
 });
 
-const cloudRequest = useRequest(async (params: { sessionId: string; tagType: string }) => await getCategoryDiagnosisTagSalesShare(params.sessionId, params.tagType), {
-  onSuccess: (res) => {
-    cloudWords.value = buildCloudWords((res?.data?.salesAndSkuList || detailRows.value || []) as TagSalesSkuItemResponse[]);
+const resolveCategoryNames = (categoryName: string) => {
+  const sourceNames = Object.keys(STATIC_TAG_ANALYSIS_DATA);
+  const normalized = categoryName.trim();
+  if (normalized) {
+    const aliasKey = Object.keys(STATIC_TAG_CATEGORY_ALIASES).find((key) => normalized.includes(key));
+    if (aliasKey) return STATIC_TAG_CATEGORY_ALIASES[aliasKey].filter((item) => sourceNames.includes(item));
+
+    const direct = sourceNames.find((item) => normalized.includes(item));
+    if (direct) return [direct];
   }
-});
+  return ['洗护', '家清'];
+};
 
-const detailRequest = useRequest(async (params: { sessionId: string; tagType: string }) => await getCategoryDiagnosisTagList(params.sessionId, params.tagType, undefined, 1, 20, 'sales', 'desc'), {
-  onSuccess: (res) => {
-    detailRows.value = Array.isArray(res?.data?.records) ? res.data.records : [];
-    if (!cloudWords.value.length) {
-      cloudWords.value = buildCloudWords(detailRows.value as unknown as TagSalesSkuItemResponse[]);
-    }
-  }
-});
+const normalizeStaticRows = (rows: StaticTagMetric[]) => {
+  const totalSku = rows.reduce((sum, item) => sum + Number(item.sku || 0), 0) || 1;
+  return rows
+    .map((item) => ({
+      tagName: item.tagName,
+      sku: item.sku,
+      skuPer: (Number(item.sku || 0) / totalSku) * 100,
+      sales: item.sku,
+      salesPer: (Number(item.sku || 0) / totalSku) * 100
+    }))
+    .sort((a, b) => Number(b.sku || 0) - Number(a.sku || 0));
+};
 
-const cloudLoading = computed(() => typesRequest.loading.value || cloudRequest.loading.value);
-const detailLoading = computed(() => detailRequest.loading.value);
+const mergeStaticRows = (categoryNames: string[], tagType: string) => {
+  const rowMap = new Map<string, StaticTagMetric>();
+  categoryNames.forEach((categoryName) => {
+    const rows = STATIC_TAG_ANALYSIS_DATA[categoryName]?.[tagType] || [];
+    rows.forEach((item) => {
+      const key = item.tagName.trim();
+      if (!key) return;
+      const current = rowMap.get(key);
+      rowMap.set(key, {
+        tagName: key,
+        sku: Number(current?.sku || 0) + Number(item.sku || 0)
+      });
+    });
+  });
+  return normalizeStaticRows([...rowMap.values()]);
+};
 
-const route = useRoute();
-const sessionId = computed(() => String(route.query.sessionId || ''));
+const getAvailableTagTypes = (categoryNames: string[]) => {
+  const typeSet = new Set<string>();
+  categoryNames.forEach((categoryName) => {
+    Object.keys(STATIC_TAG_ANALYSIS_DATA[categoryName] || {}).forEach((tagType) => typeSet.add(tagType));
+  });
+  return [...typeSet].map((tagType) => ({
+    tagType,
+    tagTypeName: tagType
+  }));
+};
 
-const colorPool = ['#2563eb', '#16a34a', '#f59e0b', '#8b5cf6', '#06b6d4', '#ef4444', '#0f766e'];
+const cloudSlots = [
+  [50, 48],
+  [31, 36],
+  [69, 37],
+  [18, 54],
+  [82, 54],
+  [43, 24],
+  [58, 25],
+  [36, 64],
+  [64, 64],
+  [22, 28],
+  [78, 28],
+  [13, 40],
+  [88, 41],
+  [49, 73],
+  [27, 76],
+  [73, 76],
+  [10, 66],
+  [91, 66],
+  [38, 12],
+  [62, 12],
+  [16, 16],
+  [84, 16],
+  [50, 88],
+  [30, 90],
+  [70, 90],
+  [7, 24],
+  [94, 24],
+  [7, 82],
+  [94, 82],
+  [24, 10],
+  [76, 10],
+  [41, 84],
+  [59, 84],
+  [4, 50],
+  [96, 50],
+  [50, 8]
+] as const;
 
 const buildCloudWords = (items: TagSalesSkuItemResponse[]) => {
-  const sorted = [...items].sort((a, b) => Number(b.sales || 0) - Number(a.sales || 0));
-  const maxSales = Math.max(...sorted.map((item) => Number(item.sales || 0)), 1);
-  const stageWidth = 1000;
-  const stageHeight = 500;
-  const centerX = stageWidth / 2;
-  const centerY = stageHeight / 2;
+  const sorted = [...items].sort((a, b) => Number(b.sku || 0) - Number(a.sku || 0)).slice(0, cloudSlots.length);
+  const maxSku = Math.max(...sorted.map((item) => Number(item.sku || 0)), 1);
   return sorted.map((item, index) => {
-    const sales = Number(item.sales || 0);
-    const size = 16 + (sales / maxSales) * 22;
-    const angle = index * 0.85;
-    const radius = 20 + index * 18;
-    const x = Math.max(60, Math.min(stageWidth - 60, centerX + Math.cos(angle) * radius));
-    const y = Math.max(40, Math.min(stageHeight - 40, centerY + Math.sin(angle) * radius * 0.72));
+    const sku = Number(item.sku || 0);
+    const weight = sku / maxSku;
+    const size = 13 + weight * 20;
+    const [x, y] = cloudSlots[index];
     const color = colorPool[index % colorPool.length];
     return {
       key: `${item.tagName || 'tag'}-${index}`,
       name: item.tagName || '-',
-      tooltip: `标签名称<br/>销售额：${formatAmount(sales)} 元<br/>SKU：${formatAmount(item.sku, 0)}<br/>SKU占比：${formatPercent(item.skuPer)}`,
+      tooltip: `标签名称：${item.tagName || '-'}<br/>覆盖SKU数：${formatAmount(sku, 0)}<br/>覆盖占比：${formatPercent(item.skuPer)}`,
       style: {
-        left: `${(x / stageWidth) * 100}%`,
-        top: `${(y / stageHeight) * 100}%`,
+        left: `${x}%`,
+        top: `${y}%`,
         fontSize: `${size.toFixed(0)}px`,
         color,
-        transform: `translate(-50%, -50%) rotate(${(index % 5 - 2) * 4}deg)`
+        transform: 'translate(-50%, -50%) rotate(0deg)',
+        zIndex: `${100 - index}`,
+        maxWidth: '210px'
       }
     };
   });
@@ -200,35 +266,38 @@ const formatPercent = (value: unknown) => {
   return `${num.toFixed(2)}%`;
 };
 
-const loadCloud = async () => {
-  if (!sessionId.value || !activeTagType.value) return;
-  await Promise.all([
-    cloudRequest.run({ sessionId: sessionId.value, tagType: activeTagType.value }),
-    detailRequest.run({ sessionId: sessionId.value, tagType: activeTagType.value })
-  ]);
+const loadStaticTagAnalysis = () => {
+  cloudLoading.value = true;
+  detailLoading.value = true;
+  try {
+    tabGroups.value = getAvailableTagTypes(activeCategoryNames.value);
+    if (!tabGroups.value.some((item) => item.tagType === activeTagType.value)) {
+      activeTagType.value = tabGroups.value[0]?.tagType || '';
+    }
+    const rows = activeTagType.value ? mergeStaticRows(activeCategoryNames.value, activeTagType.value) : [];
+    detailRows.value = rows;
+    cloudWords.value = buildCloudWords(rows as TagSalesSkuItemResponse[]);
+  } finally {
+    cloudLoading.value = false;
+    detailLoading.value = false;
+  }
 };
 
-const handleTabChange = async (tagType: string) => {
+const handleTabChange = (tagType: string) => {
   if (activeTagType.value === tagType) return;
   activeTagType.value = tagType;
-  await loadCloud();
+  loadStaticTagAnalysis();
 };
 
-onMounted(async () => {
-  if (!sessionId.value) return;
-  await typesRequest.run(sessionId.value);
+onMounted(() => {
+  loadStaticTagAnalysis();
 });
 
 watch(
-  () => route.query.sessionId,
-  async () => {
-    tabGroups.value = [];
+  () => route.query.categoryName,
+  () => {
     activeTagType.value = '';
-    cloudWords.value = [];
-    detailRows.value = [];
-    if (sessionId.value) {
-      await typesRequest.run(sessionId.value);
-    }
+    loadStaticTagAnalysis();
   }
 );
 </script>
@@ -298,9 +367,22 @@ watch(
   gap: 10px;
 }
 
+.source-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.source-label {
+  color: #64748b;
+  font-size: 13px;
+}
+
 .tag-tab-btn {
   min-width: 82px;
-  border-radius: 10px;
+  border-radius: 8px;
 }
 
 .card-header {
@@ -313,6 +395,11 @@ watch(
   font-size: 15px;
   font-weight: 600;
   color: #0f172a;
+}
+
+.card-subtitle {
+  font-size: 12px;
+  color: #94a3b8;
 }
 
 .cloud-wrap {
@@ -334,17 +421,23 @@ watch(
 .cloud-stage {
   position: relative;
   width: 100%;
-  height: 520px;
+  min-height: 520px;
   background: linear-gradient(180deg, rgba(248, 250, 252, 0.72) 0%, rgba(255, 255, 255, 1) 100%);
   border-radius: 16px;
+  overflow: hidden;
 }
 
 .cloud-word {
   position: absolute;
-  white-space: nowrap;
+  display: inline-block;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.18;
   font-weight: 600;
   cursor: default;
   user-select: none;
+  overflow-wrap: anywhere;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.85);
 }
 
 .summary-card {
@@ -368,7 +461,7 @@ watch(
   }
 
   .cloud-stage {
-    height: 420px;
+    min-height: 460px;
   }
 
   .cloud-empty {

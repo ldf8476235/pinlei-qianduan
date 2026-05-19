@@ -60,7 +60,17 @@ export const useUserStore = defineStore('user', () => {
   // 注销
   const logout = async (): Promise<void> => {
     await logoutApi();
+    clearAuth();
+  };
+
+  // 清理本地登录态。认证失效时不能再依赖 logout 接口，避免再次触发 401。
+  const clearAuth = (): void => {
     token.value = '';
+    name.value = '';
+    nickname.value = '';
+    userId.value = '';
+    tenantId.value = '';
+    avatar.value = '';
     roles.value = [];
     permissions.value = [];
     removeToken();
@@ -81,6 +91,7 @@ export const useUserStore = defineStore('user', () => {
     login,
     getInfo,
     logout,
+    clearAuth,
     setAvatar
   };
 });

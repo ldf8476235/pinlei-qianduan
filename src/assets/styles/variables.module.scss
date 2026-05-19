@@ -1,23 +1,30 @@
 // 全局SCSS变量
 :root {
-  --menuBg: #1f2d3d;
-  --menuColor: #bfcbd9;
-  --menuActiveText: #f4f4f5;
-  --menuHover: #263445;
+  --menuBg: #ff8a18;
+  --menuColor: #fff4e8;
+  --menuActiveText: #c86a15;
+  --menuHover: rgba(255, 255, 255, 0.12);
 
-  --subMenuBg: #1f2d3d;
-  --subMenuActiveText: #f4f4f5;
-  --subMenuHover: #001528;
-  --subMenuTitleHover: #293444;
+  --subMenuBg: transparent;
+  --subMenuActiveText: #c86a15;
+  --subMenuHover: rgba(255, 255, 255, 0.12);
+  --subMenuTitleHover: rgba(255, 255, 255, 0.12);
+  --sidebarGradientStart: #ff9a2f;
+  --sidebarGradientMiddle: #ff8712;
+  --sidebarGradientEnd: #f27500;
+  --sidebarActiveBg: #f6e6cf;
+  --sidebarActiveText: #c86a15;
+  --sidebarDividerColor: rgba(255, 244, 232, 0.34);
+  --sidebarShadowColor: rgba(166, 79, 14, 0.22);
 
   // 菜单栏缩进
   --el-menu-base-level-padding: 12px;
   --el-menu-level-padding: 8px;
   --el-menu-item-height: 50px;
 
-  --fixedHeaderBg: #ffffff;
-  --tableHeaderBg: #f8f8f9;
-  --tableHeaderTextColor: #515a6e;
+  --fixedHeaderBg: #fffaf5;
+  --tableHeaderBg: #fff4ec;
+  --tableHeaderTextColor: #7c4a28;
 
   // ele
   --brder-color: #e8e8e8;
@@ -42,21 +49,28 @@
   --el-border-radius-round: 999px;
   --el-box-shadow-light: var(--app-shadow-sm);
   --el-box-shadow: var(--app-shadow-md);
-  --el-bg-color-page: #f5f7fb;
+  --el-bg-color-page: #fff7f2;
 }
 
 html.dark {
-  --menuBg: #1d1e1f;
-  --menuColor: #bfcbd9;
-  --menuActiveText: #f4f4f5;
-  --menuHover: #171819;
+  --menuBg: #ff8a18;
+  --menuColor: #fff4e8;
+  --menuActiveText: #c86a15;
+  --menuHover: rgba(255, 255, 255, 0.12);
 
-  --subMenuBg: #1d1e1f;
-  --subMenuActiveText: #1d1e1f;
-  --subMenuHover: #171819;
-  --subMenuTitleHover: #171819;
+  --subMenuBg: transparent;
+  --subMenuActiveText: #c86a15;
+  --subMenuHover: rgba(255, 255, 255, 0.12);
+  --subMenuTitleHover: rgba(255, 255, 255, 0.12);
+  --sidebarGradientStart: #ff9a2f;
+  --sidebarGradientMiddle: #ff8712;
+  --sidebarGradientEnd: #f27500;
+  --sidebarActiveBg: #f6e6cf;
+  --sidebarActiveText: #c86a15;
+  --sidebarDividerColor: rgba(255, 244, 232, 0.34);
+  --sidebarShadowColor: rgba(166, 79, 14, 0.22);
 
-  --fixedHeaderBg: #171819;
+  --fixedHeaderBg: #18100c;
   --tableHeaderBg: var(--el-bg-color);
   --tableHeaderTextColor: var(--el-text-color);
 
@@ -66,23 +80,23 @@ html.dark {
   }
 
   .el-button--primary {
-    --el-button-bg-color: #2b6bd3;
-    --el-button-border-color: #3a7be8;
-    --el-button-text-color: #eef4ff;
-    --el-button-hover-bg-color: #3a7be8;
-    --el-button-hover-border-color: #3a7be8;
-    --el-button-active-bg-color: #255fb8;
-    --el-button-active-border-color: #255fb8;
+    --el-button-bg-color: #c65a10;
+    --el-button-border-color: #e97218;
+    --el-button-text-color: #fff7ed;
+    --el-button-hover-bg-color: #e97218;
+    --el-button-hover-border-color: #e97218;
+    --el-button-active-bg-color: #a94d0d;
+    --el-button-active-border-color: #a94d0d;
   }
 
   .el-button--primary.is-plain {
-    --el-button-bg-color: rgba(43, 107, 211, 0.12);
-    --el-button-border-color: rgba(58, 123, 232, 0.5);
-    --el-button-text-color: #dbe8ff;
-    --el-button-hover-bg-color: rgba(58, 123, 232, 0.2);
-    --el-button-hover-border-color: rgba(58, 123, 232, 0.7);
-    --el-button-active-bg-color: rgba(43, 107, 211, 0.28);
-    --el-button-active-border-color: rgba(43, 107, 211, 0.8);
+    --el-button-bg-color: rgba(249, 115, 22, 0.14);
+    --el-button-border-color: rgba(251, 146, 60, 0.55);
+    --el-button-text-color: #ffedd5;
+    --el-button-hover-bg-color: rgba(249, 115, 22, 0.24);
+    --el-button-hover-border-color: rgba(251, 146, 60, 0.78);
+    --el-button-active-bg-color: rgba(234, 88, 12, 0.34);
+    --el-button-active-border-color: rgba(234, 88, 12, 0.88);
   }
 
   .el-button--success {
@@ -207,12 +221,12 @@ html.dark {
   --app-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.28), 0 8px 18px rgba(0, 0, 0, 0.25);
   --app-shadow-md: 0 10px 26px rgba(0, 0, 0, 0.35);
   --app-shadow-lg: 0 14px 34px rgba(0, 0, 0, 0.4);
-  --app-surface-bg: #151922;
+  --app-surface-bg: #18110d;
   --app-surface-border: var(--el-border-color);
-  --el-bg-color-page: #0f1115;
+  --el-bg-color-page: #120d0a;
   // vxe-table 主题
   --vxe-font-color: #98989e;
-  --vxe-primary-color: #2c7ecf;
+  --vxe-primary-color: #f97316;
   --vxe-icon-background-color: #98989e;
   --vxe-table-font-color: #98989e;
   --vxe-table-resizable-color: #95969a;
@@ -256,7 +270,7 @@ $fixed-header-bg: var(--fixedHeaderBg);
 $table-header-bg: var(--tableHeaderBg);
 $table-header-text-color: var(--tableHeaderTextColor);
 
-$--color-primary: #409eff;
+$--color-primary: #f97316;
 $--color-success: #67c23a;
 $--color-warning: #e6a23c;
 $--color-danger: #f56c6c;

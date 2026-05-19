@@ -58,6 +58,7 @@
               <el-option label="A" value="A" />
               <el-option label="B" value="B" />
               <el-option label="C" value="C" />
+              <el-option label="/" value="NONE" />
             </el-select>
           </el-form-item>
 
@@ -67,6 +68,7 @@
               <el-option label="A" value="A" />
               <el-option label="B" value="B" />
               <el-option label="C" value="C" />
+              <el-option label="/" value="NONE" />
             </el-select>
           </el-form-item>
 
@@ -89,14 +91,28 @@
         </div>
       </template>      <div class="table-scroll-wrap">
         <el-table
+          ref="goodsTableRef"
           :data="displayRows"
           border
           stripe
           class="goods-table goods-table--wide"
+          :row-key="getProductRowKey"
+          :expand-row-keys="expandedProductKeys"
           :default-sort="{ prop: 'sales', order: 'descending' }"
           header-cell-class-name="goods-table-header"
           @sort-change="handleSortChange"
         >
+          <el-table-column type="expand" width="1" fixed="left" class-name="goods-detail-expand-column">
+            <template #default="{ row }">
+              <div class="goods-detail-row">
+                <span v-for="item in buildGoodsDetailItems(row)" :key="item.label" class="goods-detail-item">
+                  <strong>{{ item.label }}：</strong>
+                  <span>{{ item.value }}</span>
+                </span>
+              </div>
+            </template>
+          </el-table-column>
+
           <el-table-column
             label="商品编码"
             prop="productNo"
@@ -129,8 +145,16 @@
           </el-table-column>
 
           <el-table-column label="销售额ABC类别" align="center" header-align="center">
-            <el-table-column label="本期" prop="currentAbc" min-width="110" align="center" header-align="center" />
-            <el-table-column label="对比日期" prop="compareAbc" min-width="120" align="center" header-align="center" />
+            <el-table-column label="本期" prop="currentAbc" min-width="110" align="center" header-align="center">
+              <template #default="{ row }">
+                {{ formatAbcLabel(row.currentAbc) }}
+              </template>
+            </el-table-column>
+            <el-table-column label="对比日期" prop="compareAbc" min-width="120" align="center" header-align="center">
+              <template #default="{ row }">
+                {{ formatAbcLabel(row.compareAbc) }}
+              </template>
+            </el-table-column>
           </el-table-column>
 
           <el-table-column label="销售量" align="center" header-align="center">
@@ -258,6 +282,8 @@ const abcParams = ref<AbcTypeParamVO[]>([]);
 const tableRows = ref<AbcSalesListItemVO[]>([]);
 const tableLoading = ref(false);
 const processDialogVisible = ref(false);
+const goodsTableRef = ref<any>();
+const expandedProductKeys = ref<string[]>([]);
 
 const sortState = reactive<{
   prop: string;
@@ -297,12 +323,20 @@ const categoryTitle = computed(() => {
   return `${categoryId}${categoryName}（${levelName}）`;
 });
 
+const normalizeRouteAbc = (value: unknown) => {
+  const code = String(value || '').trim().toUpperCase();
+  if (!code || code === '0') return '';
+  if (code === 'NONE' || code === '/') return 'NONE';
+  if (['A', 'B', 'C'].includes(code)) return code;
+  return '';
+};
+
 const initialQueryForm = () => ({
   abcType: String(route.query.abcType || ''),
   status: ['-1'] as string[],
   promotion: '',
-  currentAbc: '',
-  compareAbc: ''
+  currentAbc: normalizeRouteAbc(route.query.currentAbc),
+  compareAbc: normalizeRouteAbc(route.query.compareAbc)
 });
 
 const queryForm = reactive(initialQueryForm());
@@ -353,7 +387,10 @@ const loadAbcParams = async () => {
 const loadTable = async () => {
   if (!sessionReady.value || !sessionId.value || !queryForm.abcType) return;
   tableLoading.value = true;
+  expandedProductKeys.value = [];
   try {
+    const order = sortState.prop || 'sales';
+    const orderType = sortState.order === 'ascending' ? 'asc' : 'desc';
     const res: any = await getAbcSalesList({
       sessionId: sessionId.value,
       abcType: queryForm.abcType,
@@ -363,8 +400,8 @@ const loadTable = async () => {
       compareAbc: queryForm.compareAbc || undefined,
       pageNum: pagination.pageNum,
       pageSize: pagination.pageSize,
-      order: 'sales',
-      orderType: 'desc'
+      order,
+      orderType
     });
     const payload = res?.data || {};
     tableRows.value = Array.isArray(payload.records) ? payload.records : [];
@@ -451,17 +488,40 @@ const displayRows = computed(() => {
   });
 });
 
+const getProductRowKey = (row: AbcSalesListItemVO) => String(row.productNo || row.productBarcode || row.productName || '');
+
+const formatDetailValue = (value: unknown, fallback = '--') => {
+  const text = String(value ?? '').trim();
+  return text || fallback;
+};
+
+const buildGoodsDetailItems = (row: AbcSalesListItemVO) => [
+  { label: '品类编码', value: formatDetailValue(row.classNo || route.query.categoryId) },
+  { label: '品类名称', value: formatDetailValue(row.className || route.query.categoryName) },
+  { label: '商品条码', value: formatDetailValue(row.productBarcode || row.productNo) },
+  { label: '品牌名称', value: formatDetailValue(row.brandName) },
+  { label: '规格', value: formatDetailValue(row.spec) },
+  { label: '预估进价', value: formatMoneyValue(row.inPrice, 2) },
+  { label: '售价', value: formatMoneyValue(row.salesPrice, 2) },
+  { label: '供应商', value: formatDetailValue(row.productVendorNoName || row.productVendorName || row.productVendorNo) }
+];
+
 const handleSortChange = ({ prop, order }: { prop: string; order: Sort['order'] }) => {
   sortState.prop = prop || 'sales';
   sortState.order = order as SortOrder;
+  pagination.pageNum = 1;
+  void loadTable();
 };
 
 const handleExport = () => {
   ElMessage.info('导出功能后续对接真实接口');
 };
 
-const handleGoodsDetail = (_row: AbcSalesListItemVO) => {
-  ElMessage.info('商品详情跳转功能待接入');
+const handleGoodsDetail = (row: AbcSalesListItemVO) => {
+  const rowKey = getProductRowKey(row);
+  const isExpanded = expandedProductKeys.value.includes(rowKey);
+  expandedProductKeys.value = isExpanded ? [] : [rowKey];
+  goodsTableRef.value?.toggleRowExpansion(row, !isExpanded);
 };
 
 const handleProcess = (_row: AbcSalesListItemVO) => {
@@ -485,11 +545,26 @@ const formatNumber = (value: number | string | null | undefined, digits = 2) => 
   });
 };
 
+const formatMoneyValue = (value: number | string | null | undefined, digits = 2) => {
+  const num = Number(value);
+  if (!Number.isFinite(num) || num === 0) return '--';
+  return num.toLocaleString('zh-CN', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: digits
+  });
+};
+
 const formatPercent = (value: number | string | null | undefined) => {
   const num = Number(value);
   if (!Number.isFinite(num)) return '0.00%';
   const actual = Math.abs(num) <= 1 ? num * 100 : num;
   return `${actual.toFixed(2)}%`;
+};
+
+const formatAbcLabel = (value: string | null | undefined) => {
+  const code = String(value || '').trim().toUpperCase();
+  if (!code || code === 'NONE') return '/';
+  return code;
 };
 
 onMounted(async () => {
@@ -604,6 +679,55 @@ onBeforeUnmount(() => {
 
 .goods-table :deep(.el-table__body td) {
   color: #334155;
+}
+
+.goods-table :deep(.goods-detail-expand-column) {
+  width: 1px !important;
+  padding: 0 !important;
+  border-right: 0;
+}
+
+.goods-table :deep(.goods-detail-expand-column .cell) {
+  display: none;
+}
+
+.goods-table :deep(.el-table__expanded-cell) {
+  padding: 0 !important;
+  background: #ffffff;
+}
+
+.goods-detail-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-height: 52px;
+  padding: 0 24px;
+  overflow: hidden;
+  border-left: 4px solid #ff7e18;
+  background: linear-gradient(90deg, rgba(255, 126, 24, 0.1), rgba(255, 247, 237, 0.92));
+  color: #5f6368;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.goods-detail-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.goods-detail-item strong {
+  color: #4b5563;
+  font-weight: 700;
+}
+
+.goods-detail-item span {
+  display: inline-block;
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
 }
 
 .table-scroll-wrap {

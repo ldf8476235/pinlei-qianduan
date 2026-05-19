@@ -24,7 +24,16 @@
               <span class="card-title">本期销售占比</span>
             </div>
           </template>
-          <div ref="pieChartRef" class="chart-box" />
+          <div class="vue-chart-tooltip-wrap" @mousemove="handlePieTooltipMousemove" @mouseleave="hidePieTooltip">
+            <div ref="pieChartRef" class="chart-box" />
+            <div v-if="pieTooltip.visible" class="channel-trend-tooltip" :style="{ left: `${pieTooltip.x}px`, top: `${pieTooltip.y}px` }">
+              <div class="tooltip-title">{{ pieTooltip.title }}</div>
+              <div v-for="item in pieTooltip.rows" :key="item.name" class="tooltip-row">
+                <span class="tooltip-dot" :style="{ background: item.color }" />
+                <span>{{ item.name }}：{{ item.value }}</span>
+              </div>
+            </div>
+          </div>
         </el-card>
       </el-col>
       <el-col :lg="12" :md="12" :sm="24" :xs="24">
@@ -34,7 +43,20 @@
               <span class="card-title">本期销售趋势</span>
             </div>
           </template>
-          <div ref="trendChartRef" class="chart-box" />
+          <div class="channel-trend-chart-wrap" @mousemove="handleChannelTrendMousemove" @mouseleave="hideChannelTrendTooltip">
+            <div ref="trendChartRef" class="chart-box" />
+            <div
+              v-if="customTrendTooltip.visible"
+              class="channel-trend-tooltip"
+              :style="{ left: `${customTrendTooltip.x}px`, top: `${customTrendTooltip.y}px` }"
+            >
+              <div class="tooltip-title">{{ customTrendTooltip.title }}</div>
+              <div v-for="item in customTrendTooltip.rows" :key="item.name" class="tooltip-row">
+                <span class="tooltip-dot" :style="{ background: item.color }" />
+                <span>{{ item.name }}：{{ item.value }}</span>
+              </div>
+            </div>
+          </div>
         </el-card>
       </el-col>
     </el-row>
@@ -125,6 +147,7 @@
 import * as echarts from 'echarts';
 import type { EChartsOption } from 'echarts';
 import { useRequest } from '@/hooks/useRequest';
+import { createVueChartTooltip, getCategoryIndexByMouse, hideVueChartTooltip, showVueChartTooltip } from './useVueChartTooltip';
 import {
   getCategoryDiagnosisChannelPie,
   getCategoryDiagnosisChannelTable,
@@ -173,6 +196,14 @@ const trendData = ref<ChannelSalesTrendResponse>({
   xdata: []
 });
 const tableRows = ref<ChannelTableViewRow[]>([]);
+const pieTooltip = createVueChartTooltip();
+const customTrendTooltip = reactive({
+  visible: false,
+  x: 0,
+  y: 0,
+  title: '',
+  rows: [] as Array<{ name: string; value: string; color: string }>
+});
 
 const query = computed<DiagnosisSubClassQuery>(() => ({
   sessionId: (route.query.sessionId as string) || '',
@@ -309,19 +340,68 @@ const formatGrowth = (value: unknown) => {
   return `${Number(fixed) > 0 ? '+' : ''}${fixed}%`;
 };
 
+const hidePieTooltip = () => {
+  hideVueChartTooltip(pieTooltip);
+};
+
+const hideChannelTrendTooltip = () => {
+  customTrendTooltip.visible = false;
+};
+
+const handlePieTooltipMousemove = (event: MouseEvent) => {
+  if (!pieData.value.length || !pieChartRef.value || !pieChartIns.value) {
+    hidePieTooltip();
+    return;
+  }
+  const rect = pieChartRef.value.getBoundingClientRect();
+  const point = [event.clientX - rect.left, event.clientY - rect.top];
+  const index = pieData.value.findIndex((_, dataIndex) => pieChartIns.value?.containPixel({ seriesIndex: 0, dataIndex }, point));
+  if (index < 0) {
+    hidePieTooltip();
+    return;
+  }
+  const item = pieData.value[index];
+  const total = pieData.value.reduce((sum, row) => sum + Number(row.value || 0), 0);
+  const percent = total > 0 ? (Number(item.value || 0) / total) * 100 : 0;
+  showVueChartTooltip(
+    pieTooltip,
+    event,
+    item.displayName || '--',
+    [
+      { name: '销售额', value: formatAmount(item.value), color: item.color },
+      { name: '占比', value: `${toNumber(percent, 2).toFixed(2)}%`, color: item.color }
+    ],
+    { width: 230, height: 96 }
+  );
+};
+
+const handleChannelTrendMousemove = (event: MouseEvent) => {
+  const dates = trendData.value.xdata || [];
+  const series = trendSeries.value || [];
+  if (!dates.length || !series.length || !trendChartRef.value) {
+    hideChannelTrendTooltip();
+    return;
+  }
+
+  const index = getCategoryIndexByMouse(event, trendChartRef.value, dates.length, { left: 56, right: 24 });
+  const rows = series.map((item) => ({
+    name: item.displayName || '--',
+    value: formatAmount(item.values[index]),
+    color: item.color
+  }));
+
+  customTrendTooltip.title = dates[index] || '--';
+  customTrendTooltip.rows = rows;
+  showVueChartTooltip(customTrendTooltip, event, dates[index] || '--', rows, { width: 260, height: 120 });
+};
+
 const renderPieChart = () => {
   initPieChart();
   if (!pieChartIns.value) return;
 
   const option: EChartsOption = {
     color: pieData.value.map((item) => item.color),
-    tooltip: {
-      trigger: 'item',
-      formatter: (params: any) => {
-        const percent = toNumber(params.percent, 2).toFixed(2);
-        return `${params.name}<br/>销售额：${formatAmount(params.value)}<br/>占比：${percent}%`;
-      }
-    },
+    tooltip: { show: false },
     legend: {
       orient: 'vertical',
       right: 12,
@@ -365,15 +445,7 @@ const renderTrendChart = () => {
 
   const option: EChartsOption = {
     color: trendSeries.value.map((item) => item.color),
-    tooltip: {
-      trigger: 'axis',
-      formatter: (params: any) => {
-        const rows = Array.isArray(params) ? params : [params];
-        const title = rows[0]?.axisValueLabel || rows[0]?.axisValue || '';
-        const lines = rows.map((item) => `${item.marker}${item.seriesName}：${formatAmount(item.value)}`);
-        return [title, ...lines].join('<br/>');
-      }
-    },
+    tooltip: { show: false },
     legend: {
       top: 0,
       left: 'center',
@@ -595,6 +667,53 @@ onUnmounted(() => {
   height: 360px;
 }
 
+.vue-chart-tooltip-wrap {
+  position: relative;
+  width: 100%;
+  height: 360px;
+}
+
+.channel-trend-chart-wrap {
+  position: relative;
+  width: 100%;
+  height: 360px;
+}
+
+.channel-trend-tooltip {
+  position: absolute;
+  z-index: 20;
+  min-width: 220px;
+  max-width: 300px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(17, 24, 39, 0.94);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1.6;
+  pointer-events: none;
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.24);
+}
+
+.tooltip-title {
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+
+.tooltip-dot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 999px;
+}
+
 .channel-cell {
   display: flex;
   align-items: center;
@@ -653,6 +772,10 @@ onUnmounted(() => {
   }
 
   .chart-box {
+    height: 320px;
+  }
+
+  .channel-trend-chart-wrap {
     height: 320px;
   }
 }

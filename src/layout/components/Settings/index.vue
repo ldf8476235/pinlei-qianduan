@@ -141,7 +141,7 @@ const showSettings = ref(false);
 const theme = ref(settingsStore.theme);
 const sideTheme = ref(settingsStore.sideTheme);
 const storeSettings = computed(() => settingsStore);
-const predefineColors = ref(['#409EFF', '#ff4500', '#ff8c00', '#ffd700', '#90ee90', '#00ced1', '#1e90ff', '#c71585']);
+const predefineColors = ref(['#f97316', '#ea580c', '#fb923c', '#f59e0b', '#facc15', '#14b8a6', '#22c55e', '#c2410c']);
 const navType = ref(settingsStore.navType);
 // 是否暗黑模式
 const isDark = useDark({
@@ -271,7 +271,7 @@ defineExpose({
       height: 100%;
       padding-top: 15px;
       padding-left: 24px;
-      color: #1890ff;
+      color: #f97316;
       font-weight: 700;
       font-size: 14px;
     }

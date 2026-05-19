@@ -4,7 +4,7 @@ export type RequestExecutor<TParams, TResult> = (params: TParams) => Promise<TRe
 
 export interface UseRequestOptions<TResult> {
   onSuccess?: (res: TResult) => void;
-  onError?: (err: any) => void;
+  onError?: (err: any) => void | Promise<void>;
 }
 
 /**
@@ -27,7 +27,7 @@ export const useRequest = <TParams = void, TResult = any>(executor: RequestExecu
       return res;
     } catch (err: any) {
       if (!alive) return undefined;
-      options?.onError?.(err);
+      await options?.onError?.(err);
       return undefined;
     } finally {
       if (alive) {

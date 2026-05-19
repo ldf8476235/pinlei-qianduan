@@ -11,7 +11,19 @@
     </el-card>
 
     <section class="metric-row">
-      <el-card v-for="item in metrics" :key="item.label" shadow="hover" class="page-card metric-card">
+      <el-card
+        v-for="item in metrics"
+        :key="item.label"
+        shadow="hover"
+        class="page-card metric-card"
+        :class="{ 'metric-card--clickable': item.drillable }"
+        :tabindex="item.drillable ? 0 : -1"
+        :role="item.drillable ? 'button' : undefined"
+        :aria-label="item.drillable ? `${item.label}，点击查看规格清单` : undefined"
+        @click="handleMetricClick(item)"
+        @keydown.enter.prevent="handleMetricClick(item)"
+        @keydown.space.prevent="handleMetricClick(item)"
+      >
         <div class="metric-label">{{ item.label }}</div>
         <div class="metric-value" :class="{ emphasis: item.emphasis }">{{ item.value }}</div>
       </el-card>
@@ -25,7 +37,16 @@
           </div>
         </template>
         <div class="pie-layout">
-          <div ref="pieChartRef" class="chart-box pie-chart" />
+          <div class="vue-chart-tooltip-wrap pie-tooltip-wrap" @mousemove="handleSpecTooltipMousemove($event, 'pie')" @mouseleave="hideSpecTooltip">
+            <div ref="pieChartRef" class="chart-box pie-chart" />
+            <div v-if="activeTooltipType === 'pie' && chartTooltip.visible" class="vue-chart-tooltip" :style="{ left: `${chartTooltip.x}px`, top: `${chartTooltip.y}px` }">
+              <div class="tooltip-title">{{ chartTooltip.title }}</div>
+              <div v-for="item in chartTooltip.rows" :key="item.name" class="tooltip-row">
+                <span v-if="item.color" class="tooltip-dot" :style="{ background: item.color }" />
+                <span>{{ item.name }}：{{ item.value }}</span>
+              </div>
+            </div>
+          </div>
           <div class="pie-legend">
             <div class="pie-legend-list">
               <div v-for="item in visiblePieLegendItems" :key="item.name" class="pie-legend-item">
@@ -50,8 +71,10 @@
               <el-button link type="primary" class="sort-text" @click="toggleRankDesc">{{ rankDesc ? '降序' : '升序' }}</el-button>
             </div>
             <el-select v-model="rankMetric" class="rank-select" size="small">
-              <el-option label="销售额" value="sales" />
-              <el-option label="销售量" value="quantity" />
+              <el-option label="销售额" value="1" />
+              <el-option label="销售量" value="2" />
+              <el-option label="毛利额" value="3" />
+              <el-option label="毛利率" value="4" />
             </el-select>
           </div>
         </template>
@@ -67,7 +90,16 @@
             @current-change="handleRankPageChange"
           />
         </div>
-        <div ref="rankChartRef" class="chart-box rank-chart" />
+        <div class="vue-chart-tooltip-wrap rank-tooltip-wrap" @mousemove="handleSpecTooltipMousemove($event, 'rank')" @mouseleave="hideSpecTooltip">
+          <div ref="rankChartRef" class="chart-box rank-chart" />
+          <div v-if="activeTooltipType === 'rank' && chartTooltip.visible" class="vue-chart-tooltip" :style="{ left: `${chartTooltip.x}px`, top: `${chartTooltip.y}px` }">
+            <div class="tooltip-title">{{ chartTooltip.title }}</div>
+            <div v-for="item in chartTooltip.rows" :key="item.name" class="tooltip-row">
+              <span v-if="item.color" class="tooltip-dot" :style="{ background: item.color }" />
+              <span>{{ item.name }}：{{ item.value }}</span>
+            </div>
+          </div>
+        </div>
       </el-card>
     </section>
 
@@ -78,7 +110,16 @@
             <span class="panel-title">规格SKU数及销售对比变化</span>
           </div>
         </template>
-        <div ref="comboChartRef" class="chart-box combo-chart" />
+        <div class="vue-chart-tooltip-wrap combo-tooltip-wrap" @mousemove="handleSpecTooltipMousemove($event, 'combo')" @mouseleave="hideSpecTooltip">
+          <div ref="comboChartRef" class="chart-box combo-chart" />
+          <div v-if="activeTooltipType === 'combo' && chartTooltip.visible" class="vue-chart-tooltip" :style="{ left: `${chartTooltip.x}px`, top: `${chartTooltip.y}px` }">
+            <div class="tooltip-title">{{ chartTooltip.title }}</div>
+            <div v-for="item in chartTooltip.rows" :key="item.name" class="tooltip-row">
+              <span v-if="item.color" class="tooltip-dot" :style="{ background: item.color }" />
+              <span>{{ item.name }}：{{ item.value }}</span>
+            </div>
+          </div>
+        </div>
       </el-card>
     </section>
 
@@ -98,6 +139,7 @@
 <script setup lang="ts">
 import * as echarts from 'echarts';
 import type { EChartsOption } from 'echarts';
+import { createVueChartTooltip, getCategoryIndexByMouse, getCategoryIndexByMouseY, hideVueChartTooltip, showVueChartTooltip } from './useVueChartTooltip';
 import {
   getSpecDetails,
   getSpecOverview,
@@ -112,8 +154,15 @@ const router = useRouter();
 const sessionId = computed(() => String(route.query.sessionId || ''));
 const loading = ref(false);
 
-const metrics = ref([
-  { label: '规格总数', value: '1198', emphasis: true },
+interface SpecMetric {
+  label: string;
+  value: string;
+  emphasis?: boolean;
+  drillable?: boolean;
+}
+
+const metrics = ref<SpecMetric[]>([
+  { label: '规格总数', value: '1198', emphasis: true, drillable: true },
   { label: '新销规格', value: '72', emphasis: true }
 ]);
 
@@ -123,13 +172,17 @@ const comboChartRef = ref<HTMLDivElement>();
 const pieChartIns = ref<echarts.ECharts>();
 const rankChartIns = ref<echarts.ECharts>();
 const comboChartIns = ref<echarts.ECharts>();
+const chartTooltip = createVueChartTooltip();
+type SpecChartType = 'pie' | 'rank' | 'combo';
+const activeTooltipType = ref<SpecChartType | ''>('');
 
-const rankMetric = ref('sales');
+const rankMetric = ref('1');
 const rankDesc = ref(true);
 const rankPage = reactive({
   page: 1,
   pageSize: 10,
-  total: 0
+  total: 0,
+  maxData: 0
 });
 
 const legendPageSize = 4;
@@ -140,10 +193,7 @@ const comboItems = ref<any[]>([]);
 const detailRows = ref<any[]>([]);
 const specSummary = ref<{ summaryOne?: string[]; summaryTwo?: string[]; summaryThree?: string[]; summaryFour?: string[] }>({});
 
-const colors = ['#16c2a3', '#ef4444', '#8b5cf6', '#ec4899', '#f59e0b', '#3b82f6', '#22c55e', '#64748b'];
-const RANK_AXIS_MAX = 320488.28;
-const RANK_AXIS_INTERVAL = 50000;
-
+const colors = ['#f97316', '#fb923c', '#f59e0b', '#ea580c', '#fdba74', '#c2410c', '#fbbf24', '#7c2d12'];
 const formatAmount = (value: unknown, digits = 2) => {
   const num = Number(value ?? 0);
   if (!Number.isFinite(num)) return '--';
@@ -156,11 +206,87 @@ const formatPercent = (value: unknown) => {
   return `${num.toFixed(2)}%`;
 };
 
-const getName = (item: any, index = 0) => item?.specName || item?.name || item?.spec || item?.label || `规格${index + 1}`;
+const getName = (item: any, index = 0) => item?.productSpec || item?.specName || item?.name || item?.spec || item?.label || `规格${index + 1}`;
 const getSales = (item: any) => Number(item?.sales ?? item?.salesAmount ?? item?.value ?? item?.data ?? 0);
-const getQuantity = (item: any) => Number(item?.sku ?? item?.skuNum ?? item?.currentSku ?? item?.value ?? 0);
-const getGrowth = (item: any) => Number(item?.growthRate ?? item?.salesGrowthRate ?? item?.compareRate ?? item?.rate ?? 0);
-const getSkuChange = (item: any) => Number(item?.skuChange ?? item?.skuInc ?? item?.changeSku ?? 0);
+const getQuantity = (item: any) => Number(item?.sku ?? item?.skuNum ?? item?.currentSku ?? item?.value ?? item?.data ?? 0);
+const getRankValue = (item: any) => Number(item?.data ?? item?.value ?? item?.sales ?? item?.salesAmount ?? 0);
+const getGrowth = (item: any) => Number(item?.sales ?? item?.growthRate ?? item?.salesGrowthRate ?? item?.compareRate ?? item?.rate ?? 0);
+const getSkuChange = (item: any) => Number(item?.sku ?? item?.skuChange ?? item?.skuInc ?? item?.changeSku ?? 0);
+
+const hideSpecTooltip = () => {
+  activeTooltipType.value = '';
+  hideVueChartTooltip(chartTooltip);
+};
+
+const handleSpecTooltipMousemove = (event: MouseEvent, type: SpecChartType) => {
+  activeTooltipType.value = type;
+  if (type === 'pie') {
+    if (!pieChartRef.value || !pieChartIns.value || !pieItems.value.length) {
+      hideSpecTooltip();
+      return;
+    }
+    const rect = pieChartRef.value.getBoundingClientRect();
+    const point = [event.clientX - rect.left, event.clientY - rect.top];
+    const index = pieItems.value.findIndex((_, dataIndex) => pieChartIns.value?.containPixel({ seriesIndex: 0, dataIndex }, point));
+    const item = index >= 0 ? pieItems.value[index] : null;
+    if (!item) {
+      hideSpecTooltip();
+      return;
+    }
+    showVueChartTooltip(
+      chartTooltip,
+      event,
+      getName(item, index),
+      [{ name: '销售额', value: formatAmount(getSales(item)), color: item?.color || colors[index % colors.length] }],
+      { width: 220, height: 82 }
+    );
+    return;
+  }
+
+  if (type === 'rank') {
+    if (!rankChartRef.value) {
+      hideSpecTooltip();
+      return;
+    }
+    const data = sortedRankItems.value.slice(0, 10);
+    const index = getCategoryIndexByMouseY(event, rankChartRef.value, data.length, { top: 10, bottom: 20 });
+    const item = data[index];
+    if (!item) {
+      hideSpecTooltip();
+      return;
+    }
+    showVueChartTooltip(
+      chartTooltip,
+      event,
+      getName(item, index),
+      [{ name: rankMetric.value === '2' ? '销售量' : rankMetric.value === '3' ? '毛利额' : rankMetric.value === '4' ? '毛利率' : '销售额', value: formatAmount(getRankValue(item)), color: '#f97316' }],
+      { width: 230, height: 82 }
+    );
+    return;
+  }
+
+  const source = comboItems.value.length ? comboItems.value : detailRows.value;
+  if (!comboChartRef.value || !source.length) {
+    hideSpecTooltip();
+    return;
+  }
+  const index = getCategoryIndexByMouse(event, comboChartRef.value, source.length, { left: 52, right: 56 });
+  const item = source[index];
+  if (!item) {
+    hideSpecTooltip();
+    return;
+  }
+  showVueChartTooltip(
+    chartTooltip,
+    event,
+    getName(item, index),
+    [
+      { name: 'SKU变动数', value: formatAmount(getSkuChange(item), 0), color: '#f59e0b' },
+      { name: '销售额增长率', value: formatPercent(getGrowth(item)), color: '#9ca3af' }
+    ],
+    { width: 240, height: 108 }
+  );
+};
 
 const pieLegendItems = computed(() =>
   pieItems.value.map((item, index) => ({
@@ -177,8 +303,8 @@ const canNextLegend = computed(() => legendStart.value + legendPageSize < pieLeg
 
 const sortedRankItems = computed(() =>
   [...rankItems.value].sort((left, right) => {
-    const leftValue = rankMetric.value === 'quantity' ? getQuantity(left) : getSales(left);
-    const rightValue = rankMetric.value === 'quantity' ? getQuantity(right) : getSales(right);
+    const leftValue = getRankValue(left);
+    const rightValue = getRankValue(right);
     const diff = leftValue - rightValue;
     return rankDesc.value ? -diff : diff;
   })
@@ -219,7 +345,7 @@ const renderPieChart = () => {
   pieChartIns.value.setOption(
     {
       color: colors,
-      tooltip: { trigger: 'item', formatter: '{b}<br/>{c}' },
+      tooltip: { show: false },
       series: [
         {
           type: 'pie',
@@ -246,16 +372,20 @@ const renderRankChart = () => {
   rankChartIns.value ||= echarts.init(rankChartRef.value);
   const data = sortedRankItems.value.slice(0, 10);
   const topLabel = data.length ? getName(data[0], 0) : '';
+  const values = data.map((item) => getRankValue(item));
+  const maxValue = Math.max(rankPage.maxData, ...values, 1);
+  const axisMax = Number((maxValue * 1.12).toFixed(2));
+  const axisInterval = Number((axisMax / 5).toFixed(2));
   rankChartIns.value.setOption(
     {
       animationDuration: 300,
-      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+      tooltip: { show: false },
       grid: { left: 96, right: 22, top: 10, bottom: 20, containLabel: true },
       xAxis: {
         type: 'value',
         min: 0,
-        max: RANK_AXIS_MAX,
-        interval: RANK_AXIS_INTERVAL,
+        max: axisMax,
+        interval: axisInterval,
         boundaryGap: [0, 0],
         axisLabel: {
           color: '#111827',
@@ -276,19 +406,19 @@ const renderRankChart = () => {
       },
       series: [
         {
-          name: rankMetric.value === 'quantity' ? '销售量' : '销售额',
+          name: rankMetric.value === '2' ? '销售量' : rankMetric.value === '3' ? '毛利额' : rankMetric.value === '4' ? '毛利率' : '销售额',
           type: 'bar',
           barWidth: 14,
           barCategoryGap: '36%',
           data: data.map((item) => ({
-            value: rankMetric.value === 'quantity' ? getQuantity(item) : getSales(item),
-            itemStyle: { color: '#16c2a3', borderRadius: 0 }
+            value: getRankValue(item),
+            itemStyle: { color: '#f97316', borderRadius: 0 }
           })),
           markLine: {
             symbol: 'none',
             label: { show: false },
             lineStyle: { color: '#ef4444', width: 1.2, type: 'dashed' },
-            data: [{ xAxis: RANK_AXIS_MAX }]
+            data: [{ xAxis: axisMax }]
           },
           markPoint: {
             symbol: 'triangle',
@@ -298,7 +428,7 @@ const renderRankChart = () => {
             data: topLabel
               ? [
                   {
-                    coord: [RANK_AXIS_MAX, topLabel],
+                    coord: [axisMax, topLabel],
                     itemStyle: { color: '#ef4444' }
                   }
                 ]
@@ -318,9 +448,17 @@ const renderComboChart = () => {
   const names = source.map((item, index) => getName(item, index));
   const skuData = source.map((item) => getSkuChange(item));
   const rateData = source.map((item) => getGrowth(item));
+  const visibleCount = 12;
+  const zoomEnd = names.length > visibleCount ? Number(((visibleCount / names.length) * 100).toFixed(2)) : 100;
+  const minRate = rateData.length ? Math.min(...rateData, 0) : -10;
+  const maxRate = rateData.length ? Math.max(...rateData, 0) : 10;
+  const ratePadding = Math.max(10, Math.ceil((maxRate - minRate) * 0.15));
+  const minSku = skuData.length ? Math.min(...skuData, 0) : -5;
+  const maxSku = skuData.length ? Math.max(...skuData, 0) : 5;
+  const skuPadding = Math.max(2, Math.ceil((maxSku - minSku) * 0.2));
   comboChartIns.value.setOption(
     {
-      tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
+      tooltip: { show: false },
       legend: {
         top: 6,
         left: 16,
@@ -328,28 +466,32 @@ const renderComboChart = () => {
         itemHeight: 10,
         data: ['SKU变动数', '销售额增长率']
       },
-      grid: { left: 52, right: 56, top: 38, bottom: 26, containLabel: true },
+      grid: { left: 52, right: 56, top: 38, bottom: names.length > visibleCount ? 48 : 28, containLabel: true },
       xAxis: {
         type: 'category',
         data: names,
         axisTick: { show: false },
         axisLine: { lineStyle: { color: '#d9e0e7' } },
-        axisLabel: { color: '#475569', interval: 0, rotate: 0 }
+        axisLabel: {
+          color: '#475569',
+          interval: 0,
+          rotate: 0,
+          hideOverlap: true,
+          formatter: (value: string) => (value.length > 7 ? `${value.slice(0, 7)}...` : value)
+        }
       },
       yAxis: [
         {
           type: 'value',
-          min: -70,
-          max: 10,
-          interval: 10,
+          min: Math.floor((minRate - ratePadding) / 10) * 10,
+          max: Math.ceil((maxRate + ratePadding) / 10) * 10,
           axisLabel: { formatter: '{value}' },
           splitLine: { lineStyle: { color: '#edf1f5' } }
         },
         {
           type: 'value',
-          min: -9,
-          max: 6,
-          interval: 3,
+          min: Math.floor(minSku - skuPadding),
+          max: Math.ceil(maxSku + skuPadding),
           axisLabel: { formatter: '{value}' },
           splitLine: { show: false }
         }
@@ -373,7 +515,52 @@ const renderComboChart = () => {
           itemStyle: { color: '#9ca3af' },
           lineStyle: { color: '#9ca3af', width: 2.5 }
         }
-      ]
+      ],
+      dataZoom:
+        names.length > visibleCount
+          ? [
+              {
+                type: 'inside',
+                xAxisIndex: 0,
+                filterMode: 'none',
+                start: 0,
+                end: zoomEnd,
+                zoomLock: true,
+                zoomOnMouseWheel: false,
+                moveOnMouseMove: true,
+                moveOnMouseWheel: true
+              },
+              {
+                type: 'slider',
+                xAxisIndex: 0,
+                filterMode: 'none',
+                height: 14,
+                bottom: 8,
+                start: 0,
+                end: zoomEnd,
+                brushSelect: false,
+                showDetail: false,
+                borderColor: 'transparent',
+                backgroundColor: '#eef2f7',
+                fillerColor: 'rgba(249, 115, 22, 0.18)',
+                handleSize: '70%',
+                handleStyle: {
+                  color: '#f97316',
+                  borderColor: '#f97316'
+                },
+                moveHandleSize: 10,
+                moveHandleStyle: { color: '#f97316' },
+                dataBackground: {
+                  lineStyle: { color: '#cbd5e1' },
+                  areaStyle: { color: '#e2e8f0' }
+                },
+                selectedDataBackground: {
+                  lineStyle: { color: '#f97316' },
+                  areaStyle: { color: 'rgba(249, 115, 22, 0.12)' }
+                }
+              }
+            ]
+          : []
     } as EChartsOption,
     true
   );
@@ -400,7 +587,7 @@ const reload = async () => {
 
     const overview: any = overviewRes.data || {};
     metrics.value = [
-      { label: '规格总数', value: formatAmount(overview.totalNum ?? overview.specTotalNum ?? 1198, 0), emphasis: true },
+      { label: '规格总数', value: formatAmount(overview.totalNum ?? overview.specTotalNum ?? 1198, 0), emphasis: true, drillable: true },
       { label: '新销规格', value: formatAmount(overview.newNum ?? overview.newSpecNum ?? 72, 0), emphasis: true }
     ];
 
@@ -409,18 +596,22 @@ const reload = async () => {
       : Array.isArray(shareRes.data as any)
         ? (shareRes.data as any)
         : [];
-    rankItems.value = Array.isArray((rankingRes.data as any)?.data?.list)
-      ? (rankingRes.data as any).data.list
-      : Array.isArray((rankingRes.data as any)?.data?.records)
-        ? (rankingRes.data as any).data.records
-        : Array.isArray((rankingRes.data as any)?.data)
-          ? (rankingRes.data as any).data
+    const rankingData = (rankingRes.data as any)?.data || (rankingRes.data as any) || {};
+    rankItems.value = Array.isArray(rankingData.list)
+      ? rankingData.list
+      : Array.isArray(rankingData.records)
+        ? rankingData.records
+        : Array.isArray(rankingData)
+          ? rankingData
           : [];
-    comboItems.value = Array.isArray((comboRes.data as any)?.data?.list)
-      ? (comboRes.data as any).data.list
-      : Array.isArray((comboRes.data as any)?.data)
-        ? (comboRes.data as any).data
-        : [];
+    const comboData = (comboRes.data as any)?.data || (comboRes.data as any) || {};
+    comboItems.value = Array.isArray(comboData.list)
+      ? comboData.list
+      : Array.isArray(comboData.records)
+        ? comboData.records
+        : Array.isArray(comboData)
+          ? comboData
+          : [];
     detailRows.value = Array.isArray((detailsRes.data as any)?.data?.records)
       ? (detailsRes.data as any).data.records
       : Array.isArray((detailsRes.data as any)?.data?.list)
@@ -430,7 +621,8 @@ const reload = async () => {
           : [];
     specSummary.value = (filterRes.data as any)?.data || (filterRes.data as any) || {};
 
-    rankPage.total = Number((rankingRes.data as any)?.data?.total || (rankingRes.data as any)?.data?.pages || rankItems.value.length || 0);
+    rankPage.total = Number(rankingData.total || rankingData.pages || rankItems.value.length || 0);
+    rankPage.maxData = Number(rankingData.maxData || Math.max(...rankItems.value.map((item) => getRankValue(item)), 0));
     legendStart.value = Math.min(legendStart.value, Math.max(0, pieLegendItems.value.length - legendPageSize));
     if (!pieLegendItems.value.length) legendStart.value = 0;
 
@@ -445,6 +637,11 @@ const reload = async () => {
 
 const handleViewDetail = () => {
   router.push({ path: '/spec/analysis/detail', query: { ...route.query } });
+};
+
+const handleMetricClick = (item: SpecMetric) => {
+  if (!item.drillable) return;
+  handleViewDetail();
 };
 
 const handleRankPageChange = async (page: number) => {
@@ -559,6 +756,46 @@ onBeforeUnmount(() => {
   padding: 8px 12px;
 }
 
+.metric-card--clickable {
+  position: relative;
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.metric-card--clickable::after {
+  content: '查看清单';
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(249, 115, 22, 0.1);
+  color: #f97316;
+  font-size: 12px;
+  opacity: 0;
+  transform: translateY(-2px);
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+}
+
+.metric-card--clickable:hover,
+.metric-card--clickable:focus-visible {
+  border-color: rgba(249, 115, 22, 0.55);
+  box-shadow: 0 10px 24px rgba(249, 115, 22, 0.14);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.metric-card--clickable:hover::after,
+.metric-card--clickable:focus-visible::after {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 .metric-label {
   font-size: 13px;
   color: #64748b;
@@ -645,6 +882,58 @@ onBeforeUnmount(() => {
 .pie-chart {
   flex: 1 1 auto;
   height: 232px;
+}
+
+.vue-chart-tooltip-wrap {
+  position: relative;
+}
+
+.pie-tooltip-wrap {
+  flex: 1 1 auto;
+  height: 232px;
+}
+
+.rank-tooltip-wrap {
+  height: 206px;
+}
+
+.combo-tooltip-wrap {
+  height: 180px;
+}
+
+.vue-chart-tooltip {
+  position: absolute;
+  z-index: 20;
+  min-width: 220px;
+  max-width: 300px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(17, 24, 39, 0.94);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1.6;
+  pointer-events: none;
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.24);
+}
+
+.tooltip-title {
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+
+.tooltip-dot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 999px;
 }
 
 .pie-legend {

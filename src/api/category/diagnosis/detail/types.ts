@@ -122,6 +122,33 @@ export interface DiagnosisOverviewResponse {
   compareCustomerCountTotal?: number;
 }
 
+export type OverallSummaryStatus = 'NORMAL' | 'ABNORMAL' | 'OTHER';
+
+export interface DiagnosisOverallSummarySection {
+  status: OverallSummaryStatus;
+  title: string;
+  conclusion: string;
+  descriptions: string[];
+}
+
+export interface DiagnosisOverallSummaryResponse {
+  sessionId: string;
+  classNo?: string;
+  className?: string;
+  sections: DiagnosisOverallSummarySection[];
+}
+
+export interface DiagnosisIntroduceDirectionColumn {
+  label: string;
+  value: string;
+}
+
+export interface DiagnosisIntroduceDirectionResponse {
+  sessionId: string;
+  columns: DiagnosisIntroduceDirectionColumn[];
+  rows: Array<Record<string, string>>;
+}
+
 export interface DiagnosisTrendSnapshotRow {
   metricCode?: string;
   pointDate: string;

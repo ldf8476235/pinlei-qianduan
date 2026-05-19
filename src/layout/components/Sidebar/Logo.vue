@@ -4,13 +4,13 @@
     :class="{ collapse: collapse }"
   >
     <transition :enter-active-class="proxy?.animate.logoAnimate.enter" mode="out-in">
-      <router-link v-if="collapse" key="collapse" class="sidebar-logo-link" to="/">
+      <router-link v-if="collapse" key="collapse" class="sidebar-logo-link" to="/category/tree">
         <img v-if="logo" :src="logo" class="sidebar-logo" />
         <h1 v-else class="sidebar-title">
           {{ title }}
         </h1>
       </router-link>
-      <router-link v-else key="expand" class="sidebar-logo-link" to="/">
+      <router-link v-else key="expand" class="sidebar-logo-link" to="/category/tree">
         <img v-if="logo" :src="logo" class="sidebar-logo" />
         <h1 class="sidebar-title">
           {{ title }}
@@ -22,7 +22,7 @@
 
 <script setup lang="ts">
 import variables from '@/assets/styles/variables.module.scss';
-import logo from '@/assets/logo/logo.png';
+import logo from '@/assets/images/category-lab-logo.jpg';
 import { useSettingsStore } from '@/store/modules/settings';
 const { proxy } = getCurrentInstance() as ComponentInternalInstance;
 import { NavTypeEnum } from '@/enums/NavTypeEnum';

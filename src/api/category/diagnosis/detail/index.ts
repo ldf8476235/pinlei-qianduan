@@ -6,6 +6,8 @@ import {
   ChannelSalesPieItemResponse,
   ChannelSalesTrendResponse,
   DiagnosisOverviewResponse,
+  DiagnosisIntroduceDirectionResponse,
+  DiagnosisOverallSummaryResponse,
   LegacySubclassContributionListRequest,
   LegacySubclassContributionRequest,
   LegacyNodeResponse,
@@ -29,9 +31,35 @@ import type {
   AllClassCheckSkuResponse as LegacyAllClassCheckSkuResponse
 } from './all-class-check-types';
 
+export const queryObsoleteGoodsList = (data: Record<string, any>): AxiosPromise<DiagnosisApiResponse<any>> => {
+  return request({
+    url: '/api/v1/obsolete-goods/list',
+    method: 'post',
+    data
+  });
+};
+
 export const getCategoryDiagnosisDetailSummary = (sessionId: string): AxiosPromise<DiagnosisApiResponse<DiagnosisOverviewResponse>> => {
   return request({
     url: '/api/v1/diagnosis/overview',
+    method: 'get',
+    params: { sessionId }
+  });
+};
+
+export const getCategoryDiagnosisOverallSummary = (sessionId: string): AxiosPromise<DiagnosisApiResponse<DiagnosisOverallSummaryResponse>> => {
+  return request({
+    url: '/api/v1/diagnosis/overall-summary',
+    method: 'get',
+    params: { sessionId }
+  });
+};
+
+export const getCategoryDiagnosisIntroduceDirection = (
+  sessionId: string
+): AxiosPromise<DiagnosisApiResponse<DiagnosisIntroduceDirectionResponse>> => {
+  return request({
+    url: '/api/v1/diagnosis/introduce-direction',
     method: 'get',
     params: { sessionId }
   });
@@ -213,7 +241,10 @@ export const getAllClassCheckRoleTypes = (): AxiosPromise<DiagnosisApiResponse<a
 };
 
 export default {
+  queryObsoleteGoodsList,
   getCategoryDiagnosisDetailSummary,
+  getCategoryDiagnosisOverallSummary,
+  getCategoryDiagnosisIntroduceDirection,
   getCategoryDiagnosisDetailTrend,
   getCategoryDiagnosisSubClassPie,
   getCategoryDiagnosisSubClassTrend,

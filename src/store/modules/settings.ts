@@ -17,6 +17,9 @@ export const useSettingsStore = defineStore('setting', () => {
     theme: defaultSettings.theme,
     navType: defaultSettings.navType
   });
+  if (storageSetting.value.theme === '#409EFF') {
+    storageSetting.value.theme = defaultSettings.theme;
+  }
   const title = ref<string>(defaultSettings.title);
   const theme = ref<string>(storageSetting.value.theme);
   const sideTheme = ref<string>(storageSetting.value.sideTheme);

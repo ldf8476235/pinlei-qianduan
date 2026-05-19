@@ -35,9 +35,29 @@ export interface LegacyTreeNodeVO {
   saleSku?: number;
   roleNo?: string;
   roleType?: string;
+  roleName?: string;
+  currentRoleNo?: string;
+  currentRoleName?: string;
+  presetRoleNo?: string;
+  presetRoleName?: string;
   skuDiffer?: number | null;
   sysSuggestSaleSku?: number;
   subClass?: LegacyTreeNodeVO[] | null;
+}
+
+export interface CategoryNodeConfigUpdateRequest {
+  storeNo: string;
+  classNo: string;
+  roleNo: string;
+  suggestSaleSku: number;
+}
+
+export interface CategoryNodeConfigUpdateResponse {
+  storeNo?: string;
+  classNo?: string;
+  roleNo?: string;
+  roleType?: string;
+  suggestSaleSku?: number;
 }
 
 export interface CategoryFilterPayloadVO {

@@ -31,17 +31,39 @@ const toNumber = (value: any): number => {
 
 const toText = (value: any): string => String(value ?? '');
 
+export type CategoryCheckTreeOption = OptionVO & {
+  children?: CategoryCheckTreeOption[];
+};
+
+const resolveClassTreeChildren = (node: any): CategoryClassTreeNodeVO[] => {
+  if (Array.isArray(node?.children)) return node.children;
+  if (Array.isArray(node?.subClass)) return node.subClass;
+  return [];
+};
+
+const toBackendQuery = (data: CategoryCheckQuery) => ({
+  storeNo: toText(data.storeScope),
+  classLevel: data.categoryLevel,
+  classNo: (data.categoryIds || []).map((item) => toText(item)),
+  currentStartDate: data.currentStartDate,
+  currentEndDate: data.currentEndDate,
+  compareStartDate: data.compareStartDate,
+  compareEndDate: data.compareEndDate
+});
+
 const flattenClassTree = (nodes: CategoryClassTreeNodeVO[] = []): OptionVO[] => {
   const result: OptionVO[] = [];
   const walk = (list: CategoryClassTreeNodeVO[]) => {
     list.forEach((node) => {
-      const value = toText(node.id || node.label || node.level || '');
+      const value = toText((node as any).id || (node as any).classNo || node.label || node.level || '');
       const label = toText(node.labelName || node.className || node.label || value);
-      const children = Array.isArray(node.children) ? node.children : [];
+      const level = toText((node as any).classLevel || node.levelFlag || '');
+      const children = resolveClassTreeChildren(node);
       if (value && value !== '0' && label) {
         result.push({
           label: label.startsWith(value) ? label : `${value}${label}`,
-          value
+          value,
+          level
         });
       }
       if (children.length) {
@@ -51,6 +73,28 @@ const flattenClassTree = (nodes: CategoryClassTreeNodeVO[] = []): OptionVO[] => 
   };
   walk(nodes);
   return result;
+};
+
+const normalizeClassTree = (nodes: CategoryClassTreeNodeVO[] = []): CategoryCheckTreeOption[] => {
+  const walk = (list: CategoryClassTreeNodeVO[]): CategoryCheckTreeOption[] =>
+    list.flatMap((node) => {
+      const value = toText((node as any).id || (node as any).classNo || node.label || node.level || '');
+      const label = toText(node.labelName || node.className || node.label || value);
+      const level = toText((node as any).classLevel || node.levelFlag || '');
+      const children = walk(resolveClassTreeChildren(node));
+      if (!value || value === '0' || !label) {
+        return children;
+      }
+      return [
+        {
+          label: label.startsWith(value) ? label : `${value}${label}`,
+          value,
+          level,
+          children
+        }
+      ];
+    });
+  return walk(nodes);
 };
 
 const normalizeStoreOptions = (rows: StoreOptionResponse[] = []): OptionVO[] => {
@@ -71,40 +115,55 @@ const normalizeStoreOptions = (rows: StoreOptionResponse[] = []): OptionVO[] => 
 };
 
 export const getCategoryCheckFilter = async (): BackendWrap<CategoryCheckFilterVO> => {
-  const [filterRes, storeRes, treeRes] = await Promise.all([
+  const [filterRes, storeRes] = await Promise.all([
     getCategoryFilterOptions(),
-    fetchStoreOptions({ keyword: '', limit: 50 } as StoreFindRequest),
-    queryCategoryClassTree(4)
+    fetchStoreOptions({ keyword: '', limit: 50 } as StoreFindRequest)
   ]);
 
   const payload = unwrap<CategoryFilterPayloadVO>(filterRes) || {};
-  const treePayload = unwrap<{ content?: CategoryClassTreeNodeVO[] }>(treeRes) || {};
 
   return {
     data: {
       storeOptions: payload.storeOptions?.length ? payload.storeOptions : normalizeStoreOptions(unwrap<StoreOptionResponse[]>(storeRes) || []),
       levelOptions: (payload.categoryLevels || []).map((item) => ({ label: item.label, value: item.value })),
-      categoryOptions: flattenClassTree(treePayload.content || [])
+      categoryOptions: []
+    }
+  };
+};
+
+export const getCategoryCheckCategoryOptions = async (
+  level: number | string
+): BackendWrap<{ options: OptionVO[]; tree: CategoryCheckTreeOption[] }> => {
+  const currentLevel = Number(level || 1);
+  const treeRes = await queryCategoryClassTree(4);
+  const treePayload = unwrap<{ content?: CategoryClassTreeNodeVO[] }>(treeRes) || {};
+  const options = flattenClassTree(treePayload.content || []).filter((item) => String(item.level || currentLevel) === String(currentLevel));
+
+  return {
+    data: {
+      options: options.length ? options : flattenClassTree(treePayload.content || []),
+      tree: normalizeClassTree(treePayload.content || [])
     }
   };
 };
 
 export const getCategoryCheckAlert = async (data: CategoryCheckQuery): BackendWrap<CategoryCheckAlertVO> => {
+  const payload = toBackendQuery(data);
   const [roleRes, skuRes, skuDiffRes] = await Promise.all([
     request({
       url: '/salesStoreClass/allClassCheck',
       method: 'post',
-      data
+      data: payload
     }),
     request({
       url: '/salesStoreClass/findClassSku',
       method: 'post',
-      data
+      data: payload
     }),
     request({
       url: '/salesStoreClass/findClassSkuDiffer',
       method: 'post',
-      data
+      data: payload
     })
   ]);
 
@@ -125,7 +184,7 @@ export const getCategoryCheckRole = async (data: CategoryCheckQuery): BackendWra
   const res = await request({
     url: '/salesStoreClass/allClassCheck',
     method: 'post',
-    data
+    data: toBackendQuery(data)
   });
 
   const payload = unwrap<any>(res) || {};
@@ -167,16 +226,17 @@ export const getCategoryCheckRole = async (data: CategoryCheckQuery): BackendWra
 };
 
 export const getCategoryCheckSku = async (data: CategoryCheckQuery): BackendWrap<CategoryCheckSkuVO> => {
+  const payload = toBackendQuery(data);
   const [skuRes, skuDiffRes] = await Promise.all([
     request({
       url: '/salesStoreClass/findClassSku',
       method: 'post',
-      data
+      data: payload
     }),
     request({
       url: '/salesStoreClass/findClassSkuDiffer',
       method: 'post',
-      data
+      data: payload
     })
   ]);
 
@@ -209,16 +269,33 @@ export const getCategoryCheckSales = async (data: CategoryCheckSalesQuery): Back
   const res = await request({
     url: '/salesStoreClass/classSalesChange',
     method: 'post',
-    data
+    data: {
+      ...toBackendQuery(data),
+      page: toNumber(data.pageNum ?? 1),
+      size: toNumber(data.pageSize ?? 10)
+    }
   });
 
   const payload = unwrap<any>(res) || {};
-  const rows = (payload.content || payload.list || []).map((item: any) => ({
-    categoryId: item.classNo,
-    categoryName: item.className,
-    growthRate: toNumber(item.salesCompareRate),
-    salesAmount: toNumber(item.sales)
-  })) as CategorySalesChartItemVO[];
+  const rows = (payload.content || payload.list || []).map((item: any) => {
+    const growthRate = toNumber(item.salesCompareRate);
+    const salesAmount = toNumber(item.sales);
+    const explicitCompareSales = item.salesCompare ?? item.compareSales ?? item.compareSalesAmount ?? item.lastSales ?? item.lastYearSales ?? item.oldSales;
+    const compareSalesAmount =
+      explicitCompareSales !== undefined && explicitCompareSales !== null
+        ? toNumber(explicitCompareSales)
+        : growthRate === -100
+          ? 0
+          : salesAmount / (1 + growthRate / 100);
+
+    return {
+      categoryId: item.classNo,
+      categoryName: item.className,
+      growthRate,
+      salesAmount,
+      compareSalesAmount
+    };
+  }) as CategorySalesChartItemVO[];
 
   return {
     data: {

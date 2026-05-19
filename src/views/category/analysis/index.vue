@@ -154,8 +154,11 @@ const queryForm = reactive({
   categoryIds: [] as Array<string | number>
 });
 
-const currentDateRange = ref<[string, string]>(['2024-10-01', '2024-12-08']);
-const compareDateRange = ref<[string, string]>(['2023-10-01', '2023-12-08']);
+const DEFAULT_CURRENT_DATE_RANGE: [string, string] = ['2026-04-01', '2026-04-30'];
+const DEFAULT_COMPARE_DATE_RANGE: [string, string] = ['2026-03-01', '2026-03-31'];
+
+const currentDateRange = ref<[string, string]>([...DEFAULT_CURRENT_DATE_RANGE]);
+const compareDateRange = ref<[string, string]>([...DEFAULT_COMPARE_DATE_RANGE]);
 
 const salesPage = reactive({
   pageNum: 1,
@@ -332,7 +335,7 @@ const renderSkuCharts = () => {
         { type: 'value', name: '构成比差值%', axisLabel: { formatter: '{value}%' } }
       ],
       series: [
-        { name: '本期SKU构成比', type: 'bar', data: skuRatio, itemStyle: { color: '#409EFF' } },
+        { name: '本期SKU构成比', type: 'bar', data: skuRatio, itemStyle: { color: '#f97316' } },
         { name: '本期销售额构成比', type: 'bar', data: salesRatio, itemStyle: { color: '#F56C6C' } },
         { name: '构成比差值', type: 'line', yAxisIndex: 1, data: ratioDiff, itemStyle: { color: '#F4A261' } }
       ]
@@ -348,7 +351,7 @@ const renderSkuCharts = () => {
       xAxis: { type: 'category', data: names, axisLabel: { interval: 0, rotate: 25 } },
       yAxis: [{ type: 'value', name: 'SKU数' }, { type: 'value', name: 'SKU差值' }],
       series: [
-        { name: '当前SKU数', type: 'bar', data: currentSku, itemStyle: { color: '#409EFF' } },
+        { name: '当前SKU数', type: 'bar', data: currentSku, itemStyle: { color: '#f97316' } },
         { name: '预设SKU数', type: 'bar', data: presetSku, itemStyle: { color: '#F56C6C' } },
         { name: 'SKU差值', type: 'line', yAxisIndex: 1, data: skuDiff, itemStyle: { color: '#F4A261' } }
       ]
@@ -403,8 +406,8 @@ const handleReset = async () => {
   queryForm.storeScope = String(filterOptions.storeOptions[0]?.value ?? '0');
   queryForm.categoryLevel = String(filterOptions.levelOptions[0]?.value ?? '');
   queryForm.categoryIds = [];
-  currentDateRange.value = ['2024-10-01', '2024-12-08'];
-  compareDateRange.value = ['2023-10-01', '2023-12-08'];
+  currentDateRange.value = [...DEFAULT_CURRENT_DATE_RANGE];
+  compareDateRange.value = [...DEFAULT_COMPARE_DATE_RANGE];
   await loadAll();
 };
 
