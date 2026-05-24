@@ -161,11 +161,18 @@ interface PriceBandTableRow {
   suggestSku: number;
   suggestSkuPer: number | string;
   xLabel: string;
+  xValue: number;
   skuLineValue: number;
   salesLineValue: number;
   quantityLineValue: number;
   priceLineSkuValue: number;
   priceLineSalesValue: number;
+}
+
+interface PriceLineChartPoint {
+  price: number;
+  sku: number;
+  sales: number;
 }
 
 const route = useRoute();
@@ -178,6 +185,7 @@ const priceLineNum = ref('--');
 const priceRangeText = ref('--');
 const pricePointTexts = ref<string[]>([]);
 const tableRows = ref<PriceBandTableRow[]>([]);
+const priceLineChartPoints = ref<PriceLineChartPoint[]>([]);
 const summaryHighBands = ref<any[]>([]);
 const summaryLowBands = ref<any[]>([]);
 const rawPricePoints = ref<any[]>([]);
@@ -188,6 +196,12 @@ const priceTooltip = reactive({
   label: '',
   rows: [] as Array<{ name: string; value: string; color: string }>
 });
+const chartGrid = {
+  left: 150,
+  right: 86,
+  top: 72,
+  bottom: 46
+};
 
 const sessionId = computed(() => String(route.query.sessionId || ''));
 
@@ -227,6 +241,19 @@ const readText = (source: any, keys: string[]) => {
   return '';
 };
 
+const buildBandKey = (item: any) => `${item?.priceBandMin ?? ''}_${item?.priceBandMax ?? ''}`;
+
+const resolvePriceValue = (source: any, fallback = 0) => {
+  const direct = Number(source?.priceBandAve ?? source?.priceLine ?? source?.linePrice ?? source?.salePrice ?? source?.pricePoint ?? source?.minSalePrice);
+  if (Number.isFinite(direct)) return direct;
+
+  const min = Number(source?.priceBandMin ?? source?.minPrice);
+  const max = Number(source?.priceBandMax ?? source?.maxPrice);
+  if (Number.isFinite(min) && Number.isFinite(max)) return (min + max) / 2;
+  if (Number.isFinite(min)) return min;
+  return fallback;
+};
+
 const formatNumber = (value: unknown, digits = 0) => {
   const num = Number(value ?? 0);
   if (!Number.isFinite(num)) return '--';
@@ -253,14 +280,10 @@ const handlePriceTooltipMousemove = (event: MouseEvent) => {
   const wrap = event.currentTarget as HTMLElement;
   const wrapRect = wrap.getBoundingClientRect();
   const chartRect = chartRef.value.getBoundingClientRect();
-  const gridLeft = 150;
-  const gridRight = 86;
-  const gridTop = 72;
-  const gridBottom = 46;
-  const plotLeft = chartRect.left + gridLeft;
-  const plotTop = chartRect.top + gridTop;
-  const plotWidth = chartRect.width - gridLeft - gridRight;
-  const plotHeight = chartRect.height - gridTop - gridBottom;
+  const plotLeft = chartRect.left + chartGrid.left;
+  const plotTop = chartRect.top + chartGrid.top;
+  const plotWidth = chartRect.width - chartGrid.left - chartGrid.right;
+  const plotHeight = chartRect.height - chartGrid.top - chartGrid.bottom;
   const relativeX = event.clientX - plotLeft;
   const relativeY = event.clientY - plotTop;
 
@@ -269,9 +292,19 @@ const handlePriceTooltipMousemove = (event: MouseEvent) => {
     return;
   }
 
+  const chartX = event.clientX - chartRect.left;
+  const chartY = event.clientY - chartRect.top;
+  const dataCoord = chartIns.value?.convertFromPixel({ gridIndex: 0 }, [chartX, chartY]);
   const rows = sortedTableRows.value;
-  const bandWidth = plotWidth / Math.max(1, rows.length);
-  const index = Math.max(0, Math.min(rows.length - 1, Math.round(relativeX / bandWidth)));
+  const minX = rows[0]?.xValue ?? 0;
+  const maxX = rows[rows.length - 1]?.xValue ?? minX;
+  const fallbackX = minX + (relativeX / plotWidth) * Math.max(1, maxX - minX);
+  const dataX = Array.isArray(dataCoord) && Number.isFinite(Number(dataCoord[0])) ? Number(dataCoord[0]) : fallbackX;
+  const index = rows.reduce((closestIndex, row, currentIndex) => {
+    const closestDistance = Math.abs((rows[closestIndex]?.xValue ?? 0) - dataX);
+    const currentDistance = Math.abs((row.xValue ?? 0) - dataX);
+    return currentDistance < closestDistance ? currentIndex : closestIndex;
+  }, 0);
   const row = rows[index];
   if (!row) {
     hidePriceTooltip();
@@ -353,15 +386,27 @@ const renderChart = (rows: PriceBandTableRow[]) => {
   if (!chartRef.value) return;
   chartIns.value ||= echarts.init(chartRef.value);
 
-  const xAxisData = rows.map((item) => item.xLabel || item.label);
-  const skuLineData = rows.map((item) => item.skuLineValue);
-  const salesLineData = rows.map((item) => item.salesLineValue);
-  const quantityLineData = rows.map((item) => item.quantityLineValue);
-  const priceLineSkuData = rows.map((item) => item.priceLineSkuValue);
-  const priceLineSalesData = rows.map((item) => item.priceLineSalesValue);
-  const maxSales = Math.max(1, ...salesLineData.map((item) => Math.abs(Number(item || 0))), ...priceLineSalesData.map((item) => Math.abs(Number(item || 0))));
-  const maxQuantity = Math.max(1, ...quantityLineData.map((item) => Math.abs(Number(item || 0))));
-  const maxSku = Math.max(1, ...skuLineData.map((item) => Math.abs(Number(item || 0))), ...priceLineSkuData.map((item) => Math.abs(Number(item || 0))));
+  const skuLineData = rows.map((item) => [item.xValue, item.skuLineValue]);
+  const salesLineData = rows.map((item) => [item.xValue, item.salesLineValue]);
+  const quantityLineData = rows.map((item) => [item.xValue, item.quantityLineValue]);
+  const priceLineSkuData =
+    priceLineChartPoints.value.length > 0 ? priceLineChartPoints.value.map((item) => [item.price, item.sku]) : rows.map((item) => [item.xValue, item.priceLineSkuValue]);
+  const priceLineSalesData =
+    priceLineChartPoints.value.length > 0 ? priceLineChartPoints.value.map((item) => [item.price, item.sales]) : rows.map((item) => [item.xValue, item.priceLineSalesValue]);
+  const salesValues = [...salesLineData, ...priceLineSalesData].map((item) => Math.abs(Number(item[1] || 0)));
+  const quantityValues = quantityLineData.map((item) => Math.abs(Number(item[1] || 0)));
+  const skuValues = [...skuLineData, ...priceLineSkuData].map((item) => Math.abs(Number(item[1] || 0)));
+  const xValues = [
+    ...rows.map((item) => item.xValue),
+    ...rows.map((item) => Number(item.raw?.priceBandMax ?? item.raw?.maxPrice)).filter((item) => Number.isFinite(item)),
+    ...priceLineChartPoints.value.map((item) => item.price)
+  ];
+  const maxSales = Math.max(1, ...salesValues);
+  const maxQuantity = Math.max(1, ...quantityValues);
+  const maxSku = Math.max(1, ...skuValues);
+  const xMax = Math.max(1, ...xValues.filter((item) => Number.isFinite(item)));
+  const dataPointCount = Math.max(rows.length, priceLineChartPoints.value.length);
+  const minZoomSpan = dataPointCount > 20 ? 8 : 100;
 
   chartIns.value.setOption(
     {
@@ -395,24 +440,23 @@ const renderChart = (rows: PriceBandTableRow[]) => {
         data: ['SKU数', '销售额', '销售量', '价格线SKU数', '价格线销售额']
       },
       grid: {
-        left: 150,
-        right: 86,
-        top: 72,
-        bottom: 46
+        ...chartGrid
       },
       xAxis: {
-        type: 'category',
-        data: xAxisData,
-        axisTick: { alignWithLabel: true },
+        type: 'value',
+        min: 0,
+        max: xMax,
+        splitNumber: 10,
+        axisTick: { show: false },
         axisLine: { lineStyle: { color: '#c7c7c7' } },
         axisLabel: {
           color: '#4b5563',
           fontSize: 13,
-          interval: 0,
-          rotate: xAxisData.length > 14 ? 20 : 0,
+          formatter: (value: number) => formatNumber(value, value >= 100 ? 0 : 2),
           margin: 10,
           hideOverlap: true
-        }
+        },
+        splitLine: { show: true, lineStyle: { color: '#d9d9d9', type: 'dashed', width: 1 } }
       },
       yAxis: [
         {
@@ -453,35 +497,55 @@ const renderChart = (rows: PriceBandTableRow[]) => {
           splitLine: { show: false }
         }
       ],
+      dataZoom:
+        dataPointCount > 1
+          ? [
+              {
+                type: 'inside',
+                xAxisIndex: 0,
+                filterMode: 'none',
+                start: 0,
+                end: 100,
+                minSpan: minZoomSpan,
+                zoomLock: false,
+                zoomOnMouseWheel: true,
+                moveOnMouseMove: false,
+                moveOnMouseWheel: false,
+                preventDefaultMouseMove: true
+              }
+            ]
+          : [],
       series: [
         {
           name: '价格线SKU数',
           type: 'bar',
           yAxisIndex: 2,
-          barWidth: 5,
+          barWidth: 3,
           barGap: '30%',
           data: priceLineSkuData,
-          itemStyle: { color: '#ff765f', borderRadius: [2, 2, 0, 0] },
-          z: 2
+          itemStyle: { color: '#ff765f', borderRadius: [2, 2, 0, 0], opacity: 0.82 },
+          z: 1
         },
         {
           name: '价格线销售额',
           type: 'bar',
           yAxisIndex: 0,
-          barWidth: 5,
+          barWidth: 3,
           data: priceLineSalesData,
-          itemStyle: { color: '#1e88e5', borderRadius: [2, 2, 0, 0] },
-          z: 2
+          itemStyle: { color: '#1e88e5', borderRadius: [2, 2, 0, 0], opacity: 0.82 },
+          z: 1
         },
         {
           name: 'SKU数',
           type: 'line',
           yAxisIndex: 2,
           smooth: true,
-          symbol: 'emptyCircle',
-          symbolSize: 8,
+          showSymbol: true,
+          showAllSymbol: true,
+          symbol: 'circle',
+          symbolSize: 9,
           lineStyle: { width: 3, color: '#ff765f' },
-          itemStyle: { color: '#fff', borderColor: '#ff765f', borderWidth: 3 },
+          itemStyle: { color: '#fff', borderColor: '#ff765f', borderWidth: 2 },
           data: skuLineData,
           z: 5
         },
@@ -490,10 +554,12 @@ const renderChart = (rows: PriceBandTableRow[]) => {
           type: 'line',
           yAxisIndex: 0,
           smooth: true,
-          symbol: 'emptyCircle',
-          symbolSize: 8,
+          showSymbol: true,
+          showAllSymbol: true,
+          symbol: 'circle',
+          symbolSize: 9,
           lineStyle: { width: 3, color: '#1e88e5' },
-          itemStyle: { color: '#fff', borderColor: '#1e88e5', borderWidth: 3 },
+          itemStyle: { color: '#fff', borderColor: '#1e88e5', borderWidth: 2 },
           data: salesLineData,
           z: 5
         },
@@ -502,10 +568,12 @@ const renderChart = (rows: PriceBandTableRow[]) => {
           type: 'line',
           yAxisIndex: 1,
           smooth: true,
-          symbol: 'emptyCircle',
-          symbolSize: 8,
+          showSymbol: true,
+          showAllSymbol: true,
+          symbol: 'circle',
+          symbolSize: 9,
           lineStyle: { width: 3, color: '#14b8a6' },
-          itemStyle: { color: '#fff', borderColor: '#14b8a6', borderWidth: 3 },
+          itemStyle: { color: '#fff', borderColor: '#14b8a6', borderWidth: 2 },
           data: quantityLineData,
           z: 5
         }
@@ -513,6 +581,7 @@ const renderChart = (rows: PriceBandTableRow[]) => {
     } as EChartsOption,
     true
   );
+  nextTick(() => chartIns.value?.resize());
 };
 
 const reload = async () => {
@@ -524,21 +593,31 @@ const reload = async () => {
     const diagram: any = diagramRes.data || {};
     const summary: any = summaryRes.data || {};
     const chartRows = Array.isArray(diagram.rangePerformanceList) ? diagram.rangePerformanceList : [];
+    const lineRows = Array.isArray(diagram.linePerformanceList)
+      ? diagram.linePerformanceList
+      : Array.isArray(diagram.priceLineList)
+        ? diagram.priceLineList
+        : [];
     const summaryRows = Array.isArray(summary.list) ? summary.list : [];
     rawPricePoints.value = Array.isArray(diagram.pricePointList) ? diagram.pricePointList : [];
     summaryHighBands.value = Array.isArray(summary.summaryTwo) ? summary.summaryTwo : [];
     summaryLowBands.value = Array.isArray(summary.summaryThree) ? summary.summaryThree : [];
-    const chartRowMap = new Map(
-      chartRows.map((item: any) => [
-        `${item.priceBandMin ?? ''}_${item.priceBandMax ?? ''}`,
-        item
-      ])
-    );
+    priceLineChartPoints.value = lineRows
+      .map((item: any) => ({
+        price: resolvePriceValue(item),
+        sku: readNumber(item, numericFields.sku),
+        sales: readNumber(item, numericFields.sales)
+      }))
+      .filter((item: PriceLineChartPoint) => Number.isFinite(item.price))
+      .sort((a: PriceLineChartPoint, b: PriceLineChartPoint) => a.price - b.price);
+    const chartRowMap = new Map(chartRows.map((item: any) => [buildBandKey(item), item]));
 
     tableRows.value = summaryRows.map((item: any, index: number) => {
       const priceBandMin = Number(item.priceBandMin ?? item.minPrice ?? 0);
       const priceBandMax = Number(item.priceBandMax ?? item.maxPrice ?? 0);
-      const chartItem = (chartRowMap.get(`${item.priceBandMin ?? ''}_${item.priceBandMax ?? ''}`) || {}) as Record<string, any>;
+      const bandKey = buildBandKey(item);
+      const chartItem = (chartRowMap.get(bandKey) || {}) as Record<string, any>;
+      const xValue = resolvePriceValue({ ...item, ...chartItem }, Number.isFinite(priceBandMin) ? priceBandMin : index);
       return {
         label: item.priceBand ?? `${item.priceBandMin ?? '--'} - ${item.priceBandMax ?? '--'}`,
         sortValue: Number.isFinite(priceBandMin) ? priceBandMin : index,
@@ -553,7 +632,8 @@ const reload = async () => {
         promotionSku: readNumber(item, numericFields.promotionSku),
         suggestSku: readNumber(item, numericFields.suggestSku),
         suggestSkuPer: readNumber(item, numericFields.suggestSkuPer),
-        xLabel: String(chartItem.pricePoint ?? item.priceBand ?? item.priceBandMin ?? item.priceBandMax ?? index + 1),
+        xLabel: String(chartItem.pricePoint ?? chartItem.priceBandAve ?? item.priceBand ?? item.priceBandMin ?? item.priceBandMax ?? index + 1),
+        xValue,
         skuLineValue: readNumber(chartItem, numericFields.sku) || readNumber(item, numericFields.sku),
         salesLineValue: readNumber(chartItem, numericFields.sales) || readNumber(item, numericFields.sales),
         quantityLineValue: readNumber(chartItem, numericFields.saleQuantity) || readNumber(item, numericFields.saleQuantity),
@@ -562,7 +642,7 @@ const reload = async () => {
       } satisfies PriceBandTableRow;
     });
 
-    priceLineNum.value = String(diagram.priceLineNum ?? 0);
+    priceLineNum.value = String(diagram.priceLineNum ?? lineRows.length ?? 0);
     priceRangeText.value = readText(diagram, ['priceRangeText']) || `${diagram.priceBandMin ?? '--'} - ${diagram.priceBandMax ?? '--'}`;
     pricePointTexts.value = Array.isArray(diagram.pricePointList)
       ? diagram.pricePointList.map((item: any) => String(item.pricePoint ?? item.pointPrice ?? item.priceBandMin ?? item.priceBandMax ?? '--'))
@@ -582,6 +662,7 @@ const reload = async () => {
   } catch (error) {
     errorMessage.value = '价格带数据加载失败，请稍后重试';
     tableRows.value = [];
+    priceLineChartPoints.value = [];
     pricePointTexts.value = [];
     priceLineNum.value = '--';
     priceRangeText.value = '--';
@@ -696,19 +777,26 @@ onBeforeUnmount(() => {
   grid-template-columns: minmax(0, 1fr) 310px;
   gap: 22px;
   align-items: stretch;
+  overflow: hidden;
 }
 
 .chart-box {
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .price-chart-wrap {
   position: relative;
   min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .large-chart {
   height: 480px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .large-chart.is-muted {
@@ -824,19 +912,28 @@ onBeforeUnmount(() => {
   margin-bottom: 14px;
 }
 
+.summary-card-head > div {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+
 .summary-card-title {
   color: #1f2937;
   font-size: 18px;
   font-weight: 700;
   line-height: 1.2;
+  white-space: nowrap;
 }
 
 .summary-card-code {
-  margin-top: 6px;
+  margin-top: 0;
   color: var(--el-color-primary);
   font-size: 13px;
   font-weight: 800;
   letter-spacing: 0.14em;
+  white-space: nowrap;
 }
 
 .band-chip-grid,

@@ -73,6 +73,8 @@ export interface DiagnosisRecordQuery extends PageQuery {
   periodEnd?: string;
   compareStart?: string;
   compareEnd?: string;
+  createStart?: string;
+  createEnd?: string;
   deptId?: string;
   retailTypeId?: string;
   businessCircleId?: string;

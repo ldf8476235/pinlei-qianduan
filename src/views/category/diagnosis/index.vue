@@ -163,6 +163,44 @@ const resolveRouteDateRange = (startKeys: string[], endKeys: string[], fallback:
   return start && end ? [start, end] : [...fallback];
 };
 
+const parseLocalDate = (value?: string) => {
+  if (!value) return undefined;
+  const [year, month, day] = value.split('-').map(Number);
+  if (!year || !month || !day) return undefined;
+  return new Date(year, month - 1, day);
+};
+
+const formatLocalDate = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const getInclusiveDays = (range: string[]) => {
+  const start = parseLocalDate(range?.[0]);
+  const end = parseLocalDate(range?.[1]);
+  if (!start || !end) return 0;
+  return Math.floor((end.getTime() - start.getTime()) / 86400000) + 1;
+};
+
+const alignCompareDateRange = () => {
+  const currentDays = getInclusiveDays(form.currentDateRange);
+  const compareStart = parseLocalDate(form.compareDateRange?.[0]);
+  const originalEnd = form.compareDateRange?.[1];
+  if (currentDays <= 0 || !compareStart) {
+    return { adjusted: false, currentDays, nextEnd: originalEnd || '' };
+  }
+  const compareEnd = new Date(compareStart);
+  compareEnd.setDate(compareEnd.getDate() + currentDays - 1);
+  const nextEnd = formatLocalDate(compareEnd);
+  if (originalEnd !== nextEnd) {
+    form.compareDateRange = [form.compareDateRange[0], nextEnd];
+    return { adjusted: true, currentDays, nextEnd };
+  }
+  return { adjusted: false, currentDays, nextEnd };
+};
+
 const normalizeLevel = (value?: string | number | null): number | undefined => {
   const level = Number(value);
   return Number.isInteger(level) && level > 0 ? level : undefined;
@@ -341,6 +379,18 @@ const handleSubmit = async () => {
     if (!valid) return;
     submitLoading.value = true;
     try {
+      const compareAdjust = alignCompareDateRange();
+      if (compareAdjust.adjusted) {
+        await ElMessageBox.alert(
+          `本期日期共 ${compareAdjust.currentDays} 天，对比日期需要保持相同天数。系统已自动将对比结束日期调整为 ${compareAdjust.nextEnd}，请确认日期后重新点击“立即诊断”。`,
+          '日期范围已调整',
+          {
+            confirmButtonText: '我知道了',
+            type: 'warning'
+          }
+        );
+        return;
+      }
       const categoryId = form.categoryId ? String(form.categoryId) : '';
       const categoryOption = findCategoryOption(form.categoryId, categoryTreeOptions.value);
       const categoryName = categoryOption?.className || categoryOption?.label || '';

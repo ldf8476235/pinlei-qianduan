@@ -17,47 +17,21 @@
             collapse-tags
             collapse-tags-tooltip
             :max-collapse-tags="2"
+            :disabled="queryForm.classLevel === ''"
             class="filter-item-category"
-            placeholder="请选择品类"
+            :placeholder="queryForm.classLevel === '' ? '全部级别不筛选品类' : '请选择品类'"
           >
             <el-option v-for="item in categoryOptions" :key="String(item.value)" :label="item.label" :value="item.value" />
           </el-select>
         </el-form-item>
-        <el-form-item label="本期日期">
-          <el-date-picker
-            v-model="currentDateRange"
-            type="daterange"
-            value-format="YYYY-MM-DD"
-            start-placeholder="开始日期"
-            end-placeholder="结束日期"
-            range-separator="-"
-            class="filter-item-date"
-          />
+        <el-form-item label="生成时间">
+          <el-segmented v-model="dateShortcut" :options="dateShortcutOptions" class="date-shortcut" />
         </el-form-item>
         <el-form-item class="filter-action-item">
-          <el-button text type="primary" @click="moreConditionVisible = !moreConditionVisible">
-            {{ moreConditionVisible ? '收起' : '更多条件' }}
-          </el-button>
           <el-button @click="handleReset">重置</el-button>
           <el-button type="success" class="query-button" @click="handleSearch">查询</el-button>
         </el-form-item>
       </el-form>
-
-      <div v-show="moreConditionVisible" class="more-condition-wrap">
-        <el-form :model="queryForm" inline label-width="80px" class="filter-form">
-          <el-form-item label="对比日期">
-            <el-date-picker
-              v-model="compareDateRange"
-              type="daterange"
-              value-format="YYYY-MM-DD"
-              start-placeholder="开始日期"
-              end-placeholder="结束日期"
-              range-separator="-"
-              class="filter-item-date"
-            />
-          </el-form-item>
-        </el-form>
-      </div>
     </el-card>
 
     <el-card shadow="hover" class="record-card">
@@ -81,10 +55,26 @@
         <el-table-column label="门店" prop="storeRangeName" min-width="110" show-overflow-tooltip />
         <el-table-column label="状态" prop="status" min-width="110">
           <template #default="{ row }">
-            <span class="status-text" :class="{ generated: isGenerated(row) }">
+            <span class="status-text" :class="{ generated: isGenerated(row), failed: isFailed(row) }">
               <span class="status-dot" />
               {{ row.statusLabel || row.status || '--' }}
             </span>
+          </template>
+        </el-table-column>
+        <el-table-column label="计算进度" prop="progressPercent" min-width="180">
+          <template #default="{ row }">
+            <div class="progress-cell">
+              <el-progress
+                :percentage="normalizeProgress(row)"
+                :status="progressStatus(row)"
+                :stroke-width="8"
+                :show-text="false"
+              />
+              <div class="progress-meta">
+                <span>{{ normalizeProgress(row) }}%</span>
+                <span>{{ stageLabel(row.currentStage) }}</span>
+              </div>
+            </div>
           </template>
         </el-table-column>
         <el-table-column label="本期日期" prop="periodStart" min-width="180" sortable="custom">
@@ -128,15 +118,11 @@ interface SortState {
 
 const router = useRouter();
 
-const DEFAULT_CURRENT_RANGE: [string, string] = ['2024-10-01', '2024-12-08'];
-const DEFAULT_COMPARE_RANGE: [string, string] = ['2023-10-01', '2023-12-08'];
-
-const moreConditionVisible = ref(false);
 const storeScopeText = ref('全店');
-const currentDateRange = ref<[string, string]>([...DEFAULT_CURRENT_RANGE]);
-const compareDateRange = ref<[string, string]>([...DEFAULT_COMPARE_RANGE]);
+const dateShortcut = ref<'all' | 'today' | 'yesterday' | 'last30'>('all');
 const tableData = ref<DiagnosisRecordRow[]>([]);
 const levelOptions = ref<OptionVO[]>([
+  { label: '全部级别', value: '' },
   { label: '一级品类', value: '1' },
   { label: '二级品类', value: '2' },
   { label: '三级品类', value: '3' },
@@ -151,7 +137,7 @@ const sortState = reactive<SortState>({
 
 const queryForm = reactive({
   storeScope: '0',
-  classLevel: '1' as string | number,
+  classLevel: '' as string | number,
   classNos: [] as Array<string | number>,
   deptName: '',
   retailTypeName: '',
@@ -159,8 +145,14 @@ const queryForm = reactive({
   deptGroupName: ''
 });
 
+const dateShortcutOptions = [
+  { label: '全部', value: 'all' },
+  { label: '今日', value: 'today' },
+  { label: '昨日', value: 'yesterday' },
+  { label: '近30日', value: 'last30' }
+];
+
 const normalizeText = (value?: string | number | null) => String(value ?? '').trim();
-const findOptionByText = (options: OptionVO[], text: string) => options.find((item) => String(item.label || '').includes(text));
 
 const parseClassTreePayload = (raw: any): CategoryClassTreeNodeVO[] => {
   const isCategoryNodeArray = (arr: any[]) =>
@@ -213,27 +205,55 @@ const applyDefaults = () => {
   queryForm.retailTypeName = '';
   queryForm.businessCircleName = '';
   queryForm.deptGroupName = '';
-  queryForm.classLevel = findOptionByText(levelOptions.value, '一级品类')?.value ?? levelOptions.value[0]?.value ?? '1';
-
-  const defaultCategory = findOptionByText(categoryOptions.value, '004洗化部') ?? categoryOptions.value[0];
-  queryForm.classNos = defaultCategory ? [defaultCategory.value] : [];
-  currentDateRange.value = [...DEFAULT_CURRENT_RANGE];
-  compareDateRange.value = [...DEFAULT_COMPARE_RANGE];
+  queryForm.classLevel = '';
+  queryForm.classNos = [];
+  dateShortcut.value = 'all';
 };
 
-const buildQuery = (): DiagnosisRecordQuery => ({
-  pageNum: 1,
-  pageSize: 20,
-  storeScope: queryForm.storeScope,
-  classLevel: queryForm.classLevel,
-  classNos: queryForm.classNos,
-  periodStart: currentDateRange.value?.[0],
-  periodEnd: currentDateRange.value?.[1],
-  compareStart: compareDateRange.value?.[0],
-  compareEnd: compareDateRange.value?.[1],
-  orderByColumn: sortState.orderByColumn,
-  isAsc: sortState.isAsc
-});
+const toDateString = (date: Date) => {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const addDays = (date: Date, days: number) => {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+};
+
+const resolveCreateRange = () => {
+  const today = new Date();
+  if (dateShortcut.value === 'today') {
+    const value = toDateString(today);
+    return { createStart: value, createEnd: value };
+  }
+  if (dateShortcut.value === 'yesterday') {
+    const value = toDateString(addDays(today, -1));
+    return { createStart: value, createEnd: value };
+  }
+  if (dateShortcut.value === 'last30') {
+    return { createStart: toDateString(addDays(today, -29)), createEnd: toDateString(today) };
+  }
+  return {};
+};
+
+const buildQuery = (): DiagnosisRecordQuery => {
+  const query: DiagnosisRecordQuery = {
+    pageNum: 1,
+    pageSize: 0,
+    storeScope: queryForm.storeScope,
+    classNos: queryForm.classNos,
+    orderByColumn: sortState.orderByColumn,
+    isAsc: sortState.isAsc,
+    ...resolveCreateRange()
+  };
+  if (queryForm.classLevel !== '') {
+    query.classLevel = queryForm.classLevel;
+  }
+  return query;
+};
 
 const storeRequest = useRequest(async () => await findStore({ keyword: '', limit: 50 }), {
   onSuccess: (res) => {
@@ -277,6 +297,36 @@ const formatRange = (start?: string, end?: string) => {
   return `${formatDate(start)} - ${formatDate(end)}`;
 };
 
+const parseLocalDate = (value?: string) => {
+  if (!value) return undefined;
+  const [year, month, day] = value.split('-').map(Number);
+  if (!year || !month || !day) return undefined;
+  return new Date(year, month - 1, day);
+};
+
+const formatLocalDate = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const inclusiveDays = (start?: string, end?: string) => {
+  const startDate = parseLocalDate(start);
+  const endDate = parseLocalDate(end);
+  if (!startDate || !endDate) return 0;
+  return Math.floor((endDate.getTime() - startDate.getTime()) / 86400000) + 1;
+};
+
+const alignCompareEnd = (periodStart?: string, periodEnd?: string, compareStart?: string, compareEnd?: string) => {
+  const days = inclusiveDays(periodStart, periodEnd);
+  const start = parseLocalDate(compareStart);
+  if (days <= 0 || !start) return compareEnd;
+  const end = new Date(start);
+  end.setDate(end.getDate() + days - 1);
+  return formatLocalDate(end);
+};
+
 const formatDateTime = (value?: string) => {
   if (!value) return '--';
   return value.replace('T', ' ').replace(/-/g, '/');
@@ -284,7 +334,42 @@ const formatDateTime = (value?: string) => {
 
 const isGenerated = (row: DiagnosisRecordRow) => {
   const text = `${row.statusLabel || ''}${row.status || ''}`.toUpperCase();
-  return text.includes('生成') || text.includes('SUCCESS') || text.includes('READY');
+  if (isFailed(row)) return false;
+  return text.includes('生成成功') || text.includes('已生成') || text.includes('SUCCESS') || text.includes('READY') || text.includes('DONE');
+};
+
+const isFailed = (row: DiagnosisRecordRow) => {
+  const text = `${row.statusLabel || ''}${row.status || ''}${row.currentStage || ''}`.toUpperCase();
+  return text.includes('失败') || text.includes('FAILED') || text.includes('ERROR');
+};
+
+const normalizeProgress = (row: DiagnosisRecordRow) => {
+  if (isGenerated(row)) return 100;
+  const value = Number(row.progressPercent ?? 0);
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(100, Math.round(value)));
+};
+
+const progressStatus = (row: DiagnosisRecordRow) => {
+  if (isFailed(row)) return 'exception';
+  if (isGenerated(row)) return 'success';
+  return undefined;
+};
+
+const stageLabel = (stage?: string) => {
+  const map: Record<string, string> = {
+    WAIT_PRECOMPUTE: '等待计算',
+    PLAN_WINDOW: '规划窗口',
+    INIT: '初始化',
+    PREPARE: '准备数据',
+    READ_SOURCE: '读取数据',
+    WRITE_SNAPSHOT: '写入快照',
+    DONE: '已完成',
+    FAILED: '计算失败',
+    ERROR: '计算失败'
+  };
+  const key = String(stage || '').trim();
+  return map[key] || key || '等待计算';
 };
 
 const loadTableData = async () => {
@@ -296,11 +381,10 @@ const handleSearch = async () => {
 };
 
 const handleReset = async () => {
-  moreConditionVisible.value = false;
   sortState.orderByColumn = undefined;
   sortState.isAsc = undefined;
-  await loadClassTreeOptions(Number(queryForm.classLevel || 1) || 1);
   applyDefaults();
+  categoryOptions.value = [];
   await loadTableData();
 };
 
@@ -317,6 +401,7 @@ const handleSortChange = ({ prop, order }: { prop: string; order: 'ascending' | 
 };
 
 const handleViewReport = async (row: DiagnosisRecordRow) => {
+  const alignedCompareEnd = alignCompareEnd(row.periodStart, row.periodEnd, row.compareStart, row.compareEnd);
   const response = await createDiagnosisSession({
     classLevel: row.classLevel,
     classNo: row.classNo,
@@ -329,7 +414,7 @@ const handleViewReport = async (row: DiagnosisRecordRow) => {
     periodStart: row.periodStart,
     periodEnd: row.periodEnd,
     compareStart: row.compareStart,
-    compareEnd: row.compareEnd,
+    compareEnd: alignedCompareEnd,
     triggerIfMissing: false,
     waitSeconds: 0
   });
@@ -348,14 +433,13 @@ const handleViewReport = async (row: DiagnosisRecordRow) => {
       startDate: row.periodStart,
       endDate: row.periodEnd,
       compareStartDate: row.compareStart || '',
-      compareEndDate: row.compareEnd || ''
+      compareEndDate: alignedCompareEnd || ''
     }
   });
 };
 
 const initPage = async () => {
   await storeRequest.run(undefined as never);
-  await loadClassTreeOptions(Number(queryForm.classLevel || 1) || 1);
   applyDefaults();
   await loadTableData();
 };
@@ -363,18 +447,21 @@ const initPage = async () => {
 watch(
   () => queryForm.classLevel,
   async (value) => {
+    if (value === '') {
+      categoryOptions.value = [];
+      queryForm.classNos = [];
+      return;
+    }
     const level = Number(value || 1) || 1;
     await loadClassTreeOptions(level);
     const validSet = new Set(categoryOptions.value.map((item) => String(item.value)));
     queryForm.classNos = queryForm.classNos.filter((item) => validSet.has(String(item)));
-    if (!queryForm.classNos.length && categoryOptions.value.length) {
-      const defaultCategory = findOptionByText(categoryOptions.value, '004洗化部') ?? categoryOptions.value[0];
-      if (defaultCategory) {
-        queryForm.classNos = [defaultCategory.value];
-      }
-    }
   }
 );
+
+watch(dateShortcut, () => {
+  loadTableData();
+});
 
 onMounted(() => {
   initPage();
@@ -416,8 +503,10 @@ onMounted(() => {
   width: 220px;
 }
 
-.filter-item-date {
-  width: 250px;
+.date-shortcut {
+  --el-segmented-item-selected-color: #fff;
+  --el-segmented-item-selected-bg-color: #ff6a00;
+  --el-border-radius-base: 999px;
 }
 
 .filter-action-item {
@@ -433,11 +522,6 @@ onMounted(() => {
 .query-button:focus {
   background: #1ca29b;
   border-color: #1ca29b;
-}
-
-.more-condition-wrap {
-  padding-top: 4px;
-  border-top: 1px solid #f0f2f5;
 }
 
 .record-title {
@@ -469,12 +553,37 @@ onMounted(() => {
   color: #16a34a;
 }
 
+.status-text.failed {
+  color: #dc2626;
+}
+
 .status-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
   background: currentColor;
   margin-right: 6px;
+}
+
+.progress-cell {
+  min-width: 140px;
+}
+
+.progress-cell :deep(.el-progress-bar__outer) {
+  background: #fff3e8;
+}
+
+.progress-cell :deep(.el-progress-bar__inner) {
+  background: linear-gradient(90deg, #ff9a1f 0%, #ff6a00 100%);
+}
+
+.progress-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+  color: #8a4b20;
+  font-size: 12px;
 }
 
 .record-card :deep(.el-table th) {

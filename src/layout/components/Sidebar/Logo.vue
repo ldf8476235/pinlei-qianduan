@@ -22,7 +22,7 @@
 
 <script setup lang="ts">
 import variables from '@/assets/styles/variables.module.scss';
-import logo from '@/assets/images/category-lab-logo.jpg';
+import logo from '@/assets/images/category-lab-sidebar-logo.png';
 import { useSettingsStore } from '@/store/modules/settings';
 const { proxy } = getCurrentInstance() as ComponentInternalInstance;
 import { NavTypeEnum } from '@/enums/NavTypeEnum';
@@ -74,21 +74,26 @@ const getLogoTextColor = computed(() => {
 .sidebar-logo-container {
   position: relative;
   height: 50px;
-  line-height: 50px;
   background: v-bind(getLogoBackground);
   text-align: center;
   overflow: hidden;
 
   & .sidebar-logo-link {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
     height: 100%;
     width: 100%;
+    padding-left: 22px;
+    gap: 8px;
 
     & .sidebar-logo {
-      width: 32px;
-      height: 32px;
-      vertical-align: middle;
-      margin-right: 12px;
-      margin-left: 12px;
+      width: 48px;
+      height: 34px;
+      object-fit: contain;
+      flex: 0 0 auto;
+      margin-right: 0;
+      transform: translateY(4px);
     }
 
     & .sidebar-title {
@@ -96,14 +101,19 @@ const getLogoTextColor = computed(() => {
       margin: 0;
       color: v-bind(getLogoTextColor);
       font-weight: 600;
-      line-height: 50px;
-      font-size: 14px;
+      line-height: 1;
+      font-size: 13px;
       font-family: Avenir, Helvetica Neue, Arial, Helvetica, sans-serif;
-      vertical-align: middle;
+      transform: translateY(-1px);
     }
   }
 
   &.collapse {
+    .sidebar-logo-link {
+      justify-content: center;
+      padding-left: 0;
+    }
+
     .sidebar-logo {
       margin-right: 0px;
     }
