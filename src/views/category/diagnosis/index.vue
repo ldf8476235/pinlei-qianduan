@@ -431,7 +431,8 @@ const handleSubmit = async () => {
           startDate: form.currentDateRange?.[0] || '',
           endDate: form.currentDateRange?.[1] || '',
           compareStartDate: form.compareDateRange?.[0] || '',
-          compareEndDate: form.compareDateRange?.[1] || ''
+          compareEndDate: form.compareDateRange?.[1] || '',
+          initialView: 'performance'
         }
       });
     } finally {

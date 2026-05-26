@@ -1,14 +1,53 @@
 <template>
-  <div class="p-2 gmroi-goods-list-page">
+  <div class="p-2 brand-sku-detail-page">
     <el-card shadow="hover" class="page-card summary-card">
       <div class="summary-line">数据日期：{{ currentDateRangeText }}；对比日期：{{ compareDateRangeText }}</div>
       <div class="summary-line">组织：总部；业态：全部业态；商圈：全部商圈；</div>
       <div class="summary-line">门店：全部</div>
       <div class="category-title">{{ categoryTitle }}</div>
+      <div class="brand-subtitle">品牌：{{ selectedBrandName }}</div>
     </el-card>
 
     <el-card shadow="hover" class="page-card filter-card">
       <el-form :model="queryForm" inline class="filter-form">
+        <el-form-item label="品牌类型">
+          <el-select
+            v-model="queryForm.brandType"
+            multiple
+            collapse-tags
+            collapse-tags-tooltip
+            :max-collapse-tags="1"
+            disabled
+            placeholder="全部"
+            style="width: 220px"
+          >
+            <el-option v-for="item in fixedBrandTypeOptions" :key="item" :label="item" :value="item" />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="品牌">
+          <el-select
+            v-model="queryForm.brandName"
+            multiple
+            collapse-tags
+            collapse-tags-tooltip
+            :max-collapse-tags="1"
+            disabled
+            placeholder="全部"
+            style="width: 240px"
+          >
+            <el-option v-for="item in fixedBrandNameOptions" :key="item" :label="item" :value="item" />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="新销品牌">
+          <el-select v-model="queryForm.newSaleBrand" disabled placeholder="全部" style="width: 160px">
+            <el-option label="全部" value="" />
+            <el-option label="是" value="Y" />
+            <el-option label="否" value="N" />
+          </el-select>
+        </el-form-item>
+
         <el-form-item label="当前状态">
           <el-select
             v-model="queryForm.status"
@@ -19,7 +58,6 @@
             clearable
             placeholder="全部 +2"
             style="width: 220px"
-            @change="handleQuery"
           >
             <el-option label="全部" value="-1" />
             <el-option label="上架" value="0" />
@@ -28,41 +66,15 @@
         </el-form-item>
 
         <el-form-item label="本期促销">
-          <el-select v-model="queryForm.promotion" clearable placeholder="全部" style="width: 140px" @change="handleQuery">
+          <el-select v-model="queryForm.promotion" clearable placeholder="全部" style="width: 140px">
             <el-option label="全部" value="" />
-            <el-option label="是" value="Y" />
-            <el-option label="否" value="N" />
+            <el-option label="是" value="1" />
+            <el-option label="否" value="2" />
           </el-select>
         </el-form-item>
 
-        <el-form-item label="本期GMROI角色">
-          <el-select v-model="queryForm.currentGmroi" clearable placeholder="全部" style="width: 160px" @change="handleQuery">
-            <el-option label="全部" value="" />
-            <el-option label="成功商品" value="1" />
-            <el-option label="沉睡商品" value="2" />
-            <el-option label="问题商品" value="3" />
-            <el-option label="吸客商品" value="4" />
-          </el-select>
-        </el-form-item>
-
-        <el-form-item label="对比期GMROI角色">
-          <el-select v-model="queryForm.compareGmroi" clearable placeholder="全部" style="width: 180px" @change="handleQuery">
-            <el-option label="全部" value="" />
-            <el-option label="成功商品" value="1" />
-            <el-option label="沉睡商品" value="2" />
-            <el-option label="问题商品" value="3" />
-            <el-option label="吸客商品" value="4" />
-          </el-select>
-        </el-form-item>
-
-        <el-form-item label="GMROI区间">
-          <el-checkbox-group v-model="queryForm.gmroiRanges" @change="handleQuery">
-            <el-checkbox label="0">全部</el-checkbox>
-            <el-checkbox label="1">GMROI&lt;=1</el-checkbox>
-            <el-checkbox label="2">1&lt;GMROI&lt;=2</el-checkbox>
-            <el-checkbox label="3">2&lt;GMROI&lt;=3</el-checkbox>
-            <el-checkbox label="4">GMROI&gt;3</el-checkbox>
-          </el-checkbox-group>
+        <el-form-item class="filter-actions">
+          <el-button type="primary" @click="handleQuery">查询</el-button>
         </el-form-item>
       </el-form>
     </el-card>
@@ -70,15 +82,15 @@
     <el-card shadow="hover" class="page-card table-card">
       <template #header>
         <div class="card-header">
-          <div class="card-title-wrap">
-            <span class="card-title">GMROI商品清单</span>
-          </div>
+          <span class="card-title">品牌SKU商品清单</span>
           <div class="card-actions">
             <span class="unit-text">*金额单位：元</span>
             <el-button type="primary" link @click="handleExport">导出</el-button>
           </div>
         </div>
       </template>
+
+      <el-alert v-if="tableError" class="mb-[12px]" :title="tableError" type="error" show-icon :closable="false" />
 
       <el-table
         v-loading="tableLoading"
@@ -87,26 +99,20 @@
         stripe
         height="560"
         class="goods-table"
-        :empty-text="tableError || '暂无GMROI商品明细数据'"
+        :empty-text="tableError || '暂无品牌SKU商品明细数据'"
         @sort-change="handleSortChange"
       >
         <el-table-column label="商品编码" prop="productNo" min-width="130" fixed="left" align="left" sortable="custom" show-overflow-tooltip />
 
-        <el-table-column label="商品名称" prop="productName" min-width="220" fixed="left" align="left" sortable="custom" show-overflow-tooltip>
-          <template #default="{ row }">
-            <el-button link type="primary" class="name-link" @click="handleGoodsDetail(row)">
-              {{ row.productName || '--' }}
-            </el-button>
-          </template>
-        </el-table-column>
+        <el-table-column label="商品名称" prop="productName" min-width="220" fixed="left" align="left" sortable="custom" show-overflow-tooltip />
 
-        <el-table-column label="当前状态" prop="productStatus" min-width="110" fixed="left" align="left" sortable="custom" show-overflow-tooltip>
+        <el-table-column label="当前状态" prop="productStatus" min-width="120" align="left" sortable="custom" show-overflow-tooltip>
           <template #default="{ row }">
             {{ row.productStatus || row.productStatusNo || '--' }}
           </template>
         </el-table-column>
 
-        <el-table-column label="销售门店数" prop="storeNum" min-width="120" fixed="left" align="center" sortable="custom">
+        <el-table-column label="销售门店数" prop="storeNum" min-width="120" align="center" sortable="custom">
           <template #default="{ row }">
             <el-button
               v-if="Number(row.storeNum) > 0"
@@ -119,31 +125,6 @@
             </el-button>
             <span v-else class="store-count">{{ formatNumber(row.storeNum, 0) }}</span>
           </template>
-        </el-table-column>
-
-        <el-table-column align="center">
-          <template #header>
-            <span class="metric-header">
-              GMROI角色
-              <el-tooltip content="按毛利率和库存周转率判定，与毛利贡献角色口径不同" placement="top">
-                <el-icon class="metric-help-icon"><QuestionFilled /></el-icon>
-              </el-tooltip>
-            </span>
-          </template>
-          <el-table-column label="GMROI角色-本期" prop="currentGmroiRoleName" min-width="130" align="left" sortable="custom" show-overflow-tooltip>
-            <template #default="{ row }">
-              <span :class="['role-badge', `is-${resolveRoleClass(row.currentGmroiRole)}`]">
-                {{ row.currentGmroiRoleName || '--' }}
-              </span>
-            </template>
-          </el-table-column>
-          <el-table-column label="GMROI角色-对比日期" prop="compareGmroiRoleName" min-width="150" align="left" sortable="custom" show-overflow-tooltip>
-            <template #default="{ row }">
-              <span :class="['role-badge', `is-${resolveRoleClass(row.compareGmroiRole)}`]">
-                {{ row.compareGmroiRoleName || '--' }}
-              </span>
-            </template>
-          </el-table-column>
         </el-table-column>
 
         <el-table-column label="销售量指标" align="center">
@@ -214,11 +195,11 @@
           <el-table-column label="重点商品" prop="keyProduct" min-width="100" align="left" sortable="custom" show-overflow-tooltip>
             <template #default="{ row }">{{ formatFlagText(row.keyProduct) }}</template>
           </el-table-column>
-          <el-table-column label="季节性商品" prop="seasonableFlagName" min-width="110" align="left" sortable="custom" show-overflow-tooltip>
+          <el-table-column label="季节性商品" prop="seasonableFlagName" min-width="120" align="left" sortable="custom" show-overflow-tooltip>
             <template #default="{ row }">{{ row.seasonableFlagName || row.seasonableFlag || '--' }}</template>
           </el-table-column>
+          <el-table-column label="规格" prop="spec" min-width="110" align="left" sortable="custom" show-overflow-tooltip />
         </el-table-column>
-
       </el-table>
 
       <div class="pagination-wrap">
@@ -227,29 +208,52 @@
           v-model:page-size="queryForm.pageSize"
           background
           layout="total, sizes, prev, pager, next, jumper"
-          :page-sizes="[5, 10, 20, 50]"
+          :page-sizes="[10, 20, 50, 100]"
           :total="total"
           @size-change="handleSizeChange"
           @current-change="handlePageChange"
         />
       </div>
     </el-card>
-
   </div>
 </template>
 
 <script setup lang="ts">
 import type { Sort } from 'element-plus';
-import { QuestionFilled } from '@element-plus/icons-vue';
-import { getGmroiSalesList } from '@/api/gmroi';
-import type { GmroiSalesListItemVO } from '@/api/gmroi/types';
+import { getBrandSkuDetails } from '@/api/category/diagnosis/analysis';
 
 type SortOrder = 'ascending' | 'descending' | null;
 
-interface GoodsRow extends GmroiSalesListItemVO {
+interface GoodsRow {
+  [key: string]: unknown;
+  productNo?: string;
+  productName?: string;
+  productStatus?: string;
+  productStatusNo?: string;
+  storeNum?: number;
+  saleQuantity?: number;
+  saleQuantityPsd?: number;
+  sales?: number;
+  salesPer?: number;
+  salesPsd?: number;
+  gross?: number;
+  grossPer?: number;
+  grossPsd?: number;
+  grossRate?: number;
+  stockQuantity?: number;
+  turnoverRate?: number;
+  turnoverDays?: number;
+  stockSalesRate?: number;
+  contributionRate?: number;
+  gmroi?: number;
+  salesRate?: number;
   activity?: string;
+  firstSaleDate?: string;
+  newProduct?: string;
+  keyProduct?: string;
   seasonableFlag?: string;
   seasonableFlagName?: string;
+  spec?: string;
 }
 
 const route = useRoute();
@@ -259,16 +263,6 @@ const sessionId = computed(() => String(route.query.sessionId || ''));
 const resolveQueryValue = (value: string | string[] | null | undefined, fallback: string) => {
   if (Array.isArray(value)) return String(value[0] || fallback);
   return String(value || fallback);
-};
-
-const resolveQueryList = (value: unknown, fallback: string[]) => {
-  if (Array.isArray(value)) {
-    return value.map((item) => String(item)).filter(Boolean);
-  }
-  if (typeof value === 'string' && value) {
-    return value.split(',').map((item) => item.trim()).filter(Boolean);
-  }
-  return [...fallback];
 };
 
 const currentDateRangeText = computed(() => {
@@ -298,15 +292,31 @@ const categoryTitle = computed(() => {
   return `${categoryId}${categoryName}（${formatCategoryLevelName(categoryLevel)}）`;
 });
 
+const selectedBrandName = computed(() => resolveQueryValue(route.query.brandName as string | string[] | null | undefined, '全部品牌'));
+
+const resolveQueryList = (value: string | string[] | null | undefined) => {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item).trim()).filter(Boolean);
+  }
+  if (!value) return [];
+  return String(value)
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+};
+
 const queryForm = reactive({
+  brandType: [] as string[],
+  brandName: [] as string[],
+  newSaleBrand: '',
   status: ['-1', '0', '1'] as string[],
   promotion: '',
-  currentGmroi: resolveQueryValue(route.query.currentGmroi as string | string[] | null | undefined, ''),
-  compareGmroi: resolveQueryValue(route.query.compareGmroi as string | string[] | null | undefined, ''),
-  gmroiRanges: resolveQueryList(route.query.gmroiList, ['0']),
   pageNum: 1,
   pageSize: 10
 });
+
+const fixedBrandTypeOptions = computed(() => (queryForm.brandType.length ? queryForm.brandType : ['全部']));
+const fixedBrandNameOptions = computed(() => (queryForm.brandName.length ? queryForm.brandName : ['全部']));
 
 const sortState = reactive<{ prop: string; order: SortOrder }>({
   prop: 'sales',
@@ -317,37 +327,50 @@ const tableLoading = ref(false);
 const tableError = ref('');
 const total = ref(0);
 const tableRows = ref<GoodsRow[]>([]);
+
 const loadTableList = async () => {
   if (!sessionId.value) {
-    ElMessage.error('缺少 sessionId，无法加载商品清单');
+    tableError.value = '缺少 sessionId，无法加载品牌SKU商品清单';
+    tableRows.value = [];
+    total.value = 0;
     return;
   }
+  if (!selectedBrandName.value || selectedBrandName.value === '全部品牌') {
+    tableError.value = '缺少品牌信息，无法加载品牌SKU商品清单';
+    tableRows.value = [];
+    total.value = 0;
+    return;
+  }
+
   tableLoading.value = true;
   tableError.value = '';
   try {
-    const statusList = queryForm.status.includes('-1') ? [] : queryForm.status;
-    const res = await getGmroiSalesList({
+    const res = await getBrandSkuDetails({
       sessionId: sessionId.value,
-      status: statusList.length ? statusList : undefined,
+      brandList: queryForm.brandName.length ? queryForm.brandName : [selectedBrandName.value],
+      status: queryForm.status.includes('-1') ? undefined : queryForm.status,
       promotion: queryForm.promotion || undefined,
-      currentGmroi: queryForm.currentGmroi || undefined,
-      compareGmroi: queryForm.compareGmroi || undefined,
-      gmroiList: queryForm.gmroiRanges,
       page: queryForm.pageNum,
       size: queryForm.pageSize,
       order: sortState.prop || 'sales',
       orderType: sortState.order === 'ascending' ? 'asc' : 'desc'
     });
-    const page = (res as any)?.result || (res as any)?.data?.result || {};
+    const page = (res as any)?.data || {};
     tableRows.value = Array.isArray(page.records) ? page.records : [];
     total.value = Number(page.total || 0);
   } catch (error: any) {
     tableRows.value = [];
     total.value = 0;
-    tableError.value = error?.message || 'GMROI商品明细加载失败';
+    tableError.value = error?.message || '品牌SKU商品清单加载失败';
   } finally {
     tableLoading.value = false;
   }
+};
+
+const syncQueryFormFromRoute = () => {
+  queryForm.brandType = resolveQueryList((route.query.brandType || route.query.brandTypeList) as string | string[] | null | undefined);
+  queryForm.brandName = resolveQueryList((route.query.brandName || route.query.brandList) as string | string[] | null | undefined);
+  queryForm.newSaleBrand = resolveQueryValue(route.query.newSaleBrand as string | string[] | null | undefined, '');
 };
 
 const handleQuery = async () => {
@@ -366,32 +389,8 @@ const handleSizeChange = async (size: number) => {
   await loadTableList();
 };
 
-const handleReset = async () => {
-  queryForm.status = ['-1', '0', '1'];
-  queryForm.promotion = '';
-  queryForm.currentGmroi = '';
-  queryForm.compareGmroi = '';
-  queryForm.gmroiRanges = ['0'];
-  queryForm.pageNum = 1;
-  queryForm.pageSize = 10;
-  sortState.prop = 'sales';
-  sortState.order = 'descending';
-  await loadTableList();
-};
-
 const handleExport = () => {
-  ElMessage.info('导出功能待接入真实接口');
-};
-
-const handleGoodsDetail = (row: GoodsRow) => {
-  router.push({
-    path: '/gmroi/analysis/detail',
-    query: {
-      ...route.query,
-      productNo: row.productNo,
-      productName: row.productName
-    }
-  });
+  ElMessage.info('导出功能待接入');
 };
 
 const handleStoreDrilldown = (row: GoodsRow) => {
@@ -405,23 +404,17 @@ const handleStoreDrilldown = (row: GoodsRow) => {
       ...route.query,
       productNo: row.productNo,
       productName: row.productName || '',
-      source: 'gmroi'
+      brandName: selectedBrandName.value || '',
+      spec: row.spec || '',
+      source: 'brand'
     }
   });
-};
-
-
-const resolveRoleClass = (value?: string) => {
-  if (value === '1') return 'success';
-  if (value === '2') return 'sleep';
-  if (value === '4') return 'attract';
-  return 'problem';
 };
 
 const getSortValue = (row: GoodsRow, prop: string) => {
   if (prop === 'productStatus') return row.productStatus || row.productStatusNo || '';
   if (prop === 'seasonableFlagName') return row.seasonableFlagName || row.seasonableFlag || '';
-  return (row as Record<string, unknown>)[prop];
+  return row[prop];
 };
 
 const displayRows = computed(() => {
@@ -461,18 +454,24 @@ const formatPercent = (value: number | string | null | undefined) => {
 
 const formatFlagText = (value: string | null | undefined) => {
   if (!value) return '--';
-  if (['Y', '1', '是'].includes(value)) return '是';
-  if (['N', '0', '否'].includes(value)) return '否';
+  if (['Y', '1', '是', 'YES'].includes(value)) return '是';
+  if (['N', '0', '否', 'NO'].includes(value)) return '否';
   return value;
 };
 
-onMounted(async () => {
-  await loadTableList();
-});
+watch(
+  () => route.fullPath,
+  () => {
+    syncQueryFormFromRoute();
+    queryForm.pageNum = 1;
+    void loadTableList();
+  },
+  { immediate: true }
+);
 </script>
 
 <style scoped lang="scss">
-.gmroi-goods-list-page {
+.brand-sku-detail-page {
   background: linear-gradient(180deg, #f7fbff 0%, #f5f7fa 180px), #f5f7fa;
   min-height: calc(100vh - 84px);
 }
@@ -501,10 +500,38 @@ onMounted(async () => {
   font-weight: 700;
 }
 
+.brand-subtitle {
+  margin-top: 8px;
+  color: #0f9f9a;
+  font-size: 14px;
+  font-weight: 600;
+}
+
 .filter-form {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px 12px;
+  gap: 8px 0;
+  width: 100%;
+}
+
+.filter-form :deep(.el-form-item) {
+  margin-bottom: 0;
+  margin-right: 18px;
+}
+
+.filter-form :deep(.el-form-item__label) {
+  color: #334155;
+  font-weight: 600;
+}
+
+.filter-form :deep(.el-input__wrapper),
+.filter-form :deep(.el-select__wrapper) {
+  border-radius: 10px;
+  box-shadow: 0 0 0 1px #d7e0ea inset;
+}
+
+.filter-actions {
+  margin-left: auto;
 }
 
 .card-header {
@@ -512,12 +539,6 @@ onMounted(async () => {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-}
-
-.card-title-wrap {
-  display: flex;
-  align-items: center;
-  gap: 10px;
 }
 
 .card-title {
@@ -537,14 +558,8 @@ onMounted(async () => {
   color: #64748b;
 }
 
-.name-link {
-  padding: 0;
-  font-weight: 600;
-}
-
-.store-count {
-  color: #0f766e;
-  font-weight: 700;
+.goods-table {
+  width: 100%;
 }
 
 .drilldown-number {
@@ -552,98 +567,20 @@ onMounted(async () => {
   font-weight: 700;
 }
 
-.goods-table {
-  width: 100%;
-}
-
-.goods-table :deep(.el-table__header th) {
-  background: #f8fafc;
-  color: #0f172a;
-  font-weight: 600;
-}
-
-.goods-table :deep(.cell) {
-  text-align: center;
-}
-
-.metric-header {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-}
-
-.metric-help-icon {
-  color: #94a3b8;
-  cursor: help;
-  font-size: 15px;
-}
-
-.goods-table :deep(.el-table__body tr:nth-child(2n)) td {
-  background: #fbfdff;
-}
-
-.goods-table :deep(.el-table__body td) {
-  color: #334155;
-}
-
-.goods-table :deep(.el-table__fixed-left),
-.goods-table :deep(.el-table__fixed-right) {
-  box-shadow: 0 0 12px rgba(15, 23, 42, 0.06);
-}
-
-.role-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 12px;
+.store-count {
+  color: #0f9f9a;
   font-weight: 700;
 }
 
-.role-badge.is-success {
-  background: rgba(33, 183, 168, 0.12);
-  color: #0f766e;
-}
-
-.role-badge.is-sleep {
-  background: rgba(245, 158, 11, 0.12);
-  color: #b45309;
-}
-
-.role-badge.is-attract {
-  background: rgba(139, 92, 246, 0.12);
-  color: #7c3aed;
-}
-
-.role-badge.is-problem {
-  background: rgba(239, 68, 68, 0.12);
-  color: #dc2626;
+.goods-table :deep(.el-table__header th) {
+  background: #fff3e8;
+  color: #111827;
+  font-weight: 700;
 }
 
 .pagination-wrap {
   display: flex;
   justify-content: flex-end;
-  margin-top: 14px;
-}
-
-.dialog-form {
-  margin-top: 8px;
-}
-
-.process-tip {
-  background: rgba(33, 183, 168, 0.12);
-  color: #0f766e;
-  padding: 10px 12px;
-  border-radius: 10px;
-  margin-bottom: 16px;
-  font-weight: 600;
-}
-
-.dialog-footer {
-  display: flex;
-  justify-content: center;
-  gap: 12px;
+  padding-top: 14px;
 }
 </style>

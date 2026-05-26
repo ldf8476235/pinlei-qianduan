@@ -74,11 +74,7 @@
               <span class="card-title">本期销售趋势</span>
             </div>
           </template>
-          <div
-            class="subclass-trend-chart-wrap"
-            @mousemove="handleSubclassTrendMousemove"
-            @mouseleave="hideSubclassTrendTooltip"
-          >
+          <div class="subclass-trend-chart-wrap" @mousemove="handleSubclassTrendMousemove" @mouseleave="hideSubclassTrendTooltip">
             <div ref="trendChartRef" class="chart-box" />
             <div
               v-if="customTrendTooltip.visible"
@@ -103,14 +99,7 @@
         </div>
       </template>
 
-      <el-table
-        :data="tableRows"
-        border
-        stripe
-        row-key="categoryKey"
-        class="sub-class-table"
-        header-cell-class-name="sub-class-table-header"
-      >
+      <el-table :data="tableRows" border stripe row-key="categoryKey" class="sub-class-table" header-cell-class-name="sub-class-table-header">
         <el-table-column label="品类" fixed="left" min-width="200" align="center">
           <template #default="{ row }">
             <div class="category-cell">
@@ -232,7 +221,7 @@ import * as echarts from 'echarts';
 import type { EChartsOption } from 'echarts';
 import { download } from '@/utils/request';
 import { useRequest } from '@/hooks/useRequest';
-import { createVueChartTooltip, getCategoryIndexByMouse, hideVueChartTooltip, showVueChartTooltip } from './useVueChartTooltip';
+import { createVueChartTooltip, hideVueChartTooltip, showVueChartTooltip } from './useVueChartTooltip';
 import {
   getCategoryDiagnosisSubClassPie,
   getCategoryDiagnosisSubClassTable,
@@ -273,11 +262,13 @@ const trendChartRef = ref<HTMLDivElement>();
 const pieChartIns = ref<echarts.ECharts>();
 const trendChartIns = ref<echarts.ECharts>();
 
-const colorMap: Record<string, string> = {
+const baseColorMap: Record<string, string> = {
   '00401': '#27b0d6',
   '00402': '#f06b4f',
   '00403': '#b69cff'
 };
+const subClassPalette = ['#27b0d6', '#f06b4f', '#b69cff', '#16a34a', '#f59e0b', '#ef4444', '#2563eb', '#14b8a6', '#a855f7', '#64748b'];
+const subClassColorMap = reactive<Record<string, string>>({ ...baseColorMap });
 
 const pieData = ref<PieChartItem[]>([]);
 const trendData = ref<LegacySubclassSalesTrendResponse>({ legend: [], xdata: [], lineDate: [] });
@@ -322,7 +313,21 @@ const toNumber = (value: unknown, digits?: number) => {
   return typeof digits === 'number' ? Number(num.toFixed(digits)) : num;
 };
 
-const resolveColor = (classNo: string, index: number) => colorMap[classNo] || Object.values(colorMap)[index % 3] || '#27b0d6';
+const getSubClassKey = (classNo: string, className = '') => classNo || className || 'unknown';
+const resetSubClassColorMap = () => {
+  Object.keys(subClassColorMap).forEach((key) => delete subClassColorMap[key]);
+  Object.assign(subClassColorMap, baseColorMap);
+};
+const registerSubClassColor = (classNo: string, className = '') => {
+  const key = getSubClassKey(classNo, className);
+  if (!subClassColorMap[key]) {
+    const assignedCount = Object.keys(subClassColorMap).filter((item) => !baseColorMap[item]).length;
+    subClassColorMap[key] = subClassPalette[assignedCount % subClassPalette.length];
+  }
+  return subClassColorMap[key];
+};
+const getSubClassColor = (classNo: string, className = '', index = 0) =>
+  subClassColorMap[getSubClassKey(classNo, className)] || subClassPalette[index % subClassPalette.length];
 const resolveDisplayName = (classNo: string, className: string) => `${classNo} ${className}`.trim();
 
 const normalizePieData = (payload: LegacySubclassSalesPerItem[] | undefined): PieChartItem[] => {
@@ -337,13 +342,24 @@ const normalizePieData = (payload: LegacySubclassSalesPerItem[] | undefined): Pi
       salesAmount: toNumber(item.sales ?? 0, 2),
       salesShare: toNumber(item.salesPer ?? 0, 2),
       displayName: resolveDisplayName(classNo, className),
-      color: resolveColor(classNo, index)
+      color: registerSubClassColor(classNo, className)
     };
   });
 };
 
 const normalizeTrendData = (payload: LegacySubclassSalesTrendResponse | undefined): LegacySubclassSalesTrendResponse => {
   const source = payload || {};
+  if (Array.isArray(source.lineDate)) {
+    const seenKeys = new Set<string>();
+    source.lineDate.forEach((item) => {
+      const classNo = String(item.classNo || '');
+      const className = String(item.className || '');
+      const key = getSubClassKey(classNo, className);
+      if (seenKeys.has(key)) return;
+      seenKeys.add(key);
+      registerSubClassColor(classNo, className);
+    });
+  }
   return {
     legend: Array.isArray(source.legend) ? source.legend.map((item) => String(item || '')) : [],
     xdata: Array.isArray(source.xdata) ? source.xdata.map((item) => String(item || '')) : [],
@@ -383,7 +399,7 @@ const trendSeries = computed<TrendChartSeriesItem[]>(() => {
     classNo,
     className: row.className,
     displayName: resolveDisplayName(classNo, row.className || legend[index] || ''),
-    color: resolveColor(classNo, index),
+    color: getSubClassColor(classNo, row.className, index),
     values: (trendData.value.xdata || []).map((date) => row.values[date] ?? 0)
   }));
 });
@@ -453,14 +469,49 @@ const hideSubclassTrendTooltip = () => {
   customTrendTooltip.visible = false;
 };
 
+const getPieIndexByMouse = (event: MouseEvent) => {
+  if (!pieChartRef.value || !pieData.value.length) return -1;
+  const rect = pieChartRef.value.getBoundingClientRect();
+  const centerX = rect.width * 0.42;
+  const centerY = rect.height * 0.5;
+  const radiusBase = Math.min(rect.width, rect.height) / 2;
+  const innerRadius = radiusBase * 0.48;
+  const outerRadius = radiusBase * 0.7;
+  const dx = event.clientX - rect.left - centerX;
+  const dy = event.clientY - rect.top - centerY;
+  const distance = Math.sqrt(dx * dx + dy * dy);
+  if (distance < innerRadius || distance > outerRadius) return -1;
+
+  const total = pieData.value.reduce((sum, item) => sum + Math.max(0, toNumber(item.salesAmount)), 0);
+  if (total <= 0) return -1;
+
+  const angle = ((Math.atan2(dx, -dy) * 180) / Math.PI + 360) % 360;
+  let cursor = 0;
+  for (let index = 0; index < pieData.value.length; index += 1) {
+    const span = (Math.max(0, toNumber(pieData.value[index].salesAmount)) / total) * 360;
+    if (angle >= cursor && angle < cursor + span) return index;
+    cursor += span;
+  }
+  return pieData.value.length - 1;
+};
+
+const getTrendIndexByMouse = (event: MouseEvent, itemCount: number) => {
+  if (!trendChartRef.value || !trendChartIns.value || itemCount <= 0) return -1;
+  const chartRect = trendChartRef.value.getBoundingClientRect();
+  const point: [number, number] = [event.clientX - chartRect.left, event.clientY - chartRect.top];
+  if (!trendChartIns.value.containPixel({ gridIndex: 0 }, point)) return -1;
+  const coord = trendChartIns.value.convertFromPixel({ gridIndex: 0 }, point);
+  const rawIndex = Array.isArray(coord) ? Number(coord[0]) : Number(coord);
+  const index = Math.round(rawIndex);
+  return Number.isInteger(index) && index >= 0 && index < itemCount ? index : -1;
+};
+
 const handlePieTooltipMousemove = (event: MouseEvent) => {
   if (!pieData.value.length || !pieChartRef.value || !pieChartIns.value) {
     hidePieTooltip();
     return;
   }
-  const rect = pieChartRef.value.getBoundingClientRect();
-  const point = [event.clientX - rect.left, event.clientY - rect.top];
-  const index = pieData.value.findIndex((_, dataIndex) => pieChartIns.value?.containPixel({ seriesIndex: 0, dataIndex }, point));
+  const index = getPieIndexByMouse(event);
   if (index < 0) {
     hidePieTooltip();
     return;
@@ -486,7 +537,11 @@ const handleSubclassTrendMousemove = (event: MouseEvent) => {
     return;
   }
 
-  const index = getCategoryIndexByMouse(event, trendChartRef.value, dates.length, { left: 56, right: 24 });
+  const index = getTrendIndexByMouse(event, dates.length);
+  if (index < 0) {
+    hideSubclassTrendTooltip();
+    return;
+  }
   const rows = series.map((item) => ({
     name: item.displayName || item.classNo || '--',
     value: formatAmount(item.values[index]),
@@ -511,6 +566,8 @@ const renderPieChart = () => {
         type: 'pie',
         radius: ['48%', '70%'],
         center: ['42%', '50%'],
+        startAngle: 90,
+        clockwise: true,
         label: { show: false },
         labelLine: { show: false },
         data: pieData.value.map((item) => ({
@@ -591,6 +648,7 @@ const loadPageData = async () => {
     ElMessage.error('缺少 sessionId，无法加载子类贡献详情');
     return;
   }
+  resetSubClassColorMap();
   const body = buildRequestBody();
   await Promise.all([
     pieRequest.run(body),

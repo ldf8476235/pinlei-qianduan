@@ -59,7 +59,30 @@
         </div>
       </template>
 
-      <el-table :data="tableRows" border stripe class="goods-table" @sort-change="handleSortChange">
+      <el-table
+        ref="goodsTableRef"
+        :data="tableRows"
+        :row-key="getRowKey"
+        :expand-row-keys="expandedRowKeys"
+        border
+        stripe
+        class="goods-table"
+        @sort-change="handleSortChange"
+      >
+        <el-table-column type="expand" width="1" class-name="detail-expand-column">
+          <template #default="{ row }">
+            <div class="goods-inline-detail">
+              <span class="goods-inline-detail-item"><strong>品类编码：</strong>{{ row.classNo || '--' }}</span>
+              <span class="goods-inline-detail-item"><strong>品类名称：</strong>{{ row.className || '--' }}</span>
+              <span class="goods-inline-detail-item"><strong>商品条码：</strong>{{ row.productBarcode || '--' }}</span>
+              <span class="goods-inline-detail-item"><strong>品牌名称：</strong>{{ row.brandName || '--' }}</span>
+              <span class="goods-inline-detail-item"><strong>规格：</strong>{{ row.spec || '--' }}</span>
+              <span class="goods-inline-detail-item"><strong>预估进价：</strong>{{ formatNumber(row.inPrice, 2) }}</span>
+              <span class="goods-inline-detail-item"><strong>售价：</strong>{{ formatNumber(row.salesPrice, 2) }}</span>
+              <span class="goods-inline-detail-item"><strong>供应商：</strong>{{ row.productVendorNoName || row.productVendorName || row.productVendorNo || '--' }}</span>
+            </div>
+          </template>
+        </el-table-column>
         <el-table-column label="商品编码" prop="productNo" min-width="130" fixed="left" align="left" sortable="custom" show-overflow-tooltip />
         <el-table-column label="商品名称" prop="productName" min-width="220" fixed="left" align="left" sortable="custom" show-overflow-tooltip>
           <template #default="{ row }">
@@ -70,7 +93,18 @@
           <template #default="{ row }">{{ row.productStatus || row.productStatusNo || '--' }}</template>
         </el-table-column>
         <el-table-column label="销售门店数" prop="storeNum" min-width="120" align="center" sortable="custom">
-          <template #default="{ row }"><span class="store-count">{{ formatNumber(row.storeNum, 0) }}</span></template>
+          <template #default="{ row }">
+            <el-button
+              v-if="Number(row.storeNum) > 0"
+              link
+              type="primary"
+              class="drilldown-number"
+              @click="handleStoreDrilldown(row)"
+            >
+              {{ formatNumber(row.storeNum, 0) }}
+            </el-button>
+            <span v-else class="store-count">{{ formatNumber(row.storeNum, 0) }}</span>
+          </template>
         </el-table-column>
         <el-table-column label="销售量-总计" prop="saleQuantity" min-width="120" align="center" sortable="custom">
           <template #default="{ row }">{{ formatNumber(row.saleQuantity, 2) }}</template>
@@ -170,6 +204,7 @@ type SortOrder = 'ascending' | 'descending' | null;
 interface PriceBandGoodsRow {
   productNo?: string;
   productName?: string;
+  productBarcode?: string;
   productStatus?: string;
   productStatusNo?: string;
   storeNum?: number;
@@ -195,16 +230,28 @@ interface PriceBandGoodsRow {
   keyProduct?: string;
   seasonableFlag?: string;
   seasonableFlagName?: string;
+  classNo?: string;
+  className?: string;
+  brandName?: string;
+  spec?: string;
+  inPrice?: number;
+  salesPrice?: number;
+  productVendorNo?: string;
+  productVendorName?: string;
+  productVendorNoName?: string;
 }
 
 const ALL_RANGE_VALUE = '__ALL__';
 const route = useRoute();
+const router = useRouter();
 const sessionId = computed(() => String(route.query.sessionId || ''));
+const goodsTableRef = ref<any>();
 
 const statusOptions = ref<OptionVO[]>([]);
 const priceBandOptions = ref<string[]>([]);
 const selectedRangeValues = ref<string[]>([ALL_RANGE_VALUE]);
 const tableRows = ref<PriceBandGoodsRow[]>([]);
+const expandedRowKeys = ref<string[]>([]);
 const loading = ref(false);
 const total = ref(0);
 const processDialogVisible = ref(false);
@@ -222,6 +269,17 @@ const queryForm = reactive({
 const resolveQueryValue = (value: string | string[] | null | undefined, fallback: string) => {
   if (Array.isArray(value)) return String(value[0] || fallback);
   return String(value || fallback);
+};
+
+const resolveQueryList = (value: string | string[] | null | undefined) => {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item).trim()).filter(Boolean);
+  }
+  if (!value) return [];
+  return String(value)
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
 };
 
 const currentDateRangeText = computed(() => {
@@ -279,6 +337,7 @@ const sortFieldMap: Record<string, string> = {
 
 const currentOrder = computed(() => sortFieldMap[sortState.prop] || 'sales');
 const currentOrderType = computed(() => (sortState.order === 'ascending' ? 'asc' : 'desc'));
+const getRowKey = (row: PriceBandGoodsRow) => String(row.productNo || row.productBarcode || row.productName || '');
 
 const loadStatusOptions = async () => {
   const res: any = await getCategoryFilterOptions();
@@ -313,6 +372,7 @@ const loadTable = async () => {
     });
     const payload = res?.data || {};
     tableRows.value = Array.isArray(payload.records) ? payload.records : [];
+    expandedRowKeys.value = expandedRowKeys.value.filter((key) => tableRows.value.some((row) => getRowKey(row) === key));
     total.value = Number(payload.total || 0);
     queryForm.page = Number(payload.current || queryForm.page);
     queryForm.size = Number(payload.size || queryForm.size);
@@ -329,14 +389,18 @@ const syncSelectedRanges = () => {
   selectedRangeValues.value = [...queryForm.priceBandList];
 };
 
-const handleRangeChange = (values: string[]) => {
+const handleRangeChange = async (values: string[]) => {
   if (values.includes(ALL_RANGE_VALUE)) {
     selectedRangeValues.value = [ALL_RANGE_VALUE];
     queryForm.priceBandList = [];
-    return;
+  } else {
+    queryForm.priceBandList = values.filter((item) => item !== ALL_RANGE_VALUE);
+    if (!queryForm.priceBandList.length) {
+      selectedRangeValues.value = [ALL_RANGE_VALUE];
+    }
   }
-  queryForm.priceBandList = values.filter((item) => item !== ALL_RANGE_VALUE);
-  if (!queryForm.priceBandList.length) selectedRangeValues.value = [ALL_RANGE_VALUE];
+  queryForm.page = 1;
+  await loadTable();
 };
 
 const handleQuery = async () => {
@@ -366,8 +430,31 @@ const handleExport = () => {
   ElMessage.info('导出功能后续对接真实接口');
 };
 
-const handleGoodsDetail = (_row: PriceBandGoodsRow) => {
-  ElMessage.info('商品详情跳转功能待接入');
+const handleGoodsDetail = (row: PriceBandGoodsRow) => {
+  const rowKey = getRowKey(row);
+  if (!rowKey) return;
+  const expanded = expandedRowKeys.value.includes(rowKey);
+  expandedRowKeys.value = expanded ? [] : [rowKey];
+  goodsTableRef.value?.toggleRowExpansion(row, !expanded);
+};
+
+const handleStoreDrilldown = (row: PriceBandGoodsRow) => {
+  if (!row.productNo) {
+    ElMessage.warning('缺少商品编码，无法查看销售门店明细');
+    return;
+  }
+  router.push({
+    path: '/product-store/detail',
+    query: {
+      ...route.query,
+      productNo: row.productNo,
+      productName: row.productName || '',
+      productBarcode: row.productBarcode || '',
+      brandName: row.brandName || '',
+      spec: row.spec || '',
+      source: 'price-band'
+    }
+  });
 };
 
 const handleProcess = (_row: PriceBandGoodsRow) => {
@@ -404,6 +491,7 @@ const formatFlagText = (value: string | null | undefined) => {
 
 onMounted(async () => {
   await Promise.all([loadStatusOptions(), loadPriceBandOptions()]);
+  queryForm.priceBandList = resolveQueryList(route.query.priceBandList as string | string[] | null | undefined);
   syncSelectedRanges();
   await loadTable();
 });
@@ -414,6 +502,16 @@ watch(
     queryForm.page = 1;
     queryForm.priceBandList = [];
     await loadPriceBandOptions();
+    syncSelectedRanges();
+    await loadTable();
+  }
+);
+
+watch(
+  () => route.query.priceBandList,
+  async () => {
+    queryForm.page = 1;
+    queryForm.priceBandList = resolveQueryList(route.query.priceBandList as string | string[] | null | undefined);
     syncSelectedRanges();
     await loadTable();
   }
@@ -508,8 +606,28 @@ watch(
 .goods-table {
   width: 100%;
 }
+.goods-inline-detail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  padding: 10px 12px;
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.8;
+  background: #fffaf2;
+  border-radius: 8px;
+}
+.goods-inline-detail-item strong {
+  color: #334155;
+  font-weight: 700;
+}
 .name-link {
   padding: 0;
+  font-weight: 600;
+}
+.drilldown-number {
+  padding: 0;
+  font-weight: 700;
 }
 .store-count {
   color: #16c2a3;
@@ -523,5 +641,16 @@ watch(
   display: flex;
   justify-content: flex-end;
   padding-top: 12px;
+}
+.goods-table :deep(.detail-expand-column .cell) {
+  display: none;
+}
+.goods-table :deep(.el-table__expand-column) {
+  padding: 0 !important;
+  border-right: 0;
+}
+.goods-table :deep(.el-table__expanded-cell) {
+  padding: 8px 12px 12px;
+  background: #fff;
 }
 </style>

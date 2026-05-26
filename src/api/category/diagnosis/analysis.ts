@@ -19,6 +19,9 @@ export const getPriceBandRangeSummary = (sessionId: string): AxiosPromise<Diagno
 export const getPriceBandDetails = (params: Record<string, any>): AxiosPromise<DiagnosisApiResponse<any>> =>
   request({ url: '/api/v1/price-band/details', method: 'get', params });
 
+export const getProductStoreDetails = (params: Record<string, any>): AxiosPromise<DiagnosisApiResponse<any>> =>
+  request({ url: '/api/v1/product-store/details', method: 'get', params });
+
 export const getBrandOverview = (sessionId: string): AxiosPromise<DiagnosisApiResponse<any>> =>
   request({ url: '/api/v1/brand-analysis/overview', method: 'get', params: { sessionId } });
 
@@ -33,6 +36,9 @@ export const getBrandSkuSalesChange = (sessionId: string): AxiosPromise<Diagnosi
 
 export const getBrandDetails = (params: Record<string, any>): AxiosPromise<DiagnosisApiResponse<any>> =>
   request({ url: '/api/v1/brand-analysis/list', method: 'get', params });
+
+export const getBrandSkuDetails = (params: Record<string, any>): AxiosPromise<DiagnosisApiResponse<any>> =>
+  request({ url: '/api/v1/brand-analysis/sku-list', method: 'get', params });
 
 export const getBrandFilterOptions = (sessionId: string): AxiosPromise<DiagnosisApiResponse<any>> =>
   request({ url: '/api/v1/brand-analysis/filter-options', method: 'get', params: { sessionId } });

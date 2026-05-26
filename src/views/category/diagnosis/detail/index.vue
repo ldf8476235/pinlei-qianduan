@@ -528,7 +528,19 @@ const writeNavState = () => {
   );
 };
 
+const resetToPerformanceView = () => {
+  activeMainNav.value = 'performance';
+  activeSideModule.value = '';
+  const performanceGroupKey = resolveGroupKeyByActiveModule('performance', '');
+  expandedGroupKeys.value = [performanceGroupKey || getDefaultExpandedGroupKeys()[0] || navGroups[0]?.key].filter(Boolean) as string[];
+  writeNavState();
+};
+
 const syncNavState = () => {
+  if (route.query.initialView === 'performance') {
+    resetToPerformanceView();
+    return;
+  }
   const state = readNavState();
   activeMainNav.value = state?.activeMainNav || 'performance';
   activeSideModule.value = state?.activeSideModule || '';

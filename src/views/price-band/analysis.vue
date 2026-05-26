@@ -22,19 +22,11 @@
       </template>
 
       <div class="chart-panel">
-        <div class="price-chart-wrap" @mousemove="handlePriceTooltipMousemove" @mouseleave="hidePriceTooltip">
+        <div class="price-chart-wrap">
           <div ref="chartRef" class="chart-box large-chart" :class="{ 'is-muted': chartStateVisible }" />
           <div v-if="chartStateVisible" class="chart-state">
             <el-alert v-if="errorMessage" :title="errorMessage" type="error" show-icon :closable="false" />
             <el-empty v-else-if="!loading" description="暂无价格带数据" :image-size="96" />
-          </div>
-          <div v-if="priceTooltip.visible" class="price-chart-tooltip" :style="{ left: `${priceTooltip.x}px`, top: `${priceTooltip.y}px` }">
-            <div class="price-chart-tooltip-title">价格区间：{{ priceTooltip.label }}</div>
-            <div v-for="item in priceTooltip.rows" :key="item.name" class="price-chart-tooltip-row">
-              <span class="price-chart-tooltip-dot" :style="{ background: item.color }" />
-              <span class="price-chart-tooltip-name">{{ item.name }}：</span>
-              <strong>{{ item.value }}</strong>
-            </div>
           </div>
         </div>
         <aside class="chart-side-info" aria-label="价格带摘要">
@@ -90,7 +82,11 @@
 
         <el-table-column label="本期" align="center">
           <el-table-column label="SKU" min-width="100" align="center" sortable :sort-method="sortNumber('sku')">
-            <template #default="{ row }"><span class="key-number">{{ formatInteger(row.sku) }}</span></template>
+            <template #default="{ row }">
+              <el-button link type="primary" class="drilldown-number" @click="handleSkuDrilldown(row)">
+                {{ formatInteger(row.sku) }}
+              </el-button>
+            </template>
           </el-table-column>
           <el-table-column label="占比" min-width="100" align="center" sortable :sort-method="sortNumber('skuPer')">
             <template #default="{ row }">{{ formatPercent(row.skuPer) }}</template>
@@ -105,7 +101,9 @@
             <template #default="{ row }">{{ formatNumber(row.salePrice) }}</template>
           </el-table-column>
           <el-table-column label="销售额" min-width="130" align="center" sortable :sort-method="sortNumber('sales')">
-            <template #default="{ row }"><span class="key-number">{{ formatNumber(row.sales) }}</span></template>
+            <template #default="{ row }"
+              ><span class="plain-number">{{ formatNumber(row.sales) }}</span></template
+            >
           </el-table-column>
           <el-table-column label="占比" min-width="100" align="center" sortable :sort-method="sortNumber('salesPer')">
             <template #default="{ row }">{{ formatPercent(row.salesPer) }}</template>
@@ -175,6 +173,22 @@ interface PriceLineChartPoint {
   sales: number;
 }
 
+interface RangeMetricChartPoint {
+  value: [number, number];
+  kind: 'range';
+  row: PriceBandTableRow;
+  metricName: string;
+  metricValue: number;
+}
+
+interface PriceLineMetricChartPoint {
+  value: [number, number];
+  kind: 'priceLine';
+  price: number;
+  metricName: string;
+  metricValue: number;
+}
+
 const route = useRoute();
 const router = useRouter();
 const chartRef = ref<HTMLDivElement>();
@@ -189,13 +203,6 @@ const priceLineChartPoints = ref<PriceLineChartPoint[]>([]);
 const summaryHighBands = ref<any[]>([]);
 const summaryLowBands = ref<any[]>([]);
 const rawPricePoints = ref<any[]>([]);
-const priceTooltip = reactive({
-  visible: false,
-  x: 0,
-  y: 0,
-  label: '',
-  rows: [] as Array<{ name: string; value: string; color: string }>
-});
 const chartGrid = {
   left: 150,
   right: 86,
@@ -241,10 +248,17 @@ const readText = (source: any, keys: string[]) => {
   return '';
 };
 
-const buildBandKey = (item: any) => `${item?.priceBandMin ?? ''}_${item?.priceBandMax ?? ''}`;
+const formatBandKeyValue = (value: unknown) => {
+  const num = Number(value);
+  return Number.isFinite(num) ? num.toFixed(2) : '';
+};
+
+const buildBandKey = (item: any) => `${formatBandKeyValue(item?.priceBandMin)}_${formatBandKeyValue(item?.priceBandMax)}`;
 
 const resolvePriceValue = (source: any, fallback = 0) => {
-  const direct = Number(source?.priceBandAve ?? source?.priceLine ?? source?.linePrice ?? source?.salePrice ?? source?.pricePoint ?? source?.minSalePrice);
+  const direct = Number(
+    source?.priceBandAve ?? source?.priceLine ?? source?.linePrice ?? source?.salePrice ?? source?.pricePoint ?? source?.minSalePrice
+  );
   if (Number.isFinite(direct)) return direct;
 
   const min = Number(source?.priceBandMin ?? source?.minPrice);
@@ -252,6 +266,14 @@ const resolvePriceValue = (source: any, fallback = 0) => {
   if (Number.isFinite(min) && Number.isFinite(max)) return (min + max) / 2;
   if (Number.isFinite(min)) return min;
   return fallback;
+};
+
+const resolveBandCenterValue = (source: any, fallback = 0) => {
+  const min = Number(source?.priceBandMin ?? source?.minPrice);
+  const max = Number(source?.priceBandMax ?? source?.maxPrice);
+  if (Number.isFinite(min) && Number.isFinite(max)) return min + (max - min) / 2;
+  if (Number.isFinite(min)) return min;
+  return resolvePriceValue(source, fallback);
 };
 
 const formatNumber = (value: unknown, digits = 0) => {
@@ -271,73 +293,20 @@ const formatPercent = (value: unknown) => {
   return `${num.toFixed(2)}%`;
 };
 
-const hidePriceTooltip = () => {
-  priceTooltip.visible = false;
-};
-
-const handlePriceTooltipMousemove = (event: MouseEvent) => {
-  if (!chartRef.value || !sortedTableRows.value.length) return;
-  const wrap = event.currentTarget as HTMLElement;
-  const wrapRect = wrap.getBoundingClientRect();
-  const chartRect = chartRef.value.getBoundingClientRect();
-  const plotLeft = chartRect.left + chartGrid.left;
-  const plotTop = chartRect.top + chartGrid.top;
-  const plotWidth = chartRect.width - chartGrid.left - chartGrid.right;
-  const plotHeight = chartRect.height - chartGrid.top - chartGrid.bottom;
-  const relativeX = event.clientX - plotLeft;
-  const relativeY = event.clientY - plotTop;
-
-  if (relativeX < 0 || relativeX > plotWidth || relativeY < 0 || relativeY > plotHeight || plotWidth <= 0) {
-    hidePriceTooltip();
-    return;
-  }
-
-  const chartX = event.clientX - chartRect.left;
-  const chartY = event.clientY - chartRect.top;
-  const dataCoord = chartIns.value?.convertFromPixel({ gridIndex: 0 }, [chartX, chartY]);
-  const rows = sortedTableRows.value;
-  const minX = rows[0]?.xValue ?? 0;
-  const maxX = rows[rows.length - 1]?.xValue ?? minX;
-  const fallbackX = minX + (relativeX / plotWidth) * Math.max(1, maxX - minX);
-  const dataX = Array.isArray(dataCoord) && Number.isFinite(Number(dataCoord[0])) ? Number(dataCoord[0]) : fallbackX;
-  const index = rows.reduce((closestIndex, row, currentIndex) => {
-    const closestDistance = Math.abs((rows[closestIndex]?.xValue ?? 0) - dataX);
-    const currentDistance = Math.abs((row.xValue ?? 0) - dataX);
-    return currentDistance < closestDistance ? currentIndex : closestIndex;
-  }, 0);
-  const row = rows[index];
-  if (!row) {
-    hidePriceTooltip();
-    return;
-  }
-
-  const tooltipWidth = 250;
-  const tooltipHeight = 150;
-  priceTooltip.visible = true;
-  priceTooltip.label = row.label;
-  priceTooltip.rows = [
-    { name: 'SKU数', value: formatInteger(row.skuLineValue || row.sku), color: '#ff765f' },
-    { name: '销售额', value: `${formatNumber(row.salesLineValue || row.sales, 2)}元`, color: '#1e88e5' },
-    { name: '销售量', value: formatNumber(row.quantityLineValue || row.saleQuantity, 2), color: '#14b8a6' }
-  ];
-  priceTooltip.x = Math.min(Math.max(12, event.clientX - wrapRect.left + 16), Math.max(12, wrapRect.width - tooltipWidth - 12));
-  priceTooltip.y = Math.min(Math.max(12, event.clientY - wrapRect.top - 76), Math.max(12, wrapRect.height - tooltipHeight - 12));
-};
-
 const sortNumber = (field: keyof PriceBandTableRow) => (a: PriceBandTableRow, b: PriceBandTableRow) => Number(a[field] || 0) - Number(b[field] || 0);
-const sortText = (field: keyof PriceBandTableRow) => (a: PriceBandTableRow, b: PriceBandTableRow) => String(a[field] || '').localeCompare(String(b[field] || ''));
+const sortText = (field: keyof PriceBandTableRow) => (a: PriceBandTableRow, b: PriceBandTableRow) =>
+  String(a[field] || '').localeCompare(String(b[field] || ''));
 
 const sortedTableRows = computed(() => [...tableRows.value].sort((a, b) => a.sortValue - b.sortValue));
 const priceBandRangeDisplay = computed(() => {
   const rows = sortedTableRows.value;
-  const rowMaxValues = rows
-    .map((item) => Number(item.raw?.priceBandMax ?? item.raw?.maxPrice))
-    .filter((value) => Number.isFinite(value));
+  const rowMaxValues = rows.map((item) => Number(item.raw?.priceBandMax ?? item.raw?.maxPrice)).filter((value) => Number.isFinite(value));
   const rangeSource = `${priceRangeText.value}/${rows.map((item) => item.label).join('/')}`;
-  const parsedValues = rangeSource
-    .match(/\d+(?:\.\d+)?/g)
-    ?.map((item) => Number(item))
-    .filter((value) => Number.isFinite(value)) || [];
+  const parsedValues =
+    rangeSource
+      .match(/\d+(?:\.\d+)?/g)
+      ?.map((item) => Number(item))
+      .filter((value) => Number.isFinite(value)) || [];
   const max = Math.max(0, ...rowMaxValues, ...parsedValues);
   if (Number.isFinite(max) && max > 0) {
     return `0 - ${formatNumber(max, 2)}`;
@@ -360,6 +329,49 @@ const formatBandLabel = (item: any) => {
 const formatPointValue = (item: any) => {
   const num = Number(item?.salePrice ?? item?.pricePoint ?? item?.minSalePrice ?? item);
   return Number.isFinite(num) ? num.toFixed(2) : '--';
+};
+
+const getAxisMax = (value: number) => {
+  const normalized = Math.max(1, value);
+  return normalized <= 10 ? Number((normalized * 1.2).toFixed(2)) : Math.ceil(normalized * 1.12);
+};
+
+const buildRangeMetricPoint = (row: PriceBandTableRow, metricName: string, metricValue: number): RangeMetricChartPoint => ({
+  value: [row.xValue, metricValue],
+  kind: 'range',
+  row,
+  metricName,
+  metricValue
+});
+
+const buildPriceLineMetricPoint = (item: PriceLineChartPoint, metricName: string, metricValue: number): PriceLineMetricChartPoint => ({
+  value: [item.price, metricValue],
+  kind: 'priceLine',
+  price: item.price,
+  metricName,
+  metricValue
+});
+
+const formatChartTooltip = (params: any) => {
+  const data = params?.data as RangeMetricChartPoint | PriceLineMetricChartPoint | undefined;
+  if (!data) return '';
+
+  if (data.kind === 'priceLine') {
+    const valueText = data.metricName.includes('销售额') ? `${formatNumber(data.metricValue, 2)}元` : formatInteger(data.metricValue);
+    return [
+      `<div class="echarts-tooltip-title">价格线：${formatNumber(data.price, data.price >= 100 ? 0 : 2)}</div>`,
+      `<div class="echarts-tooltip-row"><span>${data.metricName}：</span><strong>${valueText}</strong></div>`
+    ].join('');
+  }
+
+  const row = data.row;
+  return [
+    `<div class="echarts-tooltip-title">价格区间：${row.label}</div>`,
+    `<div class="echarts-tooltip-row"><span>当前节点：</span><strong>${data.metricName}</strong></div>`,
+    `<div class="echarts-tooltip-row"><span>SKU数：</span><strong>${formatInteger(row.skuLineValue || row.sku)}</strong></div>`,
+    `<div class="echarts-tooltip-row"><span>销售额：</span><strong>${formatNumber(row.salesLineValue || row.sales, 2)}元</strong></div>`,
+    `<div class="echarts-tooltip-row"><span>销售量：</span><strong>${formatNumber(row.quantityLineValue || row.saleQuantity, 2)}</strong></div>`
+  ].join('');
 };
 
 const summaryLines = computed(() => {
@@ -386,16 +398,20 @@ const renderChart = (rows: PriceBandTableRow[]) => {
   if (!chartRef.value) return;
   chartIns.value ||= echarts.init(chartRef.value);
 
-  const skuLineData = rows.map((item) => [item.xValue, item.skuLineValue]);
-  const salesLineData = rows.map((item) => [item.xValue, item.salesLineValue]);
-  const quantityLineData = rows.map((item) => [item.xValue, item.quantityLineValue]);
+  const skuLineData = rows.map((item) => buildRangeMetricPoint(item, 'SKU数', item.skuLineValue));
+  const salesLineData = rows.map((item) => buildRangeMetricPoint(item, '销售额', item.salesLineValue));
+  const quantityLineData = rows.map((item) => buildRangeMetricPoint(item, '销售量', item.quantityLineValue));
   const priceLineSkuData =
-    priceLineChartPoints.value.length > 0 ? priceLineChartPoints.value.map((item) => [item.price, item.sku]) : rows.map((item) => [item.xValue, item.priceLineSkuValue]);
+    priceLineChartPoints.value.length > 0
+      ? priceLineChartPoints.value.map((item) => buildPriceLineMetricPoint(item, '价格线SKU数', item.sku))
+      : rows.map((item) => buildRangeMetricPoint(item, '价格线SKU数', item.priceLineSkuValue));
   const priceLineSalesData =
-    priceLineChartPoints.value.length > 0 ? priceLineChartPoints.value.map((item) => [item.price, item.sales]) : rows.map((item) => [item.xValue, item.priceLineSalesValue]);
-  const salesValues = [...salesLineData, ...priceLineSalesData].map((item) => Math.abs(Number(item[1] || 0)));
-  const quantityValues = quantityLineData.map((item) => Math.abs(Number(item[1] || 0)));
-  const skuValues = [...skuLineData, ...priceLineSkuData].map((item) => Math.abs(Number(item[1] || 0)));
+    priceLineChartPoints.value.length > 0
+      ? priceLineChartPoints.value.map((item) => buildPriceLineMetricPoint(item, '价格线销售额', item.sales))
+      : rows.map((item) => buildRangeMetricPoint(item, '价格线销售额', item.priceLineSalesValue));
+  const salesValues = [...salesLineData, ...priceLineSalesData].map((item) => Math.abs(Number(item.value[1] || 0)));
+  const quantityValues = quantityLineData.map((item) => Math.abs(Number(item.value[1] || 0)));
+  const skuValues = [...skuLineData, ...priceLineSkuData].map((item) => Math.abs(Number(item.value[1] || 0)));
   const xValues = [
     ...rows.map((item) => item.xValue),
     ...rows.map((item) => Number(item.raw?.priceBandMax ?? item.raw?.maxPrice)).filter((item) => Number.isFinite(item)),
@@ -405,6 +421,9 @@ const renderChart = (rows: PriceBandTableRow[]) => {
   const maxQuantity = Math.max(1, ...quantityValues);
   const maxSku = Math.max(1, ...skuValues);
   const xMax = Math.max(1, ...xValues.filter((item) => Number.isFinite(item)));
+  const maxSalesAxis = getAxisMax(maxSales);
+  const maxQuantityAxis = getAxisMax(maxQuantity);
+  const maxSkuAxis = getAxisMax(maxSku);
   const dataPointCount = Math.max(rows.length, priceLineChartPoints.value.length);
   const minZoomSpan = dataPointCount > 20 ? 8 : 100;
 
@@ -412,7 +431,17 @@ const renderChart = (rows: PriceBandTableRow[]) => {
     {
       color: ['#ff765f', '#1e88e5', '#14b8a6', '#ff765f', '#1e88e5'],
       tooltip: {
-        show: false
+        show: true,
+        trigger: 'item',
+        triggerOn: 'mousemove|click',
+        confine: true,
+        backgroundColor: 'rgba(255, 255, 255, 0.98)',
+        borderColor: '#78b7ff',
+        borderWidth: 1,
+        padding: [12, 14],
+        textStyle: { color: '#64748b', fontSize: 14 },
+        extraCssText: 'box-shadow:0 14px 30px rgba(15,23,42,.16);border-radius:8px;',
+        formatter: formatChartTooltip
       },
       axisPointer: {
         show: true,
@@ -463,8 +492,8 @@ const renderChart = (rows: PriceBandTableRow[]) => {
           type: 'value',
           name: '销售额(元)',
           position: 'left',
-          min: -maxSales,
-          max: maxSales,
+          min: 0,
+          max: maxSalesAxis,
           nameTextStyle: { color: '#343434', fontSize: 13, align: 'center', padding: [0, 0, 10, 0] },
           axisLabel: { color: '#4b5563', fontSize: 13, formatter: (value: number) => formatNumber(value, 2) },
           axisLine: { show: false },
@@ -477,7 +506,7 @@ const renderChart = (rows: PriceBandTableRow[]) => {
           position: 'left',
           offset: 92,
           min: 0,
-          max: maxQuantity,
+          max: maxQuantityAxis,
           nameTextStyle: { color: '#343434', fontSize: 13, align: 'center', padding: [0, 0, 10, 0] },
           axisLabel: { color: '#4b5563', fontSize: 13, formatter: (value: number) => formatNumber(value, 2) },
           axisLine: { show: false },
@@ -489,7 +518,7 @@ const renderChart = (rows: PriceBandTableRow[]) => {
           name: 'SKU数',
           position: 'right',
           min: 0,
-          max: maxSku,
+          max: maxSkuAxis,
           nameTextStyle: { color: '#343434', fontSize: 13, align: 'center', padding: [0, 0, 10, 0] },
           axisLabel: { color: '#4b5563', fontSize: 13, formatter: (value: number) => formatInteger(value) },
           axisLine: { show: false },
@@ -520,7 +549,7 @@ const renderChart = (rows: PriceBandTableRow[]) => {
           name: '价格线SKU数',
           type: 'bar',
           yAxisIndex: 2,
-          barWidth: 3,
+          barWidth: 4,
           barGap: '30%',
           data: priceLineSkuData,
           itemStyle: { color: '#ff765f', borderRadius: [2, 2, 0, 0], opacity: 0.82 },
@@ -530,7 +559,7 @@ const renderChart = (rows: PriceBandTableRow[]) => {
           name: '价格线销售额',
           type: 'bar',
           yAxisIndex: 0,
-          barWidth: 3,
+          barWidth: 4,
           data: priceLineSalesData,
           itemStyle: { color: '#1e88e5', borderRadius: [2, 2, 0, 0], opacity: 0.82 },
           z: 1
@@ -543,7 +572,8 @@ const renderChart = (rows: PriceBandTableRow[]) => {
           showSymbol: true,
           showAllSymbol: true,
           symbol: 'circle',
-          symbolSize: 9,
+          symbolSize: 10,
+          emphasis: { focus: 'series', scale: 1.35 },
           lineStyle: { width: 3, color: '#ff765f' },
           itemStyle: { color: '#fff', borderColor: '#ff765f', borderWidth: 2 },
           data: skuLineData,
@@ -557,7 +587,8 @@ const renderChart = (rows: PriceBandTableRow[]) => {
           showSymbol: true,
           showAllSymbol: true,
           symbol: 'circle',
-          symbolSize: 9,
+          symbolSize: 10,
+          emphasis: { focus: 'series', scale: 1.35 },
           lineStyle: { width: 3, color: '#1e88e5' },
           itemStyle: { color: '#fff', borderColor: '#1e88e5', borderWidth: 2 },
           data: salesLineData,
@@ -571,7 +602,8 @@ const renderChart = (rows: PriceBandTableRow[]) => {
           showSymbol: true,
           showAllSymbol: true,
           symbol: 'circle',
-          symbolSize: 9,
+          symbolSize: 10,
+          emphasis: { focus: 'series', scale: 1.35 },
           lineStyle: { width: 3, color: '#14b8a6' },
           itemStyle: { color: '#fff', borderColor: '#14b8a6', borderWidth: 2 },
           data: quantityLineData,
@@ -617,7 +649,7 @@ const reload = async () => {
       const priceBandMax = Number(item.priceBandMax ?? item.maxPrice ?? 0);
       const bandKey = buildBandKey(item);
       const chartItem = (chartRowMap.get(bandKey) || {}) as Record<string, any>;
-      const xValue = resolvePriceValue({ ...item, ...chartItem }, Number.isFinite(priceBandMin) ? priceBandMin : index);
+      const xValue = resolveBandCenterValue({ ...item, ...chartItem }, Number.isFinite(priceBandMin) ? priceBandMin : index);
       return {
         label: item.priceBand ?? `${item.priceBandMin ?? '--'} - ${item.priceBandMax ?? '--'}`,
         sortValue: Number.isFinite(priceBandMin) ? priceBandMin : index,
@@ -675,6 +707,17 @@ const reload = async () => {
 
 const handleViewDetail = () => {
   router.push({ path: '/price-band/analysis/detail', query: { ...route.query } });
+};
+
+const handleSkuDrilldown = (row: PriceBandTableRow) => {
+  router.push({
+    path: '/price-band/analysis/detail',
+    query: {
+      ...route.query,
+      priceBandList: row.label,
+      page: '1'
+    }
+  });
 };
 
 const handlePriceSetting = () => {
@@ -814,49 +857,24 @@ onBeforeUnmount(() => {
   border-radius: 6px;
 }
 
-.price-chart-tooltip {
-  position: absolute;
-  z-index: 20;
-  width: 250px;
-  padding: 14px 16px;
-  border: 1px solid #78b7ff;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.97);
-  box-shadow: 0 14px 30px rgb(15 23 42 / 16%);
-  color: #64748b;
-  font-size: 15px;
-  line-height: 1.55;
-  pointer-events: none;
-  backdrop-filter: blur(6px);
-}
-
-.price-chart-tooltip-title {
+:deep(.echarts-tooltip-title) {
   margin-bottom: 8px;
   color: #475569;
   font-weight: 700;
+  line-height: 1.35;
 }
 
-.price-chart-tooltip-row {
+:deep(.echarts-tooltip-row) {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 18px;
   margin-top: 5px;
+  line-height: 1.45;
 }
 
-.price-chart-tooltip-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 999px;
-  flex: 0 0 auto;
-}
-
-.price-chart-tooltip-name {
-  color: #64748b;
-}
-
-.price-chart-tooltip-row strong {
-  margin-left: auto;
-  color: #64748b;
+:deep(.echarts-tooltip-row strong) {
+  color: #475569;
   font-weight: 700;
 }
 
@@ -880,8 +898,7 @@ onBeforeUnmount(() => {
   border: 1px solid #fed7aa;
   border-radius: 0;
   background:
-    radial-gradient(circle at 92% 12%, rgba(249, 115, 22, 0.13), transparent 34%),
-    linear-gradient(180deg, #fffaf5 0%, #fffefd 62%, #fff7ed 100%);
+    radial-gradient(circle at 92% 12%, rgba(249, 115, 22, 0.13), transparent 34%), linear-gradient(180deg, #fffaf5 0%, #fffefd 62%, #fff7ed 100%);
   box-shadow: none;
 }
 
@@ -992,7 +1009,14 @@ onBeforeUnmount(() => {
 }
 
 .range-text,
-.key-number {
+.plain-number {
+  color: #334155;
+  font-weight: 500;
+}
+
+.drilldown-number {
+  height: auto;
+  padding: 0;
   color: #0f766e;
   text-decoration: underline;
   text-underline-offset: 2px;

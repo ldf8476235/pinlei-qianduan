@@ -176,6 +176,19 @@ export const constantRoutes: RouteRecordRaw[] = [
     ]
   },
   {
+    path: '/product-store',
+    component: Layout,
+    hidden: true,
+    children: [
+      {
+        path: 'detail',
+        component: () => import('@/views/product-store/detail.vue'),
+        name: 'ProductStoreDetail',
+        meta: { title: '商品销售门店明细', activeMenu: '/category/diagnosis/detail' }
+      }
+    ]
+  },
+  {
     path: '/brand',
     component: Layout,
     hidden: true,
@@ -185,6 +198,12 @@ export const constantRoutes: RouteRecordRaw[] = [
         component: () => import('@/views/brand/detail.vue'),
         name: 'BrandDetail',
         meta: { title: '品牌商品明细', activeMenu: '/category/diagnosis/detail' }
+      },
+      {
+        path: 'analysis/detail/sku',
+        component: () => import('@/views/brand/sku-detail.vue'),
+        name: 'BrandSkuDetail',
+        meta: { title: '品牌SKU商品明细', activeMenu: '/category/diagnosis/detail' }
       }
     ]
   },

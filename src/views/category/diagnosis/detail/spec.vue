@@ -39,7 +39,11 @@
         <div class="pie-layout">
           <div class="vue-chart-tooltip-wrap pie-tooltip-wrap" @mousemove="handleSpecTooltipMousemove($event, 'pie')" @mouseleave="hideSpecTooltip">
             <div ref="pieChartRef" class="chart-box pie-chart" />
-            <div v-if="activeTooltipType === 'pie' && chartTooltip.visible" class="vue-chart-tooltip" :style="{ left: `${chartTooltip.x}px`, top: `${chartTooltip.y}px` }">
+            <div
+              v-if="activeTooltipType === 'pie' && chartTooltip.visible"
+              class="vue-chart-tooltip"
+              :style="{ left: `${chartTooltip.x}px`, top: `${chartTooltip.y}px` }"
+            >
               <div class="tooltip-title">{{ chartTooltip.title }}</div>
               <div v-for="item in chartTooltip.rows" :key="item.name" class="tooltip-row">
                 <span v-if="item.color" class="tooltip-dot" :style="{ background: item.color }" />
@@ -92,7 +96,11 @@
         </div>
         <div class="vue-chart-tooltip-wrap rank-tooltip-wrap" @mousemove="handleSpecTooltipMousemove($event, 'rank')" @mouseleave="hideSpecTooltip">
           <div ref="rankChartRef" class="chart-box rank-chart" />
-          <div v-if="activeTooltipType === 'rank' && chartTooltip.visible" class="vue-chart-tooltip" :style="{ left: `${chartTooltip.x}px`, top: `${chartTooltip.y}px` }">
+          <div
+            v-if="activeTooltipType === 'rank' && chartTooltip.visible"
+            class="vue-chart-tooltip"
+            :style="{ left: `${chartTooltip.x}px`, top: `${chartTooltip.y}px` }"
+          >
             <div class="tooltip-title">{{ chartTooltip.title }}</div>
             <div v-for="item in chartTooltip.rows" :key="item.name" class="tooltip-row">
               <span v-if="item.color" class="tooltip-dot" :style="{ background: item.color }" />
@@ -112,7 +120,11 @@
         </template>
         <div class="vue-chart-tooltip-wrap combo-tooltip-wrap" @mousemove="handleSpecTooltipMousemove($event, 'combo')" @mouseleave="hideSpecTooltip">
           <div ref="comboChartRef" class="chart-box combo-chart" />
-          <div v-if="activeTooltipType === 'combo' && chartTooltip.visible" class="vue-chart-tooltip" :style="{ left: `${chartTooltip.x}px`, top: `${chartTooltip.y}px` }">
+          <div
+            v-if="activeTooltipType === 'combo' && chartTooltip.visible"
+            class="vue-chart-tooltip"
+            :style="{ left: `${chartTooltip.x}px`, top: `${chartTooltip.y}px` }"
+          >
             <div class="tooltip-title">{{ chartTooltip.title }}</div>
             <div v-for="item in chartTooltip.rows" :key="item.name" class="tooltip-row">
               <span v-if="item.color" class="tooltip-dot" :style="{ background: item.color }" />
@@ -139,7 +151,7 @@
 <script setup lang="ts">
 import * as echarts from 'echarts';
 import type { EChartsOption } from 'echarts';
-import { createVueChartTooltip, getCategoryIndexByMouse, getCategoryIndexByMouseY, hideVueChartTooltip, showVueChartTooltip } from './useVueChartTooltip';
+import { createVueChartTooltip, getCategoryIndexByMouseY, hideVueChartTooltip, showVueChartTooltip } from './useVueChartTooltip';
 import {
   getSpecDetails,
   getSpecOverview,
@@ -213,6 +225,17 @@ const getRankValue = (item: any) => Number(item?.data ?? item?.value ?? item?.sa
 const getGrowth = (item: any) => Number(item?.sales ?? item?.growthRate ?? item?.salesGrowthRate ?? item?.compareRate ?? item?.rate ?? 0);
 const getSkuChange = (item: any) => Number(item?.sku ?? item?.skuChange ?? item?.skuInc ?? item?.changeSku ?? 0);
 
+const getComboIndexByMouse = (event: MouseEvent, itemCount: number) => {
+  if (!comboChartRef.value || !comboChartIns.value || itemCount <= 0) return -1;
+  const chartRect = comboChartRef.value.getBoundingClientRect();
+  const point: [number, number] = [event.clientX - chartRect.left, event.clientY - chartRect.top];
+  if (!comboChartIns.value.containPixel({ gridIndex: 0 }, point)) return -1;
+  const coord = comboChartIns.value.convertFromPixel({ gridIndex: 0 }, point);
+  const rawIndex = Array.isArray(coord) ? Number(coord[0]) : Number(coord);
+  const index = Math.round(rawIndex);
+  return Number.isInteger(index) && index >= 0 && index < itemCount ? index : -1;
+};
+
 const hideSpecTooltip = () => {
   activeTooltipType.value = '';
   hideVueChartTooltip(chartTooltip);
@@ -259,7 +282,13 @@ const handleSpecTooltipMousemove = (event: MouseEvent, type: SpecChartType) => {
       chartTooltip,
       event,
       getName(item, index),
-      [{ name: rankMetric.value === '2' ? '销售量' : rankMetric.value === '3' ? '毛利额' : rankMetric.value === '4' ? '毛利率' : '销售额', value: formatAmount(getRankValue(item)), color: '#f97316' }],
+      [
+        {
+          name: rankMetric.value === '2' ? '销售量' : rankMetric.value === '3' ? '毛利额' : rankMetric.value === '4' ? '毛利率' : '销售额',
+          value: formatAmount(getRankValue(item)),
+          color: '#f97316'
+        }
+      ],
       { width: 230, height: 82 }
     );
     return;
@@ -270,7 +299,7 @@ const handleSpecTooltipMousemove = (event: MouseEvent, type: SpecChartType) => {
     hideSpecTooltip();
     return;
   }
-  const index = getCategoryIndexByMouse(event, comboChartRef.value, source.length, { left: 52, right: 56 });
+  const index = getComboIndexByMouse(event, source.length);
   const item = source[index];
   if (!item) {
     hideSpecTooltip();
@@ -324,18 +353,10 @@ const summaryLines = computed(() => {
   const four = (specSummary.value.summaryFour || []).filter(Boolean);
 
   return [
-    one.length
-      ? `规格“${one.join('”“')}”销售额相对较好，客户购买意向高。`
-      : defaultSummaryLines[0],
-    two.length
-      ? `规格“${two.join('”“')}”销售额相对较差，客户购买意向偏低。`
-      : defaultSummaryLines[1],
-    three.length
-      ? `规格“${three.join('”“')}”销售额对比上升较大，排除促销因素影响，反映出客户对该类规格的购买意向增加。`
-      : defaultSummaryLines[2],
-    four.length
-      ? `规格“${four.join('”“')}”销售额对比下降较大，排除促销因素影响，反映出客户对该类规格的购买意向降低。`
-      : defaultSummaryLines[3]
+    one.length ? `规格“${one.join('”“')}”销售额相对较好，客户购买意向高。` : defaultSummaryLines[0],
+    two.length ? `规格“${two.join('”“')}”销售额相对较差，客户购买意向偏低。` : defaultSummaryLines[1],
+    three.length ? `规格“${three.join('”“')}”销售额对比上升较大，排除促销因素影响，反映出客户对该类规格的购买意向增加。` : defaultSummaryLines[2],
+    four.length ? `规格“${four.join('”“')}”销售额对比下降较大，排除促销因素影响，反映出客户对该类规格的购买意向降低。` : defaultSummaryLines[3]
   ];
 });
 

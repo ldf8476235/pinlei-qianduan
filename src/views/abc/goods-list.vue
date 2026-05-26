@@ -140,7 +140,16 @@
 
           <el-table-column label="销售门店数" prop="storeNum" min-width="120" align="center" header-align="center" sortable="custom">
             <template #default="{ row }">
-              <span class="store-count">{{ formatNumber(row.storeNum, 0) }}</span>
+              <el-button
+                v-if="Number(row.storeNum) > 0"
+                link
+                type="primary"
+                class="drilldown-number"
+                @click="handleStoreDrilldown(row)"
+              >
+                {{ formatNumber(row.storeNum, 0) }}
+              </el-button>
+              <span v-else class="store-count">{{ formatNumber(row.storeNum, 0) }}</span>
             </template>
           </el-table-column>
 
@@ -275,6 +284,7 @@ import type { Sort } from 'element-plus';
 type SortOrder = 'ascending' | 'descending' | null;
 
 const route = useRoute();
+const router = useRouter();
 const pollTimer = ref<number | null>(null);
 
 const statusState = ref<any>();
@@ -524,6 +534,25 @@ const handleGoodsDetail = (row: AbcSalesListItemVO) => {
   goodsTableRef.value?.toggleRowExpansion(row, !isExpanded);
 };
 
+const handleStoreDrilldown = (row: AbcSalesListItemVO) => {
+  if (!row.productNo) {
+    ElMessage.warning('缺少商品编码，无法查看销售门店明细');
+    return;
+  }
+  router.push({
+    path: '/product-store/detail',
+    query: {
+      ...route.query,
+      productNo: row.productNo,
+      productName: row.productName || '',
+      productBarcode: row.productBarcode || '',
+      brandName: row.brandName || '',
+      spec: row.spec || '',
+      source: 'abc'
+    }
+  });
+};
+
 const handleProcess = (_row: AbcSalesListItemVO) => {
   processDialogVisible.value = true;
 };
@@ -756,6 +785,11 @@ onBeforeUnmount(() => {
 
 .store-count {
   color: #0f9f9a;
+  font-weight: 700;
+}
+
+.drilldown-number {
+  padding: 0;
   font-weight: 700;
 }
 

@@ -1,10 +1,10 @@
 <template>
   <div class="p-2 brand-detail-page">
     <el-card shadow="hover" class="page-card summary-card">
-      <div class="summary-line">数据日期：2024/10/01至2024/12/08；对比日期：2023/10/01至2023/12/08</div>
+      <div class="summary-line">数据日期：{{ currentDateRangeText }}；对比日期：{{ compareDateRangeText }}</div>
       <div class="summary-line">组织：总部；业态：全部业态；商圈：全部商圈；</div>
       <div class="summary-line">门店：全部</div>
-      <div class="category-title">004洗化部（一级品类）</div>
+      <div class="category-title">{{ categoryTitle }}</div>
     </el-card>
 
     <el-card shadow="hover" class="page-card filter-card">
@@ -106,9 +106,7 @@
           show-overflow-tooltip
         >
           <template #default="{ row }">
-            <el-button link type="primary" class="name-link" @click="handleBrandDetail(row)">
-              {{ resolveBrandName(row) }}
-            </el-button>
+            <span class="brand-name-text">{{ resolveBrandName(row) }}</span>
           </template>
         </el-table-column>
 
@@ -142,7 +140,16 @@
         <el-table-column label="SKU&销量核心列" align="center">
           <el-table-column label="SKU数-总计" prop="sku" min-width="110" align="center" sortable="custom">
             <template #default="{ row }">
-              <span class="major-number">{{ formatNumber(resolveNumber(row, ['sku'])) }}</span>
+              <el-button
+                v-if="resolveNumber(row, ['sku']) > 0"
+                link
+                type="primary"
+                class="sku-link"
+                @click="handleSkuDetail(row)"
+              >
+                {{ formatNumber(resolveNumber(row, ['sku'])) }}
+              </el-button>
+              <span v-else class="major-number">{{ formatNumber(resolveNumber(row, ['sku'])) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="SKU数-对比增长" prop="skuChange" min-width="120" align="center" sortable="custom">
@@ -249,6 +256,7 @@ interface OptionItem {
 type SortOrder = 'ascending' | 'descending' | null;
 
 const route = useRoute();
+const router = useRouter();
 const sessionId = computed(() => String(route.query.sessionId || ''));
 const loading = ref(false);
 const tableRows = ref<BrandRow[]>([]);
@@ -258,6 +266,53 @@ const queryForm = reactive({
   brandName: [] as string[],
   newSaleBrand: ''
 });
+
+const resolveQueryValue = (value: string | string[] | null | undefined, fallback = '') => {
+  if (Array.isArray(value)) return String(value[0] || fallback);
+  return String(value || fallback);
+};
+
+const resolveQueryList = (value: string | string[] | null | undefined) => {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item).trim()).filter(Boolean);
+  }
+  if (!value) return [];
+  return String(value)
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+};
+
+const currentDateRangeText = computed(() => {
+  const start = resolveQueryValue(route.query.startDate as string | string[] | null | undefined, '2024/10/01');
+  const end = resolveQueryValue(route.query.endDate as string | string[] | null | undefined, '2024/12/08');
+  return `${start}至${end}`;
+});
+
+const compareDateRangeText = computed(() => {
+  const start = resolveQueryValue(route.query.compareStartDate as string | string[] | null | undefined, '2023/10/01');
+  const end = resolveQueryValue(route.query.compareEndDate as string | string[] | null | undefined, '2023/12/08');
+  return `${start}至${end}`;
+});
+
+const formatCategoryLevelName = (level?: string | number) => {
+  const levelNumber = Number(level || 1);
+  if (levelNumber >= 1 && levelNumber <= 5) return `${['', '一级', '二级', '三级', '四级', '五级'][levelNumber]}品类`;
+  return '一级品类';
+};
+
+const categoryTitle = computed(() => {
+  const categoryId = resolveQueryValue(route.query.categoryId as string | string[] | null | undefined, '004');
+  const categoryName = resolveQueryValue(route.query.categoryName as string | string[] | null | undefined, '洗化部');
+  const categoryLevel = resolveQueryValue(route.query.categoryLevel as string | string[] | null | undefined, '1');
+  return `${categoryId}${categoryName}（${formatCategoryLevelName(categoryLevel)}）`;
+});
+
+const syncQueryFormFromRoute = () => {
+  queryForm.brandType = resolveQueryList((route.query.brandType || route.query.brandTypeList) as string | string[] | null | undefined);
+  queryForm.brandName = resolveQueryList((route.query.brandName || route.query.brandList) as string | string[] | null | undefined);
+  queryForm.newSaleBrand = resolveQueryValue(route.query.newSaleBrand as string | string[] | null | undefined, '');
+};
 
 const sortState = reactive<{ prop: string; order: SortOrder }>({
   prop: 'sales',
@@ -366,8 +421,20 @@ const handleExport = () => {
   ElMessage.info('导出功能待接入');
 };
 
-const handleBrandDetail = (_row: BrandRow) => {
-  ElMessage.info('品牌详情跳转功能待接入');
+const handleSkuDetail = (row: BrandRow) => {
+  const brandName = resolveBrandName(row);
+  if (brandName === '--') {
+    ElMessage.warning('缺少品牌信息，无法查看品牌SKU商品明细');
+    return;
+  }
+  router.push({
+    path: '/brand/analysis/detail/sku',
+    query: {
+      ...route.query,
+      brandName,
+      brandNo: resolveBrandCode(row)
+    }
+  });
 };
 
 const handleProcess = (_row: BrandRow) => {
@@ -398,8 +465,14 @@ const formatGrowth = (value: unknown) => {
   return `${Number(fixed) > 0 ? '+' : ''}${fixed}%`;
 };
 
-onMounted(loadData);
-watch(() => route.query.sessionId, loadData);
+watch(
+  () => route.fullPath,
+  () => {
+    syncQueryFormFromRoute();
+    loadData();
+  },
+  { immediate: true }
+);
 </script>
 
 <style scoped lang="scss">
@@ -524,9 +597,14 @@ watch(() => route.query.sessionId, loadData);
   box-shadow: 0 0 18px rgba(15, 23, 42, 0.06);
 }
 
-.name-link {
-  padding: 0;
+.brand-name-text {
+  color: #334155;
   font-weight: 600;
+}
+
+.sku-link {
+  padding: 0;
+  font-weight: 700;
 }
 
 .major-number {

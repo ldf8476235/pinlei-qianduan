@@ -103,7 +103,16 @@
 
         <el-table-column label="销售门店数" prop="storeNum" min-width="120" fixed="left" align="center" sortable="custom">
           <template #default="{ row }">
-            <span class="store-count">{{ formatNumber(row.storeNum, 0) }}</span>
+            <el-button
+              v-if="!row.__isSummary && Number(row.storeNum) > 0"
+              link
+              type="primary"
+              class="drilldown-number"
+              @click="handleStoreDrilldown(row)"
+            >
+              {{ formatNumber(row.storeNum, 0) }}
+            </el-button>
+            <span v-else class="store-count">{{ formatNumber(row.storeNum, 0) }}</span>
           </template>
         </el-table-column>
 
@@ -292,6 +301,7 @@ interface QueryForm {
 type SortOrder = 'ascending' | 'descending' | null;
 
 const route = useRoute();
+const router = useRouter();
 const sessionId = computed(() => String(route.query.sessionId || ''));
 
 const resolveQueryValue = (value: string | string[] | null | undefined, fallback: string) => {
@@ -457,6 +467,22 @@ const handleExport = () => {
 
 const handleGoodsDetail = (_row: GoodsRow) => {
   ElMessage.info('商品详情跳转功能待接入');
+};
+
+const handleStoreDrilldown = (row: GoodsRow) => {
+  if (!row.productNo) {
+    ElMessage.warning('缺少商品编码，无法查看销售门店明细');
+    return;
+  }
+  router.push({
+    path: '/product-store/detail',
+    query: {
+      ...route.query,
+      productNo: row.productNo,
+      productName: row.productName || '',
+      source: 'gross-contribution'
+    }
+  });
 };
 
 const handleProcess = (_row: GoodsRow) => {
@@ -694,6 +720,11 @@ onMounted(async () => {
 
 .store-count {
   color: #0f9f9a;
+  font-weight: 700;
+}
+
+.drilldown-number {
+  padding: 0;
   font-weight: 700;
 }
 

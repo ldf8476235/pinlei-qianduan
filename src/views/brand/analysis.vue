@@ -10,8 +10,20 @@
 
     <section class="metric-row">
       <article v-for="item in metrics" :key="item.label" class="metric-card">
-        <div class="metric-label">{{ item.label }}</div>
-        <div class="metric-value" :class="{ emphasis: item.emphasis }">{{ item.value }}</div>
+        <button
+          v-if="isMetricDrillable(item)"
+          type="button"
+          class="metric-card-button"
+          :aria-label="`查看${item.label}明细`"
+          @click="handleMetricClick(item)"
+        >
+          <div class="metric-label">{{ item.label }}</div>
+          <div class="metric-value" :class="{ emphasis: item.emphasis }">{{ item.value }}</div>
+        </button>
+        <div v-else class="metric-card-content">
+          <div class="metric-label">{{ item.label }}</div>
+          <div class="metric-value" :class="{ emphasis: item.emphasis }">{{ item.value }}</div>
+        </div>
       </article>
     </section>
 
@@ -24,10 +36,17 @@
           <div ref="pieChartRef" class="chart-box donut-chart" />
           <div class="donut-legend">
             <div class="legend-list">
-              <div v-for="item in visiblePieLegendItems" :key="item.name" class="legend-item">
+              <button
+                v-for="item in visiblePieLegendItems"
+                :key="item.name"
+                type="button"
+                class="legend-item"
+                :title="`查看品牌 ${item.name} 明细`"
+                @click="handleBrandDrillDown(item.name)"
+              >
                 <span class="legend-dot" :style="{ background: item.color }" />
                 <span class="legend-name" :title="item.name">{{ item.name }}</span>
-              </div>
+              </button>
             </div>
             <div class="legend-pager">
               <button type="button" class="pager-arrow" :disabled="!canPrevLegend" @click="handlePrevLegend">▲</button>
@@ -164,6 +183,12 @@ const renderedSummaryLines = computed(() => {
   ];
 });
 
+type BrandDrillExtraQuery = {
+  brandName?: string | string[];
+  brandType?: string | string[];
+  newSaleBrand?: string;
+};
+
 const formatAmount = (value: unknown, digits = 0) => {
   const num = Number(value ?? 0);
   return Number.isFinite(num) ? num.toLocaleString('zh-CN', { minimumFractionDigits: digits, maximumFractionDigits: digits }) : '--';
@@ -178,6 +203,46 @@ const resolveComboSku = (item: any) => Number(item?.sku ?? item?.skuChange ?? it
 const resolveComboSalesGrowth = (item: any) => Number(item?.sales ?? item?.salesGrowth ?? item?.salesChangeRate ?? item?.growthRate ?? 0);
 const getRankMetricLabel = () => ({ '1': '销售额', '2': '销售量', '3': '毛利额', '4': '毛利率' })[rankMetric.value] || '销售额';
 const getRankMetricValueText = (value: unknown) => (rankMetric.value === '4' ? formatPercent(value) : formatAmount(value, 0));
+const normalizeQueryList = (value: string | string[] | undefined) => {
+  if (Array.isArray(value)) return value.map((item) => String(item).trim()).filter(Boolean);
+  return value ? [String(value).trim()].filter(Boolean) : [];
+};
+
+const openBrandDetail = (extraQuery: BrandDrillExtraQuery = {}) => {
+  const query: Record<string, string | string[]> = { ...route.query } as Record<string, string | string[]>;
+  delete query.brandName;
+  delete query.brandList;
+  delete query.brandType;
+  delete query.brandTypeList;
+  delete query.newSaleBrand;
+
+  const brandNameList = normalizeQueryList(extraQuery.brandName);
+  const brandTypeList = normalizeQueryList(extraQuery.brandType);
+  const newSaleBrand = String(extraQuery.newSaleBrand || '').trim();
+
+  if (brandNameList.length) query.brandName = brandNameList;
+  if (brandTypeList.length) query.brandType = brandTypeList;
+  if (newSaleBrand) query.newSaleBrand = newSaleBrand;
+
+  router.push({ path: '/brand/analysis/detail', query });
+};
+
+const handleBrandDrillDown = (brandName: string) => {
+  if (!brandName) return;
+  openBrandDetail({ brandName });
+};
+
+const isMetricDrillable = (item: { label: string }) => item.label !== '自有品牌';
+
+const handleMetricClick = (item: { label: string }) => {
+  switch (item.label) {
+    case '新销品牌':
+      openBrandDetail({ newSaleBrand: 'Y' });
+      return;
+    default:
+      openBrandDetail();
+  }
+};
 
 const hideBrandTooltip = () => {
   brandTooltip.visible = false;
@@ -352,6 +417,11 @@ const renderPieChart = () => {
     } as EChartsOption,
     true
   );
+  pieChartIns.value.off('click');
+  pieChartIns.value.on('click', (params: any) => {
+    const brandName = String(params?.name || '').trim();
+    if (brandName) handleBrandDrillDown(brandName);
+  });
 };
 
 const renderRankChart = () => {
@@ -385,6 +455,7 @@ const renderRankChart = () => {
       },
       yAxis: {
         type: 'category',
+        triggerEvent: true,
         inverse: true,
         data: chartData.map((item, index) => normalizeName(item, index)),
         axisTick: { show: false },
@@ -481,6 +552,19 @@ const renderRankChart = () => {
   });
   rankZr.off('globalout', hideBrandTooltip);
   rankZr.on('globalout', hideBrandTooltip);
+  rankChartIns.value.off('click');
+  rankChartIns.value.on('click', (params: any) => {
+    if (params?.componentType === 'yAxis' && params?.value) {
+      handleBrandDrillDown(String(params.value));
+      return;
+    }
+    if (params?.componentType === 'series') {
+      const dataIndex = Number(params?.dataIndex);
+      if (isValidDataIndex(dataIndex, chartData.length)) {
+        handleBrandDrillDown(normalizeName(chartData[dataIndex], dataIndex));
+      }
+    }
+  });
 };
 
 const renderComboChart = () => {
@@ -511,6 +595,7 @@ const renderComboChart = () => {
       grid: { left: 58, right: 58, top: 48, bottom: names.length > visibleCount ? 58 : 46, containLabel: true },
       xAxis: {
         type: 'category',
+        triggerEvent: true,
         data: names,
         axisTick: { show: false },
         axisLine: { lineStyle: { color: '#d9e0e7' } },
@@ -645,6 +730,19 @@ const renderComboChart = () => {
   });
   comboZr.off('globalout', hideBrandTooltip);
   comboZr.on('globalout', hideBrandTooltip);
+  comboChartIns.value.off('click');
+  comboChartIns.value.on('click', (params: any) => {
+    if (params?.componentType === 'xAxis' && params?.value) {
+      handleBrandDrillDown(String(params.value));
+      return;
+    }
+    if (params?.componentType === 'series') {
+      const dataIndex = Number(params?.dataIndex);
+      if (isValidDataIndex(dataIndex, chartData.length)) {
+        handleBrandDrillDown(normalizeName(chartData[dataIndex], dataIndex));
+      }
+    }
+  });
 };
 
 const handlePrevLegend = () => { if (canPrevLegend.value) legendStart.value -= 1; };
@@ -654,7 +752,7 @@ const handleRankPageChange = async (page: number) => {
   rankPage.page = Math.max(1, Math.min(Number(page || 1), totalRankPages.value));
   await reload();
 };
-const handleViewDetail = () => { router.push({ path: '/brand/analysis/detail', query: { ...route.query } }); };
+const handleViewDetail = () => { openBrandDetail(); };
 
 const resizeCharts = () => {
   pieChartIns.value?.resize();
@@ -738,8 +836,24 @@ onBeforeUnmount(() => {
   border: 1px solid #e5e7eb;
 }
 .metric-card {
+  padding: 0;
+}
+.metric-card-button {
+  width: 100%;
+  border: 0;
+  background: transparent;
   padding: 12px 10px;
   text-align: center;
+  cursor: pointer;
+}
+.metric-card-content {
+  padding: 12px 10px;
+  text-align: center;
+}
+.metric-card-button:focus-visible,
+.legend-item:focus-visible {
+  outline: 2px solid #16c2a3;
+  outline-offset: 2px;
 }
 .metric-label {
   color: #111827;
@@ -823,8 +937,14 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 8px;
+  width: 100%;
+  border: 0;
+  padding: 0;
+  background: transparent;
   color: #111827;
   font-size: 13px;
+  text-align: left;
+  cursor: pointer;
 }
 .legend-dot {
   width: 8px;
