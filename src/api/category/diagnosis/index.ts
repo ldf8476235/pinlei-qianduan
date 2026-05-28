@@ -8,6 +8,7 @@ import {
   DiagnosisSessionCreateResponse,
   DiagnosisSessionStatusResponse
 } from './types';
+import { getMockDiagnosisStatus, isMockDiagnosisSession, mockApiResponse } from './mock-demo';
 
 export const createDiagnosisSession = (
   data: DiagnosisSessionCreateRequest
@@ -22,6 +23,9 @@ export const createDiagnosisSession = (
 export const getDiagnosisSessionStatus = (
   sessionId: string
 ): AxiosPromise<DiagnosisApiResponse<DiagnosisSessionStatusResponse>> => {
+  if (isMockDiagnosisSession(sessionId)) {
+    return mockApiResponse(getMockDiagnosisStatus()) as AxiosPromise<DiagnosisApiResponse<DiagnosisSessionStatusResponse>>;
+  }
   return request({
     url: `/api/v1/diagnosis/sessions/${sessionId}/status`,
     method: 'get',

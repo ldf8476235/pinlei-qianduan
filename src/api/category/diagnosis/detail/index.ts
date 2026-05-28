@@ -1,6 +1,7 @@
 ﻿import request from '@/utils/request';
 import { AxiosPromise } from 'axios';
 import { DiagnosisApiResponse } from '../types';
+import { getMockDiagnosisOverview, getMockOverallSummary, getMockTrend, isMockDiagnosisSession, mockApiResponse } from '../mock-demo';
 import {
   ChannelSalesDetailsResponse,
   ChannelSalesPieItemResponse,
@@ -40,6 +41,9 @@ export const queryObsoleteGoodsList = (data: Record<string, any>): AxiosPromise<
 };
 
 export const getCategoryDiagnosisDetailSummary = (sessionId: string): AxiosPromise<DiagnosisApiResponse<DiagnosisOverviewResponse>> => {
+  if (isMockDiagnosisSession(sessionId)) {
+    return mockApiResponse(getMockDiagnosisOverview()) as AxiosPromise<DiagnosisApiResponse<DiagnosisOverviewResponse>>;
+  }
   return request({
     url: '/api/v1/diagnosis/overview',
     method: 'get',
@@ -48,6 +52,9 @@ export const getCategoryDiagnosisDetailSummary = (sessionId: string): AxiosPromi
 };
 
 export const getCategoryDiagnosisOverallSummary = (sessionId: string): AxiosPromise<DiagnosisApiResponse<DiagnosisOverallSummaryResponse>> => {
+  if (isMockDiagnosisSession(sessionId)) {
+    return mockApiResponse(getMockOverallSummary()) as AxiosPromise<DiagnosisApiResponse<DiagnosisOverallSummaryResponse>>;
+  }
   return request({
     url: '/api/v1/diagnosis/overall-summary',
     method: 'get',
@@ -70,6 +77,9 @@ export const getCategoryDiagnosisDetailTrend = (
   metricCode?: string,
   tabType?: string
 ): AxiosPromise<DiagnosisApiResponse<DiagnosisTrendsResponse>> => {
+  if (isMockDiagnosisSession(sessionId)) {
+    return mockApiResponse(getMockTrend(metricCode || tabType || 'sales')) as AxiosPromise<DiagnosisApiResponse<DiagnosisTrendsResponse>>;
+  }
   return request({
     url: '/api/v1/diagnosis/trends',
     method: 'get',

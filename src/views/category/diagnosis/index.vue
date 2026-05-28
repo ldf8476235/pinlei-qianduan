@@ -19,7 +19,10 @@
       <template #header>
         <div class="diagnosis-header">
           <span class="diagnosis-title">诊断对象</span>
-          <el-button type="primary" plain class="history-btn" @click="handleHistory">历史诊断记录</el-button>
+          <div class="diagnosis-actions">
+            <el-button type="warning" plain class="mock-demo-btn" @click="handleMockDemo">模拟记录</el-button>
+            <el-button type="primary" plain class="history-btn" @click="handleHistory">历史诊断记录</el-button>
+          </div>
         </div>
       </template>
 
@@ -90,6 +93,7 @@ import { Aim, DataAnalysis, Goods, TrendCharts } from '@element-plus/icons-vue';
 import { findStore, queryCategoryClassTree } from '@/api/category/tree';
 import type { CategoryClassTreeNodeVO, OptionVO } from '@/api/category/tree/types';
 import { createDiagnosisSession } from '@/api/category/diagnosis';
+import { MOCK_DIAGNOSIS_SESSION_ID } from '@/api/category/diagnosis/mock-demo';
 import { useRequest } from '@/hooks/useRequest';
 
 interface DiagnosisForm {
@@ -373,6 +377,25 @@ const handleHistory = () => {
   router.push('/category/diagnosis/record');
 };
 
+const handleMockDemo = async () => {
+  await router.push({
+    name: 'CategoryDiagnosisDetail',
+    query: {
+      sessionId: MOCK_DIAGNOSIS_SESSION_ID,
+      categoryId: '004',
+      categoryName: '洗化部',
+      categoryLevel: '1',
+      storeNo: '',
+      startDate: '2026-04-01',
+      endDate: '2026-04-30',
+      compareStartDate: '2026-03-01',
+      compareEndDate: '2026-03-30',
+      initialView: 'performance',
+      demo: '1'
+    }
+  });
+};
+
 const handleSubmit = async () => {
   if (!formRef.value) return;
   await formRef.value.validate(async (valid) => {
@@ -559,6 +582,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16px;
 }
 
 .diagnosis-title {
@@ -567,13 +591,36 @@ onMounted(() => {
   color: #7c2d12;
 }
 
+.diagnosis-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.mock-demo-btn,
 .history-btn {
+  min-height: 40px;
+  padding: 0 18px;
   border-radius: 999px;
+  font-weight: 700;
+}
+
+.history-btn {
   color: #f97316;
   border-color: #fdba74;
   background: #fff7ed;
 }
 
+.mock-demo-btn {
+  color: #c2410c;
+  border-color: #fed7aa;
+  background: #fffaf5;
+}
+
+.mock-demo-btn:hover,
+.mock-demo-btn:focus,
 .history-btn:hover,
 .history-btn:focus {
   color: #fff;
