@@ -1,11 +1,5 @@
 import request from '@/utils/request';
-import type {
-  CategoryClassTreeNodeVO,
-  CategoryFilterPayloadVO,
-  StoreFindRequest,
-  StoreOptionResponse,
-  OptionVO
-} from '@/api/category/tree/types';
+import type { CategoryClassTreeNodeVO, CategoryFilterPayloadVO, StoreFindRequest, StoreOptionResponse, OptionVO } from '@/api/category/tree/types';
 import { getCategoryFilterOptions, findStore as fetchStoreOptions, queryCategoryClassTree } from '@/api/category/tree';
 import type {
   CategoryCheckAlertVO,
@@ -115,10 +109,7 @@ const normalizeStoreOptions = (rows: StoreOptionResponse[] = []): OptionVO[] => 
 };
 
 export const getCategoryCheckFilter = async (): BackendWrap<CategoryCheckFilterVO> => {
-  const [filterRes, storeRes] = await Promise.all([
-    getCategoryFilterOptions(),
-    fetchStoreOptions({ keyword: '', limit: 50 } as StoreFindRequest)
-  ]);
+  const [filterRes, storeRes] = await Promise.all([getCategoryFilterOptions(), fetchStoreOptions({ keyword: '', limit: 50 } as StoreFindRequest)]);
 
   const payload = unwrap<CategoryFilterPayloadVO>(filterRes) || {};
 
@@ -193,20 +184,20 @@ export const getCategoryCheckRole = async (data: CategoryCheckQuery): BackendWra
   const list = (payload.list || []).map((item: any) => {
     const contributionRate = toNumber(item.contributionRatePer ?? item.contributionRate);
     const growthRate = toNumber(item.salesCompareRate ?? item.growthRate);
-    const roleMatchStatus: CategoryRoleScatterItemVO['roleMatchStatus'] =
-      contributionRate === 0 && growthRate === 0
-        ? 'unset'
-        : contributionRate >= x && growthRate >= y
-          ? 'match'
-          : contributionRate < x && growthRate < y
-            ? 'unset'
-            : 'mismatch';
+    const presetRole = toText(item.presetRole ?? item.classRole);
+    const evaluatedRole = toText(item.evaluatedRole);
+    const roleWarning =
+      typeof item.roleWarning === 'boolean' ? item.roleWarning : Boolean(presetRole && evaluatedRole && presetRole !== evaluatedRole);
+    const roleMatchStatus: CategoryRoleScatterItemVO['roleMatchStatus'] = !presetRole ? 'unset' : roleWarning ? 'mismatch' : 'match';
 
     return {
       categoryId: item.classNo,
       categoryCode: item.classNo,
       categoryName: item.className,
-      roleName: item.classRoleName || item.classRoleTypeDescribe || item.classRoleType,
+      roleName: item.evaluatedRoleName || item.classRoleName || item.classRoleTypeDescribe || item.classRoleType,
+      presetRoleName: item.presetRoleName || item.classRoleName || item.classRoleTypeDescribe || item.classRoleType,
+      evaluatedRoleName: item.evaluatedRoleName,
+      roleWarning,
       roleMatchStatus,
       growthRate,
       contributionRate,
@@ -280,7 +271,8 @@ export const getCategoryCheckSales = async (data: CategoryCheckSalesQuery): Back
   const rows = (payload.content || payload.list || []).map((item: any) => {
     const growthRate = toNumber(item.salesCompareRate);
     const salesAmount = toNumber(item.sales);
-    const explicitCompareSales = item.salesCompare ?? item.compareSales ?? item.compareSalesAmount ?? item.lastSales ?? item.lastYearSales ?? item.oldSales;
+    const explicitCompareSales =
+      item.salesCompare ?? item.compareSales ?? item.compareSalesAmount ?? item.lastSales ?? item.lastYearSales ?? item.oldSales;
     const compareSalesAmount =
       explicitCompareSales !== undefined && explicitCompareSales !== null
         ? toNumber(explicitCompareSales)

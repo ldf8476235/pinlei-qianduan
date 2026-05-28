@@ -36,7 +36,9 @@
                     <div class="category-picker-tags">
                       <span class="category-tag">
                         {{ categoryPickerSummaryLabel }}
-                        <span v-if="!isAllCategorySelected && !categoryOptionsLoading" class="category-tag-close" @click.stop="handleCategoryClear">×</span>
+                        <span v-if="!isAllCategorySelected && !categoryOptionsLoading" class="category-tag-close" @click.stop="handleCategoryClear"
+                          >×</span
+                        >
                       </span>
                       <span v-if="selectedCategoryCount > 1" class="category-tag count">+ {{ selectedCategoryCount - 1 }}</span>
                     </div>
@@ -66,7 +68,11 @@
                       @mouseenter="setActiveCategoryPath(columnIndex, item)"
                       @click="handleCategoryOptionClick(item, columnIndex)"
                     >
-                      <span class="category-check" :class="{ checked: isCategorySelected(item, columnIndex) }" @click.stop="handleCategoryCheckClick(item, columnIndex)">
+                      <span
+                        class="category-check"
+                        :class="{ checked: isCategorySelected(item, columnIndex) }"
+                        @click.stop="handleCategoryCheckClick(item, columnIndex)"
+                      >
                         ✓
                       </span>
                       <span class="category-option-label">{{ item.label }}</span>
@@ -169,7 +175,12 @@
         </div>
       </template>
 
-      <div v-loading="skuLoading" class="chart-box h-[340px] mb-[12px] sku-tooltip-wrap" @mousemove="handleSkuTooltipMousemove($event, 'ratio')" @mouseleave="hideSkuTooltip">
+      <div
+        v-loading="skuLoading"
+        class="chart-box h-[340px] mb-[12px] sku-tooltip-wrap"
+        @mousemove="handleSkuTooltipMousemove($event, 'ratio')"
+        @mouseleave="hideSkuTooltip"
+      >
         <div
           v-if="skuHover.visible && skuHover.chartType === 'ratio'"
           class="sku-hover-band"
@@ -177,7 +188,12 @@
         />
         <div ref="skuRatioChartRef" class="chart-inner"></div>
       </div>
-      <div v-loading="skuLoading" class="chart-box h-[340px] sku-tooltip-wrap" @mousemove="handleSkuTooltipMousemove($event, 'count')" @mouseleave="hideSkuTooltip">
+      <div
+        v-loading="skuLoading"
+        class="chart-box h-[340px] sku-tooltip-wrap"
+        @mousemove="handleSkuTooltipMousemove($event, 'count')"
+        @mouseleave="hideSkuTooltip"
+      >
         <div
           v-if="skuHover.visible && skuHover.chartType === 'count'"
           class="sku-hover-band"
@@ -213,7 +229,12 @@
           </div>
         </div>
       </template>
-      <div v-loading="salesLoading" class="chart-box h-[420px] sales-no-wheel sales-tooltip-wrap" @mousemove="handleSalesTooltipMousemove" @mouseleave="hideSalesTooltip">
+      <div
+        v-loading="salesLoading"
+        class="chart-box h-[420px] sales-no-wheel sales-tooltip-wrap"
+        @mousemove="handleSalesTooltipMousemove"
+        @mouseleave="hideSalesTooltip"
+      >
         <div
           v-if="salesHover.visible"
           class="sales-hover-band"
@@ -388,7 +409,9 @@ const normalizedSelectedCategoryIds = computed(() =>
 const isAllCategorySelected = computed(
   () => targetCategoryOptions.value.length > 0 && normalizedSelectedCategoryIds.value.length === targetCategoryOptions.value.length
 );
-const selectedCategoryCount = computed(() => (isAllCategorySelected.value ? targetCategoryOptions.value.length + 1 : normalizedSelectedCategoryIds.value.length));
+const selectedCategoryCount = computed(() =>
+  isAllCategorySelected.value ? targetCategoryOptions.value.length + 1 : normalizedSelectedCategoryIds.value.length
+);
 const categoryPickerSummaryLabel = computed(() => {
   if (isAllCategorySelected.value) return ALL_CATEGORY_LABEL;
   const firstValue = normalizedSelectedCategoryIds.value[0];
@@ -628,7 +651,8 @@ const renderRoleChart = (data: CategoryCheckRoleVO) => {
         const row = params.data?.rawData || {};
         return [
           `${row.categoryCode || ''} ${row.categoryName || ''}`,
-          `品类角色：${row.roleName || '--'}`,
+          `设定角色：${row.presetRoleName || '--'}`,
+          `测算角色：${row.evaluatedRoleName || row.roleName || '--'}`,
           `销售对比增长率：${row.growthRate ?? 0}%`,
           `综合贡献率：${row.contributionRate ?? 0}%`,
           `SKU数：${row.skuCount ?? 0}`,

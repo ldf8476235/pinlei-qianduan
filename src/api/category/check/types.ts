@@ -35,6 +35,9 @@ export interface CategoryRoleScatterItemVO {
   categoryCode: string;
   categoryName: string;
   roleName?: string;
+  presetRoleName?: string;
+  evaluatedRoleName?: string;
+  roleWarning?: boolean;
   roleMatchStatus: 'match' | 'mismatch' | 'unset';
   growthRate: number;
   contributionRate: number;

@@ -2,7 +2,10 @@
   <div class="p-2 full-class-detail-page">
     <el-card shadow="hover" class="summary-card">
       <div class="summary-lines">
-        <div>数据日期：{{ query.currentStartDate || '-' }} 至 {{ query.currentEndDate || '-' }}； 对比日期：{{ query.compareStartDate || '-' }} 至 {{ query.compareEndDate || '-' }}</div>
+        <div>
+          数据日期：{{ query.currentStartDate || '-' }} 至 {{ query.currentEndDate || '-' }}； 对比日期：{{ query.compareStartDate || '-' }} 至
+          {{ query.compareEndDate || '-' }}
+        </div>
         <div>组织：总部；业态：全部业态；商圈：全部商圈；</div>
         <div>门店：{{ storeLabel }}</div>
       </div>
@@ -101,7 +104,9 @@
             <template #default="{ row }">{{ formatAmount(row.salesCompare) }}</template>
           </el-table-column>
           <el-table-column label="对比增长" min-width="110" align="right" sortable prop="salesCompareRate">
-            <template #default="{ row }"><span :class="rateClass(row.salesCompareRate)">{{ formatPercent(row.salesCompareRate) }}</span></template>
+            <template #default="{ row }"
+              ><span :class="rateClass(row.salesCompareRate)">{{ formatPercent(row.salesCompareRate) }}</span></template
+            >
           </el-table-column>
           <el-table-column label="构成比" min-width="100" align="right" sortable prop="salesAmountPer">
             <template #default="{ row }">{{ formatPercent(row.salesAmountPer ?? row.salesPer) }}</template>
@@ -116,7 +121,9 @@
             <template #default="{ row }">{{ formatAmount(row.saleQuantityCompare, 0) }}</template>
           </el-table-column>
           <el-table-column label="对比增长" min-width="110" align="right" sortable prop="saleQuantityCompareRate">
-            <template #default="{ row }"><span :class="rateClass(row.saleQuantityCompareRate)">{{ formatPercent(row.saleQuantityCompareRate) }}</span></template>
+            <template #default="{ row }"
+              ><span :class="rateClass(row.saleQuantityCompareRate)">{{ formatPercent(row.saleQuantityCompareRate) }}</span></template
+            >
           </el-table-column>
           <el-table-column label="构成比" min-width="100" align="right" sortable prop="saleQuantityPer">
             <template #default="{ row }">{{ formatPercent(row.saleQuantityPer) }}</template>
@@ -131,7 +138,9 @@
             <template #default="{ row }">{{ formatAmount(row.grossCompare) }}</template>
           </el-table-column>
           <el-table-column label="对比增长" min-width="110" align="right" sortable prop="grossCompareRate">
-            <template #default="{ row }"><span :class="rateClass(row.grossCompareRate)">{{ formatPercent(row.grossCompareRate) }}</span></template>
+            <template #default="{ row }"
+              ><span :class="rateClass(row.grossCompareRate)">{{ formatPercent(row.grossCompareRate) }}</span></template
+            >
           </el-table-column>
           <el-table-column label="构成比" min-width="100" align="right" sortable prop="grossPer">
             <template #default="{ row }">{{ formatPercent(row.grossPer) }}</template>
@@ -146,7 +155,9 @@
             <template #default="{ row }">{{ formatPercent(row.grossRateCompare) }}</template>
           </el-table-column>
           <el-table-column label="对比增长" min-width="110" align="right" sortable prop="grossRateCompareRate">
-            <template #default="{ row }"><span :class="rateClass(row.grossRateCompareRate)">{{ formatPercent(row.grossRateCompareRate) }}</span></template>
+            <template #default="{ row }"
+              ><span :class="rateClass(row.grossRateCompareRate)">{{ formatPercent(row.grossRateCompareRate) }}</span></template
+            >
           </el-table-column>
         </el-table-column>
 
@@ -158,7 +169,9 @@
             <template #default="{ row }">{{ formatAmount(row.customerCountCompare, 0) }}</template>
           </el-table-column>
           <el-table-column label="对比增长" min-width="110" align="right" sortable prop="customerCountCompareRate">
-            <template #default="{ row }"><span :class="rateClass(row.customerCountCompareRate)">{{ formatPercent(row.customerCountCompareRate) }}</span></template>
+            <template #default="{ row }"
+              ><span :class="rateClass(row.customerCountCompareRate)">{{ formatPercent(row.customerCountCompareRate) }}</span></template
+            >
           </el-table-column>
         </el-table-column>
 
@@ -170,7 +183,9 @@
             <template #default="{ row }">{{ formatAmount(row.customerPriceCompare) }}</template>
           </el-table-column>
           <el-table-column label="对比增长" min-width="110" align="right" sortable prop="customerPriceCompareRate">
-            <template #default="{ row }"><span :class="rateClass(row.customerPriceCompareRate)">{{ formatPercent(row.customerPriceCompareRate) }}</span></template>
+            <template #default="{ row }"
+              ><span :class="rateClass(row.customerPriceCompareRate)">{{ formatPercent(row.customerPriceCompareRate) }}</span></template
+            >
           </el-table-column>
         </el-table-column>
 
@@ -182,7 +197,9 @@
             <template #default="{ row }">{{ formatAmount(row.avgInventoryCostCompare) }}</template>
           </el-table-column>
           <el-table-column label="对比增长" min-width="110" align="right" sortable prop="avgInventoryCostCompareRate">
-            <template #default="{ row }"><span :class="rateClass(row.avgInventoryCostCompareRate)">{{ formatPercent(row.avgInventoryCostCompareRate) }}</span></template>
+            <template #default="{ row }"
+              ><span :class="rateClass(row.avgInventoryCostCompareRate)">{{ formatPercent(row.avgInventoryCostCompareRate) }}</span></template
+            >
           </el-table-column>
           <el-table-column label="构成比" min-width="100" align="right" sortable prop="avgInventoryCostPer">
             <template #default="{ row }">{{ formatPercent(row.avgInventoryCostPer) }}</template>
@@ -274,8 +291,7 @@ const toRouteArray = (value: unknown): string[] => {
 };
 
 const routeClassNo = toRouteArray(route.query.classNo || route.query.classNos);
-const isDefaultAllClassNo =
-  routeClassNo.length >= DEFAULT_CLASS_NO.length && DEFAULT_CLASS_NO.every((item) => routeClassNo.includes(item));
+const isDefaultAllClassNo = routeClassNo.length >= DEFAULT_CLASS_NO.length && DEFAULT_CLASS_NO.every((item) => routeClassNo.includes(item));
 query.classNo = isDefaultAllClassNo ? [] : routeClassNo;
 
 const storeLabel = computed(() => (String(query.storeNo || '0') === '0' ? '全部' : query.storeNo));
@@ -351,7 +367,10 @@ const rateClass = (value: unknown) => {
 
 const normalizeRoleOptions = (payload: any) => {
   const list = Array.isArray(payload) ? payload : payload?.list || payload?.content || [];
-  roleOptions.value = list.map((item: any) => ({ label: item.label || item.dictLabel || item.name || item.value, value: String(item.value || item.dictValue || item.code || item.label) }));
+  roleOptions.value = list.map((item: any) => ({
+    label: item.label || item.dictLabel || item.name || item.value,
+    value: String(item.value || item.dictValue || item.code || item.label)
+  }));
 };
 
 const buildMap = (list: any[] = []) => new Map(list.map((item) => [String(item.classNo || item.classCode || item.categoryId || ''), item]));
@@ -366,13 +385,23 @@ const normalizeRow = (row: any, roleItem: any, skuItem: any, diffItem: any, tota
   const customerCount = toNumber(firstValue(row, ['customerCount', 'custNum', 'customerNum', 'flowCount']));
   const customerCountCompare = toNumber(firstValue(row, ['customerCountCompare', 'compareCustomerCount', 'compareCustNum', 'compareFlowCount']));
   const customerPrice = toNumber(firstValue(row, ['customerPrice', 'avgCustomerPrice'], customerCount ? sales / customerCount : 0));
-  const customerPriceCompare = toNumber(firstValue(row, ['customerPriceCompare', 'compareCustomerPrice'], customerCountCompare ? salesCompare / customerCountCompare : 0));
+  const customerPriceCompare = toNumber(
+    firstValue(row, ['customerPriceCompare', 'compareCustomerPrice'], customerCountCompare ? salesCompare / customerCountCompare : 0)
+  );
   const avgInventoryCost = toNumber(firstValue(row, ['avgInventoryCost', 'avgStockCost', 'averageInventoryCost']));
   const avgInventoryCostCompare = toNumber(firstValue(row, ['avgInventoryCostCompare', 'compareAvgInventoryCost', 'compareAvgStockCost']));
   const grossRate = firstValue(row, ['grossRate', 'grossProfitRate'], sales ? (gross / sales) * 100 : undefined);
   const grossRateCompare = firstValue(row, ['grossRateCompare', 'compareGrossRate'], salesCompare ? (grossCompare / salesCompare) * 100 : undefined);
-  const presetRoleName = firstValue(roleItem, ['presetRoleName', 'setClassRoleName', 'roleName', 'classRoleTypeDescribe'], firstValue(row, ['presetRoleName', 'setClassRoleName'], '-'));
-  const currentRoleName = firstValue(roleItem, ['classRoleName', 'currentRoleName', 'classRoleTypeDescribe'], firstValue(row, ['classRoleName', 'currentRoleName'], '-'));
+  const presetRoleName = firstValue(roleItem, ['presetRoleName', 'setClassRoleName'], firstValue(row, ['presetRoleName', 'setClassRoleName'], '-'));
+  const currentRoleName = firstValue(
+    roleItem,
+    ['evaluatedRoleName', 'classRoleName', 'currentRoleName', 'classRoleTypeDescribe'],
+    firstValue(row, ['classRoleName', 'currentRoleName'], '-')
+  );
+  const hasPresetRole = Boolean(presetRoleName && presetRoleName !== '-');
+  const hasCurrentRole = Boolean(currentRoleName && currentRoleName !== '-');
+  const roleWarning =
+    typeof roleItem?.roleWarning === 'boolean' ? roleItem.roleWarning : hasPresetRole && hasCurrentRole && presetRoleName !== currentRoleName;
   const suggestSaleSku = toNumber(firstValue(diffItem, ['suggestSaleSku', 'sysSuggestSaleSku'], firstValue(skuItem, ['suggestSaleSku'])));
   const saleSku = toNumber(firstValue(diffItem, ['saleSku'], firstValue(skuItem, ['saleSku', 'haveSalesSku', 'classSku'])));
   const currentSku = toNumber(firstValue(skuItem, ['classSku', 'haveSalesSku', 'saleSku'], saleSku));
@@ -386,14 +415,20 @@ const normalizeRow = (row: any, roleItem: any, skuItem: any, diffItem: any, tota
     className: firstValue(row, ['className', 'classDesc', 'categoryName'], firstValue(roleItem, ['className', 'classDesc'], '-')),
     presetRoleName,
     currentRoleName,
-    roleConsistent: presetRoleName && currentRoleName && presetRoleName !== '-' && currentRoleName !== '-' && presetRoleName === currentRoleName,
+    roleWarning,
+    roleUnset: !hasPresetRole,
+    roleConsistent: hasPresetRole && hasCurrentRole && !roleWarning,
     suggestSaleSku,
     saleSku,
     currentSku,
     skuPer,
     skuRatioReasonable: Math.abs(skuPer - salesPer) <= 3,
     skuCountConsistent: suggestSaleSku ? suggestSaleSku === saleSku : true,
-    contributionRatePer: firstValue(row, ['contributionRatePer', 'contributionRate'], firstValue(roleItem, ['contributionRatePer', 'contributionRate'])),
+    contributionRatePer: firstValue(
+      row,
+      ['contributionRatePer', 'contributionRate'],
+      firstValue(roleItem, ['contributionRatePer', 'contributionRate'])
+    ),
     sales,
     salesCompare,
     salesCompareRate: firstValue(row, ['salesCompareRate', 'salesGrowthRate'], calcRate(sales, salesCompare)),
@@ -432,8 +467,8 @@ const displayRows = computed(() => {
       if (!filterForm.classRole.includes(String(roleValue))) return false;
     }
     if (filterForm.roleConsistent === 'consistent' && !row.roleConsistent) return false;
-    if (filterForm.roleConsistent === 'inconsistent' && row.roleConsistent) return false;
-    if (filterForm.roleConsistent === 'unset' && row.presetRoleName !== '-') return false;
+    if (filterForm.roleConsistent === 'inconsistent' && !row.roleWarning) return false;
+    if (filterForm.roleConsistent === 'unset' && !row.roleUnset) return false;
     if (filterForm.skuRatioStatus === 'reasonable' && !row.skuRatioReasonable) return false;
     if (filterForm.skuRatioStatus === 'unreasonable' && row.skuRatioReasonable) return false;
     if (filterForm.skuCountStatus === 'consistent' && !row.skuCountConsistent) return false;
@@ -522,9 +557,33 @@ const handleDiagnosis = (row: any) => {
 };
 
 const handleExport = () => {
-  const header = ['品类编码', '品类名称', '设定角色', '本期角色', '设定SKU', '本期SKU', '当前SKU', '综合贡献率', '销售额', '对比销售额', '销售额增长率'];
+  const header = [
+    '品类编码',
+    '品类名称',
+    '设定角色',
+    '本期角色',
+    '设定SKU',
+    '本期SKU',
+    '当前SKU',
+    '综合贡献率',
+    '销售额',
+    '对比销售额',
+    '销售额增长率'
+  ];
   const lines = displayRows.value.map((row) =>
-    [row.classNo, row.className, row.presetRoleName, row.currentRoleName, row.suggestSaleSku, row.saleSku, row.currentSku, row.contributionRatePer, row.sales, row.salesCompare, row.salesCompareRate]
+    [
+      row.classNo,
+      row.className,
+      row.presetRoleName,
+      row.currentRoleName,
+      row.suggestSaleSku,
+      row.saleSku,
+      row.currentSku,
+      row.contributionRatePer,
+      row.sales,
+      row.salesCompare,
+      row.salesCompareRate
+    ]
       .map((item) => `"${String(item ?? '').replace(/"/g, '""')}"`)
       .join(',')
   );

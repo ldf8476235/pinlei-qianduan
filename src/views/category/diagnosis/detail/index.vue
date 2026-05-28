@@ -97,7 +97,7 @@
                   :class="[compareClass(item.compareValue), hiddenMetricCompareKeys.includes(item.metricKey) ? 'metric-compare--hidden' : '']"
                 >
                   <span class="metric-arrow">{{ compareArrow(item.compareValue) }}</span>
-                  <span>{{ compareText(item.compareValue, item.compareType) }}</span>
+                  <span>{{ compareText(item.compareValue, item.compareType, item.unit) }}</span>
                 </div>
               </div>
             </div>
@@ -116,7 +116,7 @@
                   :class="[compareClass(item.compareValue), hiddenMetricCompareKeys.includes(item.metricKey) ? 'metric-compare--hidden' : '']"
                 >
                   <span class="metric-arrow">{{ compareArrow(item.compareValue) }}</span>
-                  <span>{{ compareText(item.compareValue, item.compareType) }}</span>
+                  <span>{{ compareText(item.compareValue, item.compareType, item.unit) }}</span>
                 </div>
               </div>
             </div>
@@ -616,15 +616,17 @@ const compareArrow = (value: number) => {
   return '•';
 };
 
-const compareText = (value: number, type: string) => {
-  const abs = Math.abs(Number(value || 0));
+const compareText = (value: number, type: string, unit = '') => {
+  const numericValue = Number(value || 0);
+  const abs = Math.abs(numericValue);
   if (abs === 0) {
     return '·';
   }
   if (type === 'diff') {
-    return `对比差距 ${abs.toFixed(2)}`;
+    const action = numericValue > 0 ? '提升' : '下降';
+    return unit === '%' ? `对比${action} ${abs.toFixed(2)}个百分点` : `对比${action} ${abs.toFixed(2)}`;
   }
-  return `对比增长 ${abs.toFixed(2)}%`;
+  return `${numericValue > 0 ? '对比增长' : '对比下降'} ${abs.toFixed(2)}%`;
 };
 
 const hiddenMetricCompareKeys = ['sellRate', 'penetrateRate'];

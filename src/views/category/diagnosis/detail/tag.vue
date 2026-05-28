@@ -10,7 +10,7 @@
           </div>
         </div>
         <div class="page-actions">
-          <span class="unit-text">数据来源：静态标签 Excel</span>
+          <span class="unit-text">数据来源：{{ dataSourceLabel }}</span>
         </div>
       </div>
     </el-card>
@@ -18,7 +18,7 @@
     <el-card shadow="hover" class="page-card tab-card">
       <div class="source-line">
         <span class="source-label">当前标签范围</span>
-        <el-tag v-for="item in activeCategoryNames" :key="item" size="small" effect="plain">{{ item }}</el-tag>
+        <el-tag v-for="item in displayCategoryNames" :key="item" size="small" effect="plain">{{ item }}</el-tag>
       </div>
       <div class="tag-tabs">
         <el-button
@@ -38,7 +38,7 @@
       <template #header>
         <div class="card-header">
           <span class="card-title">本期各标签覆盖贡献</span>
-          <span class="card-subtitle">按 Excel 商品标签覆盖 SKU 数计算</span>
+          <span class="card-subtitle">{{ metricSubtitle }}</span>
         </div>
       </template>
       <div class="cloud-wrap">
@@ -89,6 +89,11 @@
 
 <script setup name="TagAnalysis" lang="ts">
 import type { TagDetailItemResponse, TagSalesSkuItemResponse, TagTypeGroupResponse } from '@/api/category/diagnosis/detail/types';
+import {
+  getCategoryDiagnosisTagList,
+  getCategoryDiagnosisTagSalesShare,
+  getCategoryDiagnosisTagTypes
+} from '@/api/category/diagnosis/detail';
 import { STATIC_TAG_ANALYSIS_DATA, STATIC_TAG_CATEGORY_ALIASES, type StaticTagMetric } from './data/staticTagAnalysisData';
 
 interface CloudWordItem {
@@ -98,16 +103,13 @@ interface CloudWordItem {
   style: Record<string, string>;
 }
 
-const handleDetail = () => {
-  ElMessage.info('当前为静态标签分析，明细已在下方表格展示');
-};
-
 const tabGroups = ref<TagTypeGroupResponse[]>([]);
 const activeTagType = ref('');
 const cloudWords = ref<CloudWordItem[]>([]);
 const detailRows = ref<TagDetailItemResponse[]>([]);
 const cloudLoading = ref(false);
 const detailLoading = ref(false);
+const isUsingStaticFallback = ref(false);
 
 const route = useRoute();
 const colorPool = ['#f97316', '#fb923c', '#f59e0b', '#ea580c', '#fdba74', '#c2410c', '#fbbf24'];
@@ -121,7 +123,24 @@ const tabItems = computed(() =>
     }))
 );
 
-const activeCategoryNames = computed(() => resolveCategoryNames(String(route.query.categoryName || '')));
+const sessionId = computed(() => String(route.query.sessionId || ''));
+const routeCategoryName = computed(() => String(route.query.categoryName || '').trim());
+const staticCategoryNames = computed(() => resolveStaticCategoryNames(routeCategoryName.value));
+const displayCategoryNames = computed(() => {
+  if (staticCategoryNames.value.length) return staticCategoryNames.value;
+  return routeCategoryName.value ? [routeCategoryName.value] : ['当前品类'];
+});
+const dataSourceLabel = computed(() => {
+  if (!sessionId.value) return '静态标签 Excel';
+  return isUsingStaticFallback.value ? '静态标签 Excel（快照为空）' : '诊断快照标签数据';
+});
+const metricSubtitle = computed(() =>
+  isUsingStaticFallback.value || !sessionId.value ? '按 Excel 商品标签覆盖 SKU 数计算' : '按诊断快照商品标签覆盖 SKU 数计算'
+);
+
+const handleDetail = () => {
+  ElMessage.info(`${dataSourceLabel.value}，明细已在下方表格展示`);
+};
 
 const summaryItems = computed(() => {
   if (!detailRows.value.length) {
@@ -135,7 +154,7 @@ const summaryItems = computed(() => {
   ];
 });
 
-const resolveCategoryNames = (categoryName: string) => {
+const resolveStaticCategoryNames = (categoryName: string) => {
   const sourceNames = Object.keys(STATIC_TAG_ANALYSIS_DATA);
   const normalized = categoryName.trim();
   if (normalized) {
@@ -145,7 +164,7 @@ const resolveCategoryNames = (categoryName: string) => {
     const direct = sourceNames.find((item) => normalized.includes(item));
     if (direct) return [direct];
   }
-  return ['洗护', '家清'];
+  return [];
 };
 
 const normalizeStaticRows = (rows: StaticTagMetric[]) => {
@@ -266,15 +285,20 @@ const formatPercent = (value: unknown) => {
   return `${num.toFixed(2)}%`;
 };
 
-const loadStaticTagAnalysis = () => {
+const unwrapPayload = <T,>(res: any, fallback: T): T => {
+  return (res?.data?.data ?? res?.data?.result ?? res?.data ?? res?.result ?? fallback) as T;
+};
+
+const loadStaticTagAnalysis = (asFallback = false) => {
+  isUsingStaticFallback.value = asFallback;
   cloudLoading.value = true;
   detailLoading.value = true;
   try {
-    tabGroups.value = getAvailableTagTypes(activeCategoryNames.value);
+    tabGroups.value = getAvailableTagTypes(staticCategoryNames.value);
     if (!tabGroups.value.some((item) => item.tagType === activeTagType.value)) {
       activeTagType.value = tabGroups.value[0]?.tagType || '';
     }
-    const rows = activeTagType.value ? mergeStaticRows(activeCategoryNames.value, activeTagType.value) : [];
+    const rows = activeTagType.value ? mergeStaticRows(staticCategoryNames.value, activeTagType.value) : [];
     detailRows.value = rows;
     cloudWords.value = buildCloudWords(rows as TagSalesSkuItemResponse[]);
   } finally {
@@ -283,21 +307,84 @@ const loadStaticTagAnalysis = () => {
   }
 };
 
-const handleTabChange = (tagType: string) => {
-  if (activeTagType.value === tagType) return;
-  activeTagType.value = tagType;
+const loadApiTagAnalysis = async () => {
+  if (!sessionId.value) {
+    loadStaticTagAnalysis();
+    return;
+  }
+
+  isUsingStaticFallback.value = false;
+  cloudLoading.value = true;
+  detailLoading.value = true;
+  try {
+    const typeRes = await getCategoryDiagnosisTagTypes(sessionId.value);
+    tabGroups.value = unwrapPayload<TagTypeGroupResponse[]>(typeRes, []);
+    if (!tabGroups.value.length && staticCategoryNames.value.length) {
+      loadStaticTagAnalysis(true);
+      return;
+    }
+    if (!tabGroups.value.some((item) => item.tagType === activeTagType.value)) {
+      activeTagType.value = tabGroups.value[0]?.tagType || '';
+    }
+    if (!activeTagType.value) {
+      if (staticCategoryNames.value.length) {
+        loadStaticTagAnalysis(true);
+        return;
+      }
+      detailRows.value = [];
+      cloudWords.value = [];
+      return;
+    }
+
+    const [shareRes, listRes] = await Promise.all([
+      getCategoryDiagnosisTagSalesShare(sessionId.value, activeTagType.value),
+      getCategoryDiagnosisTagList(sessionId.value, activeTagType.value, ['-1'], 1, 200, 'sku', 'desc')
+    ]);
+    const sharePayload = unwrapPayload<{ salesAndSkuList?: TagSalesSkuItemResponse[] }>(shareRes, {});
+    const listPayload = unwrapPayload<{ records?: TagDetailItemResponse[] }>(listRes, {});
+    const rows = listPayload.records || [];
+    const cloudSource = sharePayload.salesAndSkuList?.length ? sharePayload.salesAndSkuList : (rows as TagSalesSkuItemResponse[]);
+    detailRows.value = rows;
+    cloudWords.value = buildCloudWords(cloudSource);
+  } catch (error) {
+    console.error('load tag analysis failed', error);
+    if (staticCategoryNames.value.length) {
+      loadStaticTagAnalysis(true);
+      return;
+    }
+    tabGroups.value = [];
+    detailRows.value = [];
+    cloudWords.value = [];
+    ElMessage.error('标签分析数据加载失败');
+  } finally {
+    cloudLoading.value = false;
+    detailLoading.value = false;
+  }
+};
+
+const loadTagAnalysis = () => {
+  if (sessionId.value) {
+    void loadApiTagAnalysis();
+    return;
+  }
   loadStaticTagAnalysis();
 };
 
+const handleTabChange = (tagType: string) => {
+  if (activeTagType.value === tagType) return;
+  activeTagType.value = tagType;
+  loadTagAnalysis();
+};
+
 onMounted(() => {
-  loadStaticTagAnalysis();
+  loadTagAnalysis();
 });
 
 watch(
-  () => route.query.categoryName,
+  () => [route.query.categoryName, route.query.sessionId],
   () => {
     activeTagType.value = '';
-    loadStaticTagAnalysis();
+    loadTagAnalysis();
   }
 );
 </script>

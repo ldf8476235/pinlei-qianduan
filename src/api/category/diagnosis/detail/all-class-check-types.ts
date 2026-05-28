@@ -33,6 +33,11 @@ export interface AllClassCheckSalesChangeItemResponse {
   classRoleName?: string;
   classRoleType?: string;
   classRoleTypeDescribe?: string;
+  presetRole?: string;
+  presetRoleName?: string;
+  evaluatedRole?: string;
+  evaluatedRoleName?: string;
+  roleWarning?: boolean;
 }
 
 export interface AllClassCheckSalesChangeResponse {
