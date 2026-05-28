@@ -583,24 +583,39 @@ onMounted(() => {
 
 .diagnosis-form {
   padding-top: 8px;
-  max-width: 800px;
+  max-width: 520px;
   margin: 0 auto;
 }
 
 .diagnosis-form :deep(.el-form-item) {
-  margin-bottom: 18px;
-  justify-content: center;
+  display: block;
+  margin-bottom: 22px;
 }
 
 .diagnosis-form :deep(.el-form-item__label) {
+  display: flex;
+  width: 100% !important;
+  height: auto;
+  line-height: 1.2;
+  margin-bottom: 10px;
+  padding: 0;
   text-align: left;
+  justify-content: flex-start;
   color: #7c2d12;
+  font-size: 16px;
   font-weight: 700;
 }
 
 .diagnosis-form :deep(.el-form-item__content) {
-  max-width: 480px;
-  flex: 0 1 480px;
+  width: 100%;
+  max-width: none;
+  flex: none;
+  margin-left: 0 !important;
+  line-height: 40px;
+}
+
+.diagnosis-form :deep(.el-form-item__error) {
+  padding-top: 6px;
 }
 
 .full-input {

@@ -153,8 +153,12 @@
           </div>
         </div>
       </template>
-      <div v-loading="roleLoading" class="chart-box h-[420px]">
-        <div ref="roleChartRef" class="chart-inner"></div>
+      <div v-loading="roleLoading" class="chart-box role-chart-box h-[420px]">
+        <div class="role-quadrant-label role-quadrant-label--top-left">幼童品类</div>
+        <div class="role-quadrant-label role-quadrant-label--top-right">明星品类</div>
+        <div class="role-quadrant-label role-quadrant-label--bottom-left">结构品类</div>
+        <div class="role-quadrant-label role-quadrant-label--bottom-right">金牛品类</div>
+        <div ref="roleChartRef" class="chart-inner role-chart-inner"></div>
       </div>
     </el-card>
 
@@ -302,6 +306,12 @@ const ROLE_MATCH_SERIES = [
   { key: 'match', name: '品类角色与设定一致', color: '#2A9D8F' },
   { key: 'mismatch', name: '品类角色与设定不一致', color: '#F4A261' },
   { key: 'unset', name: '品类角色未设定', color: '#9CA3AF' }
+] as const;
+const ROLE_QUADRANTS = [
+  { name: '幼童品类', x: 'low', y: 'high', color: 'rgba(244, 162, 97, 0.1)' },
+  { name: '明星品类', x: 'high', y: 'high', color: 'rgba(42, 157, 143, 0.1)' },
+  { name: '结构品类', x: 'low', y: 'low', color: 'rgba(148, 163, 184, 0.11)' },
+  { name: '金牛品类', x: 'high', y: 'low', color: 'rgba(234, 179, 8, 0.09)' }
 ] as const;
 
 const showSearch = ref(true);
@@ -570,6 +580,28 @@ const toggleCategoryValues = (values: Array<string | number>) => {
   queryForm.categoryIds = Array.from(current);
 };
 
+const pointsToNumericValues = (values: unknown[], fallback: number) => {
+  const numericValues = values.map((item) => Number(item)).filter((item) => Number.isFinite(item));
+  if (Number.isFinite(fallback)) {
+    numericValues.push(fallback);
+  }
+  return numericValues.length ? numericValues : [0];
+};
+
+const resolveRoleAxisRange = (values: number[], threshold: number, fallbackMin: number, fallbackMax: number) => {
+  const finiteThreshold = Number.isFinite(threshold) ? threshold : 0;
+  const finiteValues = values.filter((item) => Number.isFinite(item));
+  const rawMin = Math.min(fallbackMin, finiteThreshold, ...finiteValues);
+  const rawMax = Math.max(fallbackMax, finiteThreshold, ...finiteValues);
+  const span = Math.max(rawMax - rawMin, 10);
+  const padding = span * 0.08;
+
+  return {
+    min: Math.floor((rawMin - padding) / 5) * 5,
+    max: Math.ceil((rawMax + padding) / 5) * 5
+  };
+};
+
 const renderRoleChart = (data: CategoryCheckRoleVO) => {
   if (!roleChartRef.value) return;
   if (!roleChartIns.value) {
@@ -597,7 +629,13 @@ const renderRoleChart = (data: CategoryCheckRoleVO) => {
   const list = data.list || [];
   const xThreshold = data.splitLineX ?? 10;
   const yThreshold = data.splitLineY ?? 10;
+  const numericXThreshold = Number(xThreshold);
+  const numericYThreshold = Number(yThreshold);
   const resolveRoleMatchColor = (status?: string) => ROLE_MATCH_SERIES.find((item) => item.key === status)?.color || ROLE_MATCH_SERIES[2].color;
+  const xValues = pointsToNumericValues(list.map((item) => item.contributionRate), numericXThreshold);
+  const yValues = pointsToNumericValues(list.map((item) => item.growthRate), numericYThreshold);
+  const xRange = resolveRoleAxisRange(xValues, numericXThreshold, 0, 50);
+  const yRange = resolveRoleAxisRange(yValues, numericYThreshold, -40, 40);
   const formatCategoryBubbleLabel = (item: any) => {
     const code = String(item.categoryCode || '').trim();
     const name = String(item.categoryName || '').trim();
@@ -635,6 +673,16 @@ const renderRoleChart = (data: CategoryCheckRoleVO) => {
       }
     }
   };
+  const buildQuadrantArea = (item: (typeof ROLE_QUADRANTS)[number]) => {
+    const left = item.x === 'low' ? xRange.min : numericXThreshold;
+    const right = item.x === 'low' ? numericXThreshold : xRange.max;
+    const bottom = item.y === 'low' ? yRange.min : numericYThreshold;
+    const top = item.y === 'low' ? numericYThreshold : yRange.max;
+    return [
+      { name: item.name, xAxis: left, yAxis: bottom, itemStyle: { color: item.color } },
+      { xAxis: right, yAxis: top }
+    ];
+  };
 
   roleChartIns.value.setOption({
     color: ROLE_MATCH_SERIES.map((item) => item.color),
@@ -660,18 +708,26 @@ const renderRoleChart = (data: CategoryCheckRoleVO) => {
         ].join('<br/>');
       }
     },
-    grid: { left: 64, right: 24, top: 48, bottom: 42 },
+    grid: { left: 72, right: 78, top: 82, bottom: 68 },
     xAxis: {
       type: 'value',
       name: '综合贡献率%',
+      min: xRange.min,
+      max: xRange.max,
       axisLabel: { formatter: '{value}%' },
-      splitLine: { show: true, lineStyle: { color: '#EEF1F6' } }
+      axisLine: { lineStyle: { color: '#94A3B8' } },
+      axisTick: { lineStyle: { color: '#CBD5E1' } },
+      splitLine: { show: true, lineStyle: { color: '#EEF2F7' } }
     },
     yAxis: {
       type: 'value',
       name: '销售对比增长率%',
+      min: yRange.min,
+      max: yRange.max,
       axisLabel: { formatter: '{value}%' },
-      splitLine: { show: true, lineStyle: { color: '#EEF1F6' } }
+      axisLine: { lineStyle: { color: '#94A3B8' } },
+      axisTick: { lineStyle: { color: '#CBD5E1' } },
+      splitLine: { show: true, lineStyle: { color: '#EEF2F7' } }
     },
     dataZoom: [
       {
@@ -681,27 +737,49 @@ const renderRoleChart = (data: CategoryCheckRoleVO) => {
         zoomOnMouseWheel: true
       }
     ],
-    graphic: [
-      {
-        type: 'line',
-        shape: { x1: 0, y1: 0, x2: 0, y2: 0 }
-      }
-    ],
     series: [
+      {
+        name: '角色象限',
+        type: 'scatter',
+        silent: true,
+        symbolSize: 0,
+        tooltip: { show: false },
+        data: [],
+        markArea: {
+          silent: true,
+          itemStyle: { opacity: 1 },
+          label: { show: false },
+          data: ROLE_QUADRANTS.map(buildQuadrantArea)
+        }
+      },
       ...ROLE_MATCH_SERIES.map((item) => ({
         name: item.name,
         type: 'scatter',
+        z: 5,
         label: bubbleLabelOption,
         itemStyle: { color: item.color },
         data: points.filter((point: any) => point.rawData.roleMatchStatus === item.key)
       })),
       {
+        name: '角色分界线',
         type: 'line',
+        tooltip: { show: false },
         markLine: {
           silent: true,
           symbol: ['none', 'none'],
-          lineStyle: { color: '#111827', width: 1.1 },
-          data: [{ xAxis: xThreshold }, { yAxis: yThreshold }]
+          label: {
+            show: true,
+            formatter: (params: any) => (params.data?.xAxis !== undefined ? `贡献率 ${numericXThreshold}%` : `增长率 ${numericYThreshold}%`),
+            color: '#B45309',
+            fontSize: 12,
+            backgroundColor: 'rgba(255, 247, 237, 0.94)',
+            borderColor: '#FDBA74',
+            borderWidth: 1,
+            borderRadius: 4,
+            padding: [3, 6]
+          },
+          lineStyle: { color: '#EA580C', width: 1.8, type: 'solid', opacity: 0.72 },
+          data: [{ xAxis: numericXThreshold }, { yAxis: numericYThreshold }]
         }
       }
     ]
@@ -1308,6 +1386,53 @@ onBeforeUnmount(() => {
 .chart-inner {
   width: 100%;
   height: 100%;
+}
+
+.role-chart-box {
+  position: relative;
+  padding: 18px 16px 16px;
+  overflow: hidden;
+}
+
+.role-chart-inner {
+  position: relative;
+  z-index: 1;
+}
+
+.role-quadrant-label {
+  position: absolute;
+  z-index: 2;
+  min-width: 82px;
+  padding: 8px 12px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #1f2937;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+}
+
+.role-quadrant-label--top-left {
+  top: 12px;
+  left: 12px;
+}
+
+.role-quadrant-label--top-right {
+  top: 12px;
+  right: 12px;
+}
+
+.role-quadrant-label--bottom-left {
+  bottom: 12px;
+  left: 12px;
+}
+
+.role-quadrant-label--bottom-right {
+  right: 12px;
+  bottom: 12px;
 }
 
 .sku-card {

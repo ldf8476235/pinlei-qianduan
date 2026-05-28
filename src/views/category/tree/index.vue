@@ -213,11 +213,23 @@
               />
             </el-select>
           </el-form-item>
+          <el-form-item label="预设SKU数" required>
+            <el-input-number
+              v-model="nodeConfigDialog.suggestSaleSku"
+              :min="0"
+              :precision="0"
+              :step="1"
+              :controls="false"
+              placeholder="请输入预设SKU数"
+              style="width: 100%"
+              :disabled="nodeConfigDialog.submitting"
+            />
+          </el-form-item>
         </el-form>
 
         <div class="node-config-note">
-          保存只更新预设品类配置，不修改当前节点名称和 SKU 统计。
-          当前生效范围：{{ currentConfigScopeText }}；建议SKU数沿用现有配置 {{ nodeConfigDialog.suggestSaleSku }}。
+          保存只更新预设品类和预设SKU数配置，不修改当前节点名称和实际 SKU 统计。
+          当前生效范围：{{ currentConfigScopeText }}。
         </div>
       </div>
 
@@ -944,7 +956,7 @@ const renderTree = (treeRows: LegacyTreeNodeVO[], rawNodeCount: number, forceRec
         const title = `${d.categoryCode ? `${d.categoryCode} ` : ''}${d.categoryName || d.name || '--'} (${d.skuCount ?? 0})`;
         return [
           title,
-          `建议SKU数：${d.suggestSaleSku ?? d.sysSuggestSaleSku ?? 0}`,
+          `预设SKU数：${d.suggestSaleSku ?? d.sysSuggestSaleSku ?? 0}`,
           `实际SKU数：${d.skuCount ?? 0}`,
           `当前品类：${d.currentRoleName || '--'}`,
           `预设品类：${d.presetRoleName || '--'}`
@@ -1071,12 +1083,13 @@ const loadTreeData = async () => {
 const patchPresetRole = (
   nodes: LegacyTreeNodeVO[],
   classNo: string,
-  presetRole: RoleState
+  presetRole: RoleState,
+  suggestSaleSku?: number
 ): LegacyTreeNodeVO[] => {
   return nodes.map((node) => {
     const nodeClassNo = normalizeText((node as any).classNo);
     const children = resolveNodeChildren(node);
-    const nextChildren = children.length ? patchPresetRole(children, classNo, presetRole) : [];
+    const nextChildren = children.length ? patchPresetRole(children, classNo, presetRole, suggestSaleSku) : [];
     if (nodeClassNo !== classNo) {
       return {
         ...(node as any),
@@ -1087,6 +1100,9 @@ const patchPresetRole = (
       ...(node as any),
       presetRoleNo: presetRole.roleNo,
       presetRoleName: presetRole.roleName,
+      suggestSaleSku: Number(suggestSaleSku ?? (node as any).suggestSaleSku ?? 0),
+      sysSuggestSaleSku: Number(suggestSaleSku ?? (node as any).sysSuggestSaleSku ?? (node as any).suggestSaleSku ?? 0),
+      skuDiffer: resolveSaleSku(node) - Number(suggestSaleSku ?? resolveSuggestSaleSku(node)),
       subClass: nextChildren
     } as LegacyTreeNodeVO;
   });
@@ -1121,6 +1137,11 @@ const handleSaveNodeConfig = async () => {
     ElMessage.warning('请选择预设品类');
     return;
   }
+  const nextSuggestSaleSku = Number(nodeConfigDialog.suggestSaleSku);
+  if (!Number.isFinite(nextSuggestSaleSku) || nextSuggestSaleSku < 0) {
+    ElMessage.warning('请输入有效的预设SKU数');
+    return;
+  }
 
   nodeConfigDialog.submitting = true;
   try {
@@ -1128,7 +1149,7 @@ const handleSaveNodeConfig = async () => {
       storeNo: currentConfigStoreNo.value,
       classNo: nodeConfigDialog.classNo,
       roleNo: nodeConfigDialog.roleNo,
-      suggestSaleSku: Number(nodeConfigDialog.suggestSaleSku || 0)
+      suggestSaleSku: nextSuggestSaleSku
     });
     const selectedRole = editableRoleOptions.value.find((item) => String(item.value) === nodeConfigDialog.roleNo);
     const cacheKey = buildRoleCacheKey(nodeConfigDialog.classNo);
@@ -1139,13 +1160,16 @@ const handleSaveNodeConfig = async () => {
     treeRowsState.value = patchPresetRole(
       treeRowsState.value,
       nodeConfigDialog.classNo,
-      resolveRoleState(nodeConfigDialog.roleNo, selectedRole?.label)
+      resolveRoleState(nodeConfigDialog.roleNo, selectedRole?.label),
+      nextSuggestSaleSku
     );
     renderedTreeRowsState.value = patchPresetRole(
       renderedTreeRowsState.value,
       nodeConfigDialog.classNo,
-      resolveRoleState(nodeConfigDialog.roleNo, selectedRole?.label)
+      resolveRoleState(nodeConfigDialog.roleNo, selectedRole?.label),
+      nextSuggestSaleSku
     );
+    renderTree(renderedTreeRowsState.value, countNodes(renderedTreeRowsState.value), true);
     ElMessage.success('预设品类已保存');
     selectedTreeNode.value = null;
     resetNodeConfigDialog();

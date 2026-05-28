@@ -506,8 +506,8 @@ const formatDetailValue = (value: unknown, fallback = '--') => {
 };
 
 const buildGoodsDetailItems = (row: AbcSalesListItemVO) => [
-  { label: '品类编码', value: formatDetailValue(row.classNo || route.query.categoryId) },
-  { label: '品类名称', value: formatDetailValue(row.className || route.query.categoryName) },
+  { label: '品类编码', value: formatDetailValue(row.classNo) },
+  { label: '品类名称', value: formatDetailValue(row.className) },
   { label: '商品条码', value: formatDetailValue(row.productBarcode || row.productNo) },
   { label: '品牌名称', value: formatDetailValue(row.brandName) },
   { label: '规格', value: formatDetailValue(row.spec) },
