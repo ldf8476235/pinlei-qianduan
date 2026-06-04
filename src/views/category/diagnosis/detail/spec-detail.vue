@@ -99,7 +99,9 @@
         <el-table-column label="SKU数" align="center">
           <el-table-column label="总计" prop="skuTotal" min-width="110" align="center" sortable="custom">
             <template #default="{ row }">
-              <span class="major-number">{{ formatNumber(row.skuTotal, 0) }}</span>
+              <button type="button" class="sku-link" @click="handleSkuDetail(row)">
+                {{ formatNumber(row.skuTotal, 0) }}
+              </button>
             </template>
           </el-table-column>
           <el-table-column label="对比增长" prop="skuGrowth" min-width="120" align="center" sortable="custom">
@@ -260,6 +262,7 @@ interface OptionItem {
 }
 
 const route = useRoute();
+const router = useRouter();
 const sessionId = computed(() => String(route.query.sessionId || ''));
 const specTypeOptions = ref<OptionItem[]>([]);
 const specOptions = ref<OptionItem[]>([]);
@@ -425,6 +428,24 @@ const handleExport = () => {
   ElMessage.info('导出功能后续对接真实接口');
 };
 
+const handleSkuDetail = (row: SpecRow) => {
+  const specName = String(row.specName || '').trim();
+  if (!specName || specName === '--') {
+    ElMessage.warning('缺少规格信息，无法查看规格SKU商品明细');
+    return;
+  }
+  router.push({
+    path: '/brand/analysis/detail/sku',
+    query: {
+      ...route.query,
+      source: 'spec-sku',
+      specName,
+      specType: row.specTypeLabel || row.specType || '',
+      newSaleSpec: row.newSaleSpecLabel || row.newSaleSpec || ''
+    }
+  });
+};
+
 const handleProcess = (_row: SpecRow) => {
   ElMessage.info('处理功能待接入');
 };
@@ -517,6 +538,21 @@ watch(() => route.query.sessionId, async () => {
 .unit-text {
   color: #64748b;
   font-size: 13px;
+}
+
+.sku-link {
+  border: 0;
+  background: transparent;
+  color: #ea580c;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  padding: 0;
+}
+
+.sku-link:hover {
+  color: #c2410c;
+  text-decoration: underline;
 }
 
 .spec-table {

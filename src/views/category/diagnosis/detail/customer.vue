@@ -166,12 +166,12 @@ const ageGroups = [
 const ageGroupOrder = ageGroups.map((item) => item.label);
 
 const ageColorMap: Record<string, string> = {
-  '20岁及以下': '#f97316',
-  '21-30岁': '#fb923c',
-  '31-40岁': '#f59e0b',
-  '41-50岁': '#ea580c',
-  '51-60岁': '#fdba74',
-  '61岁及以上': '#c2410c'
+  '20岁及以下': '#34c6d8',
+  '21-30岁': '#f75a32',
+  '31-40岁': '#7d6ff2',
+  '41-50岁': '#e84f73',
+  '51-60岁': '#59df6b',
+  '61岁及以上': '#ff7043'
 };
 
 const ageLabelAliasMap: Record<string, string[]> = {
@@ -354,27 +354,56 @@ const renderRadarChart = () => {
       tooltip: { show: false },
       legend: {
         orient: 'vertical',
-        right: 6,
-        top: 'middle',
-        itemGap: 14,
-        icon: 'roundRect'
+        right: 56,
+        top: 'center',
+        itemWidth: 32,
+        itemHeight: 14,
+        itemGap: 13,
+        icon: 'roundRect',
+        textStyle: {
+          color: '#4b5563',
+          fontSize: 14,
+          padding: [0, 0, 0, 4]
+        }
       },
       radar: {
-        center: ['40%', '55%'],
-        radius: '62%',
+        center: ['39%', '52%'],
+        radius: 150,
+        splitNumber: 5,
+        axisName: {
+          color: '#1f2937',
+          fontSize: 18,
+          lineHeight: 24
+        },
+        axisNameGap: 16,
+        splitArea: {
+          areaStyle: {
+            color: ['rgba(248, 250, 252, 0.55)', 'rgba(241, 245, 249, 0.38)']
+          }
+        },
+        splitLine: {
+          lineStyle: {
+            color: '#dbe3ef'
+          }
+        },
+        axisLine: {
+          lineStyle: {
+            color: '#dbe3ef'
+          }
+        },
         indicator: metricLabels.map((name) => ({ name, max: indicatorMax }))
       },
       series: [
         {
           type: 'radar',
           symbol: 'circle',
-          symbolSize: 5,
+          symbolSize: 8,
           data: chartSeries.map((item) => ({
             name: item.name,
             value: item.value,
-            lineStyle: { width: 2, color: ageColorMap[item.name] },
+            lineStyle: { width: 3, color: ageColorMap[item.name] },
             itemStyle: { color: ageColorMap[item.name] },
-            areaStyle: { opacity: 0.08, color: ageColorMap[item.name] }
+            areaStyle: { opacity: 0, color: ageColorMap[item.name] }
           }))
         }
       ]

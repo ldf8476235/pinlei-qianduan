@@ -84,7 +84,17 @@
               <div class="section-title">品类业绩</div>
             </template>
             <div class="metrics-row">
-              <div v-for="item in metrics.firstRow" :key="item.metricKey" class="metric-card">
+              <div
+                v-for="item in metrics.firstRow"
+                :key="item.metricKey"
+                class="metric-card"
+                :class="{ 'is-clickable': item.metricKey === 'sku' }"
+                :role="item.metricKey === 'sku' ? 'button' : undefined"
+                :tabindex="item.metricKey === 'sku' ? 0 : undefined"
+                @click="handleMetricCardClick(item)"
+                @keydown.enter="handleMetricCardClick(item)"
+                @keydown.space.prevent="handleMetricCardClick(item)"
+              >
                 <div class="metric-name">
                   <span>{{ item.metricName }}</span>
                   <el-tooltip :content="item.metricDesc || '暂无说明'" placement="top">
@@ -516,6 +526,11 @@ const readNavState = () => {
   }
 };
 
+const getRouteQueryValue = (key: string) => {
+  const value = route.query[key];
+  return Array.isArray(value) ? value[0] : value;
+};
+
 const writeNavState = () => {
   if (typeof window === 'undefined') return;
   window.localStorage.setItem(
@@ -537,7 +552,16 @@ const resetToPerformanceView = () => {
 };
 
 const syncNavState = () => {
-  if (route.query.initialView === 'performance') {
+  const initialView = String(getRouteQueryValue('initialView') || '');
+  if (initialView && initialView !== 'performance') {
+    activeMainNav.value = 'performance';
+    activeSideModule.value = initialView;
+    const activeGroupKey = resolveGroupKeyByActiveModule(activeMainNav.value, activeSideModule.value);
+    expandedGroupKeys.value = [activeGroupKey || getDefaultExpandedGroupKeys()[0] || navGroups[0]?.key].filter(Boolean) as string[];
+    writeNavState();
+    return;
+  }
+  if (initialView === 'performance' || getRouteQueryValue('demo') === '1') {
     resetToPerformanceView();
     return;
   }
@@ -1048,6 +1072,24 @@ const handleTrendMetricChange = async (metricKey: string) => {
   }
 };
 
+const handleMetricCardClick = (item: CategoryDiagnosisMetricVO) => {
+  if (item.metricKey !== 'sku') return;
+  if (!query.value.sessionId) {
+    ElMessage.error('缺少 sessionId，无法查看 SKU 商品明细');
+    return;
+  }
+  router.push({
+    path: '/brand/analysis/detail/sku',
+    query: {
+      ...route.query,
+      source: 'category-sku',
+      categoryId: summary.coreInfo.categoryCode || query.value.categoryId,
+      categoryName: summary.coreInfo.categoryName || query.value.categoryName,
+      categoryLevel: query.value.categoryLevel
+    }
+  });
+};
+
 const resizeChart = () => chartIns.value?.resize();
 
 watch(
@@ -1329,6 +1371,26 @@ onBeforeUnmount(() => {
   padding: 12px 12px 10px;
   min-height: 132px;
   box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
+}
+
+.metric-card.is-clickable {
+  cursor: pointer;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
+}
+
+.metric-card.is-clickable:hover,
+.metric-card.is-clickable:focus-visible {
+  border-color: rgba(249, 115, 22, 0.48);
+  box-shadow: 0 12px 26px rgba(249, 115, 22, 0.14);
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.metric-card.is-clickable .metric-value {
+  color: #ea580c;
 }
 
 .metric-name {

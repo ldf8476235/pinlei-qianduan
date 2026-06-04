@@ -112,6 +112,7 @@ const detailLoading = ref(false);
 const isUsingStaticFallback = ref(false);
 
 const route = useRoute();
+const router = useRouter();
 const colorPool = ['#f97316', '#fb923c', '#f59e0b', '#ea580c', '#fdba74', '#c2410c', '#fbbf24'];
 
 const tabItems = computed(() =>
@@ -139,7 +140,17 @@ const metricSubtitle = computed(() =>
 );
 
 const handleDetail = () => {
-  ElMessage.info(`${dataSourceLabel.value}，明细已在下方表格展示`);
+  if (!sessionId.value) {
+    ElMessage.info(`${dataSourceLabel.value}，当前静态快照暂不支持跳转明细页`);
+    return;
+  }
+  router.push({
+    path: '/tag/analysis/detail',
+    query: {
+      ...route.query,
+      tagType: activeTagType.value
+    }
+  });
 };
 
 const summaryItems = computed(() => {

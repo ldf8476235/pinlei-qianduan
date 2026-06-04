@@ -699,12 +699,11 @@ const renderRoleChart = (data: CategoryCheckRoleVO) => {
         const row = params.data?.rawData || {};
         return [
           `${row.categoryCode || ''} ${row.categoryName || ''}`,
+          `实际角色：${row.evaluatedRoleName || row.roleName || '--'}`,
           `设定角色：${row.presetRoleName || '--'}`,
-          `测算角色：${row.evaluatedRoleName || row.roleName || '--'}`,
-          `销售对比增长率：${row.growthRate ?? 0}%`,
-          `综合贡献率：${row.contributionRate ?? 0}%`,
-          `SKU数：${row.skuCount ?? 0}`,
-          `销售额：${row.salesAmount ?? '--'}`
+          `销售额：${formatWanYuan(row.salesAmount)}`,
+          `销售对比增长率%：${Number(row.growthRate ?? 0).toFixed(2)}%`,
+          `综合贡献率%：${Number(row.contributionRate ?? 0).toFixed(2)}%`
         ].join('<br/>');
       }
     },

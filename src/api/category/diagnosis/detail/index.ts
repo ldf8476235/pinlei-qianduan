@@ -1,7 +1,27 @@
 ﻿import request from '@/utils/request';
 import { AxiosPromise } from 'axios';
 import { DiagnosisApiResponse } from '../types';
-import { getMockDiagnosisOverview, getMockOverallSummary, getMockTrend, isMockDiagnosisSession, mockApiResponse } from '../mock-demo';
+import {
+  getMockChannelPie,
+  getMockChannelTable,
+  getMockChannelTrend,
+  getMockCustomerAgeBuckets,
+  getMockCustomerDetails,
+  getMockCustomerRadar,
+  getMockDiagnosisOverview,
+  getMockIntroduceDirection,
+  getMockOverallSummary,
+  getMockSubClassPie,
+  getMockSubClassTable,
+  getMockSubClassTrend,
+  getMockTagList,
+  getMockTagSalesShare,
+  getMockTagTypes,
+  getMockTrend,
+  isMockDiagnosisSession,
+  mockApiResponse,
+  mockLegacyResponse
+} from '../mock-demo';
 import {
   ChannelSalesDetailsResponse,
   ChannelSalesPieItemResponse,
@@ -65,6 +85,9 @@ export const getCategoryDiagnosisOverallSummary = (sessionId: string): AxiosProm
 export const getCategoryDiagnosisIntroduceDirection = (
   sessionId: string
 ): AxiosPromise<DiagnosisApiResponse<DiagnosisIntroduceDirectionResponse>> => {
+  if (isMockDiagnosisSession(sessionId)) {
+    return mockApiResponse(getMockIntroduceDirection()) as AxiosPromise<DiagnosisApiResponse<DiagnosisIntroduceDirectionResponse>>;
+  }
   return request({
     url: '/api/v1/diagnosis/introduce-direction',
     method: 'get',
@@ -94,6 +117,9 @@ export const getCategoryDiagnosisDetailTrend = (
 export const getCategoryDiagnosisSubClassPie = (
   data: LegacySubclassContributionRequest
 ): AxiosPromise<LegacyNodeResponse<LegacySubclassSalesPerItem[]>> => {
+  if (isMockDiagnosisSession(data.sessionId)) {
+    return mockLegacyResponse(getMockSubClassPie()) as AxiosPromise<LegacyNodeResponse<LegacySubclassSalesPerItem[]>>;
+  }
   return request({
     url: '/salesStoreClass/sonClassSalesPer',
     method: 'post',
@@ -104,6 +130,9 @@ export const getCategoryDiagnosisSubClassPie = (
 export const getCategoryDiagnosisSubClassTrend = (
   data: LegacySubclassContributionRequest
 ): AxiosPromise<LegacyNodeResponse<LegacySubclassSalesTrendResponse>> => {
+  if (isMockDiagnosisSession(data.sessionId)) {
+    return mockLegacyResponse(getMockSubClassTrend()) as AxiosPromise<LegacyNodeResponse<LegacySubclassSalesTrendResponse>>;
+  }
   return request({
     url: '/salesStoreClass/sonClassSalesTrendChart',
     method: 'post',
@@ -114,6 +143,9 @@ export const getCategoryDiagnosisSubClassTrend = (
 export const getCategoryDiagnosisSubClassTable = (
   data: LegacySubclassContributionListRequest
 ): AxiosPromise<LegacyNodeResponse<LegacySubclassSalesListResponse>> => {
+  if (isMockDiagnosisSession(data.sessionId)) {
+    return mockLegacyResponse(getMockSubClassTable()) as AxiosPromise<LegacyNodeResponse<LegacySubclassSalesListResponse>>;
+  }
   return request({
     url: '/salesStoreClass/sonClassSalesList',
     method: 'post',
@@ -122,6 +154,9 @@ export const getCategoryDiagnosisSubClassTable = (
 };
 
 export const getCategoryDiagnosisChannelPie = (sessionId: string): AxiosPromise<DiagnosisApiResponse<ChannelSalesPieItemResponse[]>> => {
+  if (isMockDiagnosisSession(sessionId)) {
+    return mockApiResponse(getMockChannelPie()) as AxiosPromise<DiagnosisApiResponse<ChannelSalesPieItemResponse[]>>;
+  }
   return request({
     url: '/api/v1/channel-performance/pie',
     method: 'get',
@@ -130,6 +165,9 @@ export const getCategoryDiagnosisChannelPie = (sessionId: string): AxiosPromise<
 };
 
 export const getCategoryDiagnosisChannelTrend = (sessionId: string): AxiosPromise<DiagnosisApiResponse<ChannelSalesTrendResponse>> => {
+  if (isMockDiagnosisSession(sessionId)) {
+    return mockApiResponse(getMockChannelTrend()) as AxiosPromise<DiagnosisApiResponse<ChannelSalesTrendResponse>>;
+  }
   return request({
     url: '/api/v1/channel-performance/trend',
     method: 'get',
@@ -138,6 +176,9 @@ export const getCategoryDiagnosisChannelTrend = (sessionId: string): AxiosPromis
 };
 
 export const getCategoryDiagnosisChannelTable = (sessionId: string): AxiosPromise<DiagnosisApiResponse<ChannelSalesDetailsResponse>> => {
+  if (isMockDiagnosisSession(sessionId)) {
+    return mockApiResponse(getMockChannelTable()) as AxiosPromise<DiagnosisApiResponse<ChannelSalesDetailsResponse>>;
+  }
   return request({
     url: '/api/v1/channel-performance/details',
     method: 'get',
@@ -146,6 +187,9 @@ export const getCategoryDiagnosisChannelTable = (sessionId: string): AxiosPromis
 };
 
 export const getCategoryDiagnosisCustomerAgeBuckets = (sessionId: string): AxiosPromise<DiagnosisApiResponse<CustomerAgeBucketResponse[]>> => {
+  if (isMockDiagnosisSession(sessionId)) {
+    return mockApiResponse(getMockCustomerAgeBuckets()) as AxiosPromise<DiagnosisApiResponse<CustomerAgeBucketResponse[]>>;
+  }
   return request({
     url: '/api/v1/customer-analysis/ages',
     method: 'get',
@@ -154,6 +198,9 @@ export const getCategoryDiagnosisCustomerAgeBuckets = (sessionId: string): Axios
 };
 
 export const getCategoryDiagnosisCustomerRadar = (sessionId: string): AxiosPromise<DiagnosisApiResponse<CustomerSalesRadarItemResponse[]>> => {
+  if (isMockDiagnosisSession(sessionId)) {
+    return mockApiResponse(getMockCustomerRadar()) as AxiosPromise<DiagnosisApiResponse<CustomerSalesRadarItemResponse[]>>;
+  }
   return request({
     url: '/api/v1/customer-analysis/radar',
     method: 'get',
@@ -168,6 +215,9 @@ export const getCategoryDiagnosisCustomerDetails = (
   order?: string,
   orderType?: string
 ): AxiosPromise<DiagnosisApiResponse<CustomerSalesDetailsResponse>> => {
+  if (isMockDiagnosisSession(sessionId)) {
+    return mockApiResponse(getMockCustomerDetails()) as AxiosPromise<DiagnosisApiResponse<CustomerSalesDetailsResponse>>;
+  }
   return request({
     url: '/api/v1/customer-analysis/details',
     method: 'get',
@@ -176,6 +226,9 @@ export const getCategoryDiagnosisCustomerDetails = (
 };
 
 export const getCategoryDiagnosisTagTypes = (sessionId: string): AxiosPromise<DiagnosisApiResponse<TagTypeGroupResponse[]>> => {
+  if (isMockDiagnosisSession(sessionId)) {
+    return mockApiResponse(getMockTagTypes()) as AxiosPromise<DiagnosisApiResponse<TagTypeGroupResponse[]>>;
+  }
   return request({
     url: '/api/v1/tag-analysis/types',
     method: 'get',
@@ -184,6 +237,9 @@ export const getCategoryDiagnosisTagTypes = (sessionId: string): AxiosPromise<Di
 };
 
 export const getCategoryDiagnosisTagSalesShare = (sessionId: string, tagType: string): AxiosPromise<DiagnosisApiResponse<TagSalesPerResponse>> => {
+  if (isMockDiagnosisSession(sessionId)) {
+    return mockApiResponse(getMockTagSalesShare(tagType)) as AxiosPromise<DiagnosisApiResponse<TagSalesPerResponse>>;
+  }
   return request({
     url: '/api/v1/tag-analysis/sales-share',
     method: 'get',
@@ -200,6 +256,9 @@ export const getCategoryDiagnosisTagList = (
   order?: string,
   orderType?: string
 ): AxiosPromise<DiagnosisApiResponse<TagDetailPageResponse>> => {
+  if (isMockDiagnosisSession(sessionId)) {
+    return mockApiResponse(getMockTagList(tagType)) as AxiosPromise<DiagnosisApiResponse<TagDetailPageResponse>>;
+  }
   return request({
     url: '/api/v1/tag-analysis/list',
     method: 'get',

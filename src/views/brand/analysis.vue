@@ -361,6 +361,8 @@ const reload = async () => {
           : [];
     comboItems.value = Array.isArray((comboRes.data as any)?.data?.list)
       ? (comboRes.data as any).data.list
+      : Array.isArray((comboRes.data as any)?.list)
+        ? (comboRes.data as any).list
       : Array.isArray((comboRes.data as any)?.data)
         ? (comboRes.data as any).data
         : Array.isArray(comboRes.data)

@@ -132,6 +132,12 @@ interface ScatterPoint {
   salesShare: number;
 }
 
+interface GrossAxisConfig {
+  scaleX: number[];
+  xCenter: number;
+  yCenter: number;
+}
+
 interface MatrixRow {
   label: string;
   leading: number | string;
@@ -162,6 +168,11 @@ const barChartIns2 = ref<echarts.ECharts>();
 
 const pageLoading = ref(false);
 const scatterPoints = ref<ScatterPoint[]>([]);
+const grossAxisConfig = ref<GrossAxisConfig>({
+  scaleX: [],
+  xCenter: 17,
+  yCenter: 0
+});
 const salesCompare = reactive({
   current: { leading: 0, attracting: 0, profit: 0, problem: 0 },
   compare: { leading: 0, attracting: 0, profit: 0, problem: 0 }
@@ -256,6 +267,7 @@ const handleStackTooltipMousemove = (event: MouseEvent, type: StackChartType) =>
 };
 
 const sessionId = computed(() => String(route.query.sessionId || ''));
+const isMockDemo = computed(() => sessionId.value === 'MOCK-WASH-DEMO');
 
 const handleReload = async () => {
   await loadAnalysisData();
@@ -307,6 +319,11 @@ const loadAnalysisData = async () => {
     ]);
 
     const quadrant = quadrantRes?.result || {};
+    grossAxisConfig.value = {
+      scaleX: Array.isArray(quadrant.scaleX) ? quadrant.scaleX.map((item: unknown) => Number(item)).filter((item: number) => Number.isFinite(item)) : [],
+      xCenter: Number(quadrant.salesPer || 17),
+      yCenter: 0
+    };
     scatterPoints.value = Array.isArray(quadrant.list)
       ? quadrant.list.map((item: any) => ({
           name: item.productName || item.productNo || '-',
@@ -384,12 +401,36 @@ const initBarChart2 = () => {
   }
 };
 
+const getMockGrossTickInfo = () => {
+  const sourceTicks = grossAxisConfig.value.scaleX.length ? grossAxisConfig.value.scaleX : [-95764, 0, 17, 19, 21, 26, 35, 2254];
+  const ticks = sourceTicks.map((value, index) => ({ value, mapped: index }));
+  const xCenterIndex = ticks.find((item) => item.value === grossAxisConfig.value.xCenter)?.mapped ?? ticks.find((item) => item.value === 17)?.mapped ?? 2;
+  return { ticks, xCenterIndex };
+};
+
+const mapMockGrossRate = (value: number) => {
+  const { ticks } = getMockGrossTickInfo();
+  const finiteValue = Number.isFinite(value) ? value : 0;
+  if (finiteValue <= ticks[0].value) return ticks[0].mapped;
+  for (let index = 0; index < ticks.length - 1; index += 1) {
+    const current = ticks[index];
+    const next = ticks[index + 1];
+    if (finiteValue >= current.value && finiteValue <= next.value) {
+      const ratio = (finiteValue - current.value) / Math.max(next.value - current.value, 1);
+      return current.mapped + ratio * (next.mapped - current.mapped);
+    }
+  }
+  return ticks[ticks.length - 1].mapped;
+};
+
 const renderScatterChart = () => {
   initScatterChart();
   if (!scatterChartIns.value) return;
 
-  const xCenter = 22;
-  const yCenter = 8;
+  const mockTicks = getMockGrossTickInfo();
+  const useMockAxis = isMockDemo.value && mockTicks.ticks.length > 1;
+  const xCenter = useMockAxis ? mockTicks.xCenterIndex : 22;
+  const yCenter = useMockAxis ? grossAxisConfig.value.yCenter : 8;
 
   const option: EChartsOption = {
     tooltip: {
@@ -397,8 +438,9 @@ const renderScatterChart = () => {
       appendToBody: true,
       confine: false,
       formatter: (params: any) => {
-        const data = params.data as [number, number, string];
-        return `${data[2]}<br/>毛利率：${data[0].toFixed(2)}%<br/>销售额占比：${data[1].toFixed(2)}%`;
+        const data = params.data as [number, number, string, number?];
+        const grossRate = Number(data[3] ?? data[0]);
+        return `${data[2]}<br/>毛利率：${grossRate.toFixed(2)}%<br/>销售额占比：${data[1].toFixed(2)}%`;
       }
     },
     grid: {
@@ -407,36 +449,57 @@ const renderScatterChart = () => {
       top: 24,
       bottom: 42
     },
-    xAxis: {
-      type: 'value',
-      min: 0,
-      max: 45,
-      interval: 5,
-      name: '毛利率%',
-      nameTextStyle: { color: '#909399' },
-      axisLine: { lineStyle: { color: '#dcdfe6' } },
-      axisLabel: {
-        color: '#606266',
-        formatter: (value: number) => `${value}%`
-      },
-      splitLine: {
-        lineStyle: { color: '#ebeef5' }
-      }
-    },
+    xAxis: useMockAxis
+      ? {
+          type: 'value',
+          min: 0,
+          max: mockTicks.ticks.length - 1,
+          interval: 1,
+          name: '毛利率(%)',
+          nameTextStyle: { color: '#303133', fontSize: 13 },
+          axisLine: { lineStyle: { color: '#606266', width: 2 } },
+          axisTick: { show: false },
+          axisLabel: {
+            color: '#6b7280',
+            formatter: (value: number) => {
+              const tick = mockTicks.ticks.find((item) => item.mapped === value);
+              return tick ? Number(tick.value).toFixed(2) : '';
+            }
+          },
+          splitLine: {
+            lineStyle: { color: '#d9e5f4', type: 'dashed' }
+          }
+        }
+      : {
+          type: 'value',
+          min: 0,
+          max: 45,
+          interval: 5,
+          name: '毛利率%',
+          nameTextStyle: { color: '#909399' },
+          axisLine: { lineStyle: { color: '#dcdfe6' } },
+          axisLabel: {
+            color: '#606266',
+            formatter: (value: number) => `${value}%`
+          },
+          splitLine: {
+            lineStyle: { color: '#ebeef5' }
+          }
+        },
     yAxis: {
       type: 'value',
-      min: 0,
-      max: 20,
-      interval: 2,
+      min: useMockAxis ? -0.5 : 0,
+      max: useMockAxis ? 3 : 20,
+      interval: useMockAxis ? 0.5 : 2,
       name: '销售额占比%',
-      nameTextStyle: { color: '#909399' },
-      axisLine: { show: false },
+      nameTextStyle: { color: useMockAxis ? '#303133' : '#909399', fontSize: 13 },
+      axisLine: { show: useMockAxis, lineStyle: { color: '#606266', width: 2 } },
       axisLabel: {
         color: '#606266',
-        formatter: (value: number) => `${value}%`
+        formatter: (value: number) => (useMockAxis ? Number(value).toFixed(2) : `${value}%`)
       },
       splitLine: {
-        lineStyle: { color: '#ebeef5' }
+        lineStyle: { color: useMockAxis ? '#d9e5f4' : '#ebeef5', type: useMockAxis ? 'dashed' : 'solid' }
       }
     },
     graphic: [
@@ -471,7 +534,7 @@ const renderScatterChart = () => {
           },
           data: [{ xAxis: xCenter }, { yAxis: yCenter }]
         },
-        data: scatterPoints.value.map((item) => [item.grossRate, item.salesShare, item.name])
+        data: scatterPoints.value.map((item) => [useMockAxis ? mapMockGrossRate(item.grossRate) : item.grossRate, item.salesShare, item.name, item.grossRate])
       }
     ]
   };

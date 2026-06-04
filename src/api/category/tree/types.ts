@@ -41,7 +41,7 @@ export interface LegacyTreeNodeVO {
   presetRoleNo?: string;
   presetRoleName?: string;
   skuDiffer?: number | null;
-  sysSuggestSaleSku?: number;
+  sysSuggestSaleSku?: number | null;
   subClass?: LegacyTreeNodeVO[] | null;
 }
 
@@ -50,6 +50,7 @@ export interface CategoryNodeConfigUpdateRequest {
   classNo: string;
   roleNo: string;
   suggestSaleSku: number;
+  sysSuggestSaleSku?: number | null;
 }
 
 export interface CategoryNodeConfigUpdateResponse {
@@ -58,6 +59,7 @@ export interface CategoryNodeConfigUpdateResponse {
   roleNo?: string;
   roleType?: string;
   suggestSaleSku?: number;
+  sysSuggestSaleSku?: number | null;
 }
 
 export interface CategoryFilterPayloadVO {

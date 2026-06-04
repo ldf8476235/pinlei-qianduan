@@ -102,7 +102,7 @@
         <div class="tree-header">
           <div>
             <div class="tree-title">品类树</div>
-            <div class="tree-subtitle">点击节点可选中品类；点击节点后的编辑图标设置预设品类</div>
+            <div class="tree-subtitle">点击节点可选中品类；点击节点后的编辑图标设置设定品类</div>
           </div>
           <div class="tree-actions">
             <el-button class="guide-btn" @click="guideDialogVisible = true">品类定位设定指南</el-button>
@@ -186,7 +186,7 @@
 
     <el-dialog
       v-model="nodeConfigDialog.visible"
-      title="设置预设品类"
+      title="设置设定品类"
       width="560px"
       destroy-on-close
       append-to-body
@@ -198,10 +198,10 @@
           <el-form-item label="当前品类">
             <div class="node-config-current">{{ nodeConfigDialog.currentRoleName || '未设置' }}</div>
           </el-form-item>
-          <el-form-item label="预设品类" required>
+          <el-form-item label="设定品类" required>
             <el-select
               v-model="nodeConfigDialog.roleNo"
-              placeholder="请选择预设品类"
+              placeholder="请选择设定品类"
               style="width: 100%"
               :disabled="nodeConfigDialog.submitting"
             >
@@ -213,14 +213,26 @@
               />
             </el-select>
           </el-form-item>
-          <el-form-item label="预设SKU数" required>
+          <el-form-item label="设定SKU数" required>
             <el-input-number
               v-model="nodeConfigDialog.suggestSaleSku"
               :min="0"
               :precision="0"
               :step="1"
               :controls="false"
-              placeholder="请输入预设SKU数"
+              placeholder="请输入设定SKU数"
+              style="width: 100%"
+              :disabled="nodeConfigDialog.submitting"
+            />
+          </el-form-item>
+          <el-form-item label="建议SKU数" required>
+            <el-input-number
+              v-model="nodeConfigDialog.sysSuggestSaleSku"
+              :min="0"
+              :precision="0"
+              :step="1"
+              :controls="false"
+              placeholder="请输入建议SKU数"
               style="width: 100%"
               :disabled="nodeConfigDialog.submitting"
             />
@@ -228,7 +240,7 @@
         </el-form>
 
         <div class="node-config-note">
-          保存只更新预设品类和预设SKU数配置，不修改当前节点名称和实际 SKU 统计。
+          保存只更新设定品类、设定SKU数和建议SKU数配置，不修改当前节点名称和实际 SKU 统计。
           当前生效范围：{{ currentConfigScopeText }}。
         </div>
       </div>
@@ -353,7 +365,8 @@ const nodeConfigDialog = reactive({
   className: '',
   roleNo: '',
   currentRoleName: '',
-  suggestSaleSku: 0
+  suggestSaleSku: 0,
+  sysSuggestSaleSku: 0
 });
 
 type RoleState = {
@@ -528,6 +541,11 @@ const resolveSaleSku = (node: LegacyTreeNodeVO) => Number((node as any).saleSku 
 const resolveSuggestSaleSku = (node: LegacyTreeNodeVO) =>
   Number((node as any).suggestSaleSku ?? (node as any).sysSuggestSaleSku ?? 0);
 
+const resolveSysSuggestSaleSku = (node: LegacyTreeNodeVO) => {
+  const value = (node as any).sysSuggestSaleSku;
+  return value === null || value === undefined || value === '' ? null : Number(value);
+};
+
 const resolveRoleLabelByNo = (roleNo?: string | null) => {
   const normalized = normalizeText(roleNo);
   if (normalized === '1') return '明星品类';
@@ -582,6 +600,7 @@ const resetNodeConfigDialog = () => {
   nodeConfigDialog.roleNo = '';
   nodeConfigDialog.currentRoleName = '';
   nodeConfigDialog.suggestSaleSku = 0;
+  nodeConfigDialog.sysSuggestSaleSku = 0;
 };
 
 const openNodeConfigDialog = (node: Record<string, any>) => {
@@ -596,6 +615,7 @@ const openNodeConfigDialog = (node: Record<string, any>) => {
   nodeConfigDialog.className = normalizeText(node.className || node.categoryName || node.name);
   nodeConfigDialog.currentRoleName = currentRoleName || '未设置';
   nodeConfigDialog.suggestSaleSku = Number(node.suggestSaleSku ?? node.sysSuggestSaleSku ?? 0);
+  nodeConfigDialog.sysSuggestSaleSku = Number(node.sysSuggestSaleSku ?? node.suggestSaleSku ?? 0);
   nodeConfigDialog.roleNo = presetRoleNo || fallbackRoleNo;
   nodeConfigDialog.visible = true;
 };
@@ -814,6 +834,24 @@ const sumSuggestSku = (nodes: LegacyTreeNodeVO[]): number => {
   return total;
 };
 
+const sumSysSuggestSku = (nodes: LegacyTreeNodeVO[]): number | null => {
+  let total = 0;
+  let hasValue = false;
+  const walk = (list: LegacyTreeNodeVO[]) => {
+    list.forEach((node) => {
+      const value = resolveSysSuggestSaleSku(node);
+      if (value !== null && Number.isFinite(value)) {
+        total += value;
+        hasValue = true;
+      }
+      const children = resolveNodeChildren(node);
+      if (children.length) walk(children);
+    });
+  };
+  walk(nodes);
+  return hasValue ? total : null;
+};
+
 const compactTreeByChildren = (nodes: LegacyTreeNodeVO[], maxChildren: number): LegacyTreeNodeVO[] => {
   const walk = (list: LegacyTreeNodeVO[]): LegacyTreeNodeVO[] => {
     return list.map((node) => {
@@ -829,7 +867,7 @@ const compactTreeByChildren = (nodes: LegacyTreeNodeVO[], maxChildren: number): 
           className: `其余${hidden.length}个子类`,
           saleSku: sumSku(hidden),
           suggestSaleSku: sumSuggestSku(hidden),
-          sysSuggestSaleSku: sumSuggestSku(hidden),
+          sysSuggestSaleSku: sumSysSuggestSku(hidden),
           roleType: '结构品类',
           skuDiffer: sumSku(hidden) - sumSuggestSku(hidden),
           subClass: []
@@ -875,7 +913,7 @@ const buildTreeSeriesData = (nodes: LegacyTreeNodeVO[], isRoot = false): any[] =
         presetRoleName,
         skuCount: resolveSaleSku(item),
         suggestSaleSku: resolveSuggestSaleSku(item),
-        sysSuggestSaleSku: Number((item as any).sysSuggestSaleSku ?? (item as any).suggestSaleSku ?? 0),
+        sysSuggestSaleSku: resolveSysSuggestSaleSku(item),
         skuDiffer: Number((item as any).skuDiffer ?? resolveSaleSku(item) - resolveSuggestSaleSku(item)),
         symbol: isRoot ? 'emptyCircle' : 'circle',
         symbolSize: isRoot ? 6 : 5,
@@ -954,12 +992,14 @@ const renderTree = (treeRows: LegacyTreeNodeVO[], rawNodeCount: number, forceRec
       formatter: (params: any) => {
         const d = params?.data || {};
         const title = `${d.categoryCode ? `${d.categoryCode} ` : ''}${d.categoryName || d.name || '--'} (${d.skuCount ?? 0})`;
+        const sysSuggestSaleSku = d.sysSuggestSaleSku ?? null;
         return [
           title,
-          `预设SKU数：${d.suggestSaleSku ?? d.sysSuggestSaleSku ?? 0}`,
+          `设定SKU数：${d.suggestSaleSku ?? 0}`,
+          `建议SKU数：${sysSuggestSaleSku === null ? '--' : sysSuggestSaleSku}`,
           `实际SKU数：${d.skuCount ?? 0}`,
           `当前品类：${d.currentRoleName || '--'}`,
-          `预设品类：${d.presetRoleName || '--'}`
+          `设定品类：${d.presetRoleName || '--'}`
         ].join('<br/>');
       }
     },
@@ -1084,12 +1124,13 @@ const patchPresetRole = (
   nodes: LegacyTreeNodeVO[],
   classNo: string,
   presetRole: RoleState,
-  suggestSaleSku?: number
+  suggestSaleSku?: number,
+  sysSuggestSaleSku?: number
 ): LegacyTreeNodeVO[] => {
   return nodes.map((node) => {
     const nodeClassNo = normalizeText((node as any).classNo);
     const children = resolveNodeChildren(node);
-    const nextChildren = children.length ? patchPresetRole(children, classNo, presetRole, suggestSaleSku) : [];
+    const nextChildren = children.length ? patchPresetRole(children, classNo, presetRole, suggestSaleSku, sysSuggestSaleSku) : [];
     if (nodeClassNo !== classNo) {
       return {
         ...(node as any),
@@ -1101,7 +1142,7 @@ const patchPresetRole = (
       presetRoleNo: presetRole.roleNo,
       presetRoleName: presetRole.roleName,
       suggestSaleSku: Number(suggestSaleSku ?? (node as any).suggestSaleSku ?? 0),
-      sysSuggestSaleSku: Number(suggestSaleSku ?? (node as any).sysSuggestSaleSku ?? (node as any).suggestSaleSku ?? 0),
+      sysSuggestSaleSku: Number(sysSuggestSaleSku ?? resolveSysSuggestSaleSku(node) ?? 0),
       skuDiffer: resolveSaleSku(node) - Number(suggestSaleSku ?? resolveSuggestSaleSku(node)),
       subClass: nextChildren
     } as LegacyTreeNodeVO;
@@ -1134,12 +1175,17 @@ const handleReset = () => {
 
 const handleSaveNodeConfig = async () => {
   if (!nodeConfigDialog.roleNo) {
-    ElMessage.warning('请选择预设品类');
+    ElMessage.warning('请选择设定品类');
     return;
   }
   const nextSuggestSaleSku = Number(nodeConfigDialog.suggestSaleSku);
   if (!Number.isFinite(nextSuggestSaleSku) || nextSuggestSaleSku < 0) {
-    ElMessage.warning('请输入有效的预设SKU数');
+    ElMessage.warning('请输入有效的设定SKU数');
+    return;
+  }
+  const nextSysSuggestSaleSku = Number(nodeConfigDialog.sysSuggestSaleSku);
+  if (!Number.isFinite(nextSysSuggestSaleSku) || nextSysSuggestSaleSku < 0) {
+    ElMessage.warning('请输入有效的建议SKU数');
     return;
   }
 
@@ -1149,7 +1195,8 @@ const handleSaveNodeConfig = async () => {
       storeNo: currentConfigStoreNo.value,
       classNo: nodeConfigDialog.classNo,
       roleNo: nodeConfigDialog.roleNo,
-      suggestSaleSku: nextSuggestSaleSku
+      suggestSaleSku: nextSuggestSaleSku,
+      sysSuggestSaleSku: nextSysSuggestSaleSku
     });
     const selectedRole = editableRoleOptions.value.find((item) => String(item.value) === nodeConfigDialog.roleNo);
     const cacheKey = buildRoleCacheKey(nodeConfigDialog.classNo);
@@ -1161,16 +1208,18 @@ const handleSaveNodeConfig = async () => {
       treeRowsState.value,
       nodeConfigDialog.classNo,
       resolveRoleState(nodeConfigDialog.roleNo, selectedRole?.label),
-      nextSuggestSaleSku
+      nextSuggestSaleSku,
+      nextSysSuggestSaleSku
     );
     renderedTreeRowsState.value = patchPresetRole(
       renderedTreeRowsState.value,
       nodeConfigDialog.classNo,
       resolveRoleState(nodeConfigDialog.roleNo, selectedRole?.label),
-      nextSuggestSaleSku
+      nextSuggestSaleSku,
+      nextSysSuggestSaleSku
     );
     renderTree(renderedTreeRowsState.value, countNodes(renderedTreeRowsState.value), true);
-    ElMessage.success('预设品类已保存');
+    ElMessage.success('设定品类已保存');
     selectedTreeNode.value = null;
     resetNodeConfigDialog();
   } finally {

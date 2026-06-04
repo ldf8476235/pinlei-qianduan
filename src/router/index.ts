@@ -221,6 +221,19 @@ export const constantRoutes: RouteRecordRaw[] = [
     ]
   },
   {
+    path: '/tag',
+    component: Layout,
+    hidden: true,
+    children: [
+      {
+        path: 'analysis/detail',
+        component: () => import('@/views/category/diagnosis/detail/tag-detail.vue'),
+        name: 'TagDetail',
+        meta: { title: '品类标签清单', activeMenu: '/category/diagnosis/detail' }
+      }
+    ]
+  },
+  {
     path: '/category',
     component: Layout,
     hidden: true,

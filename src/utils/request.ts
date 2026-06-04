@@ -12,6 +12,7 @@ import { getLanguage } from '@/lang';
 import { encryptBase64, encryptWithAes, generateAesKey, decryptWithAes, decryptBase64 } from '@/utils/crypto';
 import { encrypt, decrypt } from '@/utils/jsencrypt';
 import router from '@/router';
+import { getMockDiagnosisRequestData, isMockDiagnosisRequestConfig } from '@/api/category/diagnosis/mock-demo';
 
 const encryptHeader = 'encrypt-key';
 let downloadLoadingInstance: LoadingInstance;
@@ -120,6 +121,17 @@ service.interceptors.request.use(
           cache.session.setJSON('sessionObj', requestObj);
         }
       }
+    }
+    if (isMockDiagnosisRequestConfig(config)) {
+      config.adapter = async (mockConfig) => ({
+        data: getMockDiagnosisRequestData(mockConfig as any),
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: mockConfig,
+        request: { responseType: mockConfig.responseType }
+      });
+      return config;
     }
     if (import.meta.env.VITE_APP_ENCRYPT === 'true') {
       // 当开启参数加密

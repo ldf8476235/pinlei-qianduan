@@ -5,14 +5,14 @@
       <div class="summary-line">组织：总部；业态：全部业态；商圈：全部商圈；</div>
       <div class="summary-line">门店：全部</div>
       <div class="category-title">{{ categoryTitle }}</div>
-      <div class="brand-subtitle">品牌：{{ selectedBrandName }}</div>
+      <div class="brand-subtitle">{{ subtitleText }}</div>
     </el-card>
 
     <el-card shadow="hover" class="page-card filter-card">
       <el-form :model="queryForm" inline class="filter-form">
-        <el-form-item label="品牌类型">
+        <el-form-item :label="filterTypeLabel">
           <el-select
-            v-model="queryForm.brandType"
+            :model-value="fixedFirstFilterOptions"
             multiple
             collapse-tags
             collapse-tags-tooltip
@@ -21,13 +21,13 @@
             placeholder="全部"
             style="width: 220px"
           >
-            <el-option v-for="item in fixedBrandTypeOptions" :key="item" :label="item" :value="item" />
+            <el-option v-for="item in fixedFirstFilterOptions" :key="item" :label="item" :value="item" />
           </el-select>
         </el-form-item>
 
-        <el-form-item label="品牌">
+        <el-form-item :label="filterNameLabel">
           <el-select
-            v-model="queryForm.brandName"
+            :model-value="fixedSecondFilterOptions"
             multiple
             collapse-tags
             collapse-tags-tooltip
@@ -36,12 +36,12 @@
             placeholder="全部"
             style="width: 240px"
           >
-            <el-option v-for="item in fixedBrandNameOptions" :key="item" :label="item" :value="item" />
+            <el-option v-for="item in fixedSecondFilterOptions" :key="item" :label="item" :value="item" />
           </el-select>
         </el-form-item>
 
-        <el-form-item label="新销品牌">
-          <el-select v-model="queryForm.newSaleBrand" disabled placeholder="全部" style="width: 160px">
+        <el-form-item v-if="!isTagSkuMode" :label="isSpecSkuMode ? '新销规格' : '新销品牌'">
+          <el-select :model-value="isSpecSkuMode ? selectedNewSaleSpec : queryForm.newSaleBrand" disabled placeholder="全部" style="width: 160px">
             <el-option label="全部" value="" />
             <el-option label="是" value="Y" />
             <el-option label="否" value="N" />
@@ -82,7 +82,7 @@
     <el-card shadow="hover" class="page-card table-card">
       <template #header>
         <div class="card-header">
-          <span class="card-title">品牌SKU商品清单</span>
+          <span class="card-title">{{ tableTitle }}</span>
           <div class="card-actions">
             <span class="unit-text">*金额单位：元</span>
             <el-button type="primary" link @click="handleExport">导出</el-button>
@@ -293,6 +293,36 @@ const categoryTitle = computed(() => {
 });
 
 const selectedBrandName = computed(() => resolveQueryValue(route.query.brandName as string | string[] | null | undefined, '全部品牌'));
+const selectedSpecName = computed(() => resolveQueryValue(route.query.specName as string | string[] | null | undefined, ''));
+const selectedSpecType = computed(() => resolveQueryValue(route.query.specType as string | string[] | null | undefined, '全部'));
+const selectedNewSaleSpec = computed(() => resolveQueryValue(route.query.newSaleSpec as string | string[] | null | undefined, ''));
+const selectedTagType = computed(() => resolveQueryValue(route.query.tagType as string | string[] | null | undefined, ''));
+const selectedTagTypeName = computed(() => resolveQueryValue(route.query.tagTypeName as string | string[] | null | undefined, selectedTagType.value || '全部'));
+const selectedTagNo = computed(() => resolveQueryValue(route.query.tagNo as string | string[] | null | undefined, ''));
+const selectedTagName = computed(() => resolveQueryValue(route.query.tagName as string | string[] | null | undefined, ''));
+const isCategorySkuMode = computed(() => String(route.query.source || '') === 'category-sku' || selectedBrandName.value === '全部品牌');
+const isSpecSkuMode = computed(() => String(route.query.source || '') === 'spec-sku' && !!selectedSpecName.value);
+const isTagSkuMode = computed(() => String(route.query.source || '') === 'tag-sku' && !!selectedTagType.value && !!selectedTagNo.value);
+const subtitleText = computed(() => {
+  if (isTagSkuMode.value) return `标签：${selectedTagName.value || selectedTagNo.value}`;
+  if (isSpecSkuMode.value) return `规格：${selectedSpecName.value}`;
+  return isCategorySkuMode.value ? 'SKU：全部商品' : `品牌：${selectedBrandName.value}`;
+});
+const tableTitle = computed(() => {
+  if (isTagSkuMode.value) return '标签SKU商品清单';
+  if (isSpecSkuMode.value) return '规格SKU商品清单';
+  return isCategorySkuMode.value ? 'SKU商品清单' : '品牌SKU商品清单';
+});
+const filterTypeLabel = computed(() => {
+  if (isTagSkuMode.value) return '标签类型';
+  if (isSpecSkuMode.value) return '规格类型';
+  return '品牌类型';
+});
+const filterNameLabel = computed(() => {
+  if (isTagSkuMode.value) return '标签';
+  if (isSpecSkuMode.value) return '规格';
+  return '品牌';
+});
 
 const resolveQueryList = (value: string | string[] | null | undefined) => {
   if (Array.isArray(value)) {
@@ -317,6 +347,20 @@ const queryForm = reactive({
 
 const fixedBrandTypeOptions = computed(() => (queryForm.brandType.length ? queryForm.brandType : ['全部']));
 const fixedBrandNameOptions = computed(() => (queryForm.brandName.length ? queryForm.brandName : ['全部']));
+const fixedSpecTypeOptions = computed(() => [selectedSpecType.value || '全部']);
+const fixedSpecNameOptions = computed(() => [selectedSpecName.value || '全部']);
+const fixedTagTypeOptions = computed(() => [selectedTagTypeName.value || selectedTagType.value || '全部']);
+const fixedTagNameOptions = computed(() => [selectedTagName.value || selectedTagNo.value || '全部']);
+const fixedFirstFilterOptions = computed(() => {
+  if (isTagSkuMode.value) return fixedTagTypeOptions.value;
+  if (isSpecSkuMode.value) return fixedSpecTypeOptions.value;
+  return fixedBrandTypeOptions.value;
+});
+const fixedSecondFilterOptions = computed(() => {
+  if (isTagSkuMode.value) return fixedTagNameOptions.value;
+  if (isSpecSkuMode.value) return fixedSpecNameOptions.value;
+  return fixedBrandNameOptions.value;
+});
 
 const sortState = reactive<{ prop: string; order: SortOrder }>({
   prop: 'sales',
@@ -330,13 +374,7 @@ const tableRows = ref<GoodsRow[]>([]);
 
 const loadTableList = async () => {
   if (!sessionId.value) {
-    tableError.value = '缺少 sessionId，无法加载品牌SKU商品清单';
-    tableRows.value = [];
-    total.value = 0;
-    return;
-  }
-  if (!selectedBrandName.value || selectedBrandName.value === '全部品牌') {
-    tableError.value = '缺少品牌信息，无法加载品牌SKU商品清单';
+    tableError.value = `缺少 sessionId，无法加载${isCategorySkuMode.value ? 'SKU商品清单' : '品牌SKU商品清单'}`;
     tableRows.value = [];
     total.value = 0;
     return;
@@ -347,8 +385,12 @@ const loadTableList = async () => {
   try {
     const res = await getBrandSkuDetails({
       sessionId: sessionId.value,
-      brandList: queryForm.brandName.length ? queryForm.brandName : [selectedBrandName.value],
+      brandList: queryForm.brandName.length ? queryForm.brandName : isCategorySkuMode.value ? undefined : [selectedBrandName.value],
       status: queryForm.status.includes('-1') ? undefined : queryForm.status,
+      specList: isSpecSkuMode.value ? [selectedSpecName.value] : undefined,
+      tagType: isTagSkuMode.value ? selectedTagType.value : undefined,
+      tagList: isTagSkuMode.value ? [selectedTagNo.value] : undefined,
+      activeOnly: isSpecSkuMode.value ? true : undefined,
       promotion: queryForm.promotion || undefined,
       page: queryForm.pageNum,
       size: queryForm.pageSize,
@@ -361,7 +403,7 @@ const loadTableList = async () => {
   } catch (error: any) {
     tableRows.value = [];
     total.value = 0;
-    tableError.value = error?.message || '品牌SKU商品清单加载失败';
+    tableError.value = error?.message || `${isCategorySkuMode.value ? 'SKU商品清单' : '品牌SKU商品清单'}加载失败`;
   } finally {
     tableLoading.value = false;
   }

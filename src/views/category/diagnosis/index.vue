@@ -20,7 +20,7 @@
         <div class="diagnosis-header">
           <span class="diagnosis-title">诊断对象</span>
           <div class="diagnosis-actions">
-            <el-button type="warning" plain class="mock-demo-btn" @click="handleMockDemo">模拟记录</el-button>
+            <el-button type="warning" plain class="mock-demo-btn" @click="handleMockDemo">切换模拟记录</el-button>
             <el-button type="primary" plain class="history-btn" @click="handleHistory">历史诊断记录</el-button>
           </div>
         </div>

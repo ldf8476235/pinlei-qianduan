@@ -143,7 +143,7 @@
         </el-table-column>
         <el-table-column label="对比日期分组" align="center">
           <el-table-column label="促销SKU" min-width="110" align="right">
-            <template #default="{ row }">{{ formatNumber(row.compareSku, 2) }}</template>
+            <template #default="{ row }">{{ formatNumber(row.promotionSku ?? row.currentPromotionSku ?? 0, 2) }}</template>
           </el-table-column>
           <el-table-column label="实际SKU" min-width="110" align="right">
             <template #default="{ row }">
@@ -177,52 +177,81 @@
       </div>
     </el-card>
 
-    <el-dialog v-model="settingDialogVisible" title="ABC定义设置" width="760px" destroy-on-close>
-      <el-tabs v-model="activeEditType" type="card">
+    <el-dialog v-model="settingDialogVisible" title="ABC定义设置" width="760px" destroy-on-close class="abc-setting-dialog">
+      <div class="setting-tip">最多支持添加3种ABC类型！</div>
+      <el-tabs v-model="activeEditType" class="setting-tabs">
         <el-tab-pane
-          v-for="item in editableParams"
+          v-for="(item, index) in editableParams"
           :key="item.abcType"
           :name="item.abcType"
-          :label="item.abcTypeName"
-        />
+        >
+          <template #label>
+            <span>{{ `ABC类型${index + 1}` }}</span>
+            <span class="tab-close">×</span>
+          </template>
+        </el-tab-pane>
       </el-tabs>
 
-      <el-form v-if="activeEditableItem" label-width="130px" class="setting-form">
-        <el-form-item label="ABC类型">
-          <el-input :model-value="activeEditableItem.abcTypeName" disabled />
+      <el-form v-if="activeEditableItem" label-position="top" class="setting-form">
+        <el-form-item label="类型选择" required>
+          <el-select v-model="activeEditType" class="setting-type-select">
+            <el-option
+              v-for="item in editableParams"
+              :key="item.abcType"
+              :label="item.abcTypeName"
+              :value="item.abcType"
+            />
+          </el-select>
         </el-form-item>
 
+        <div v-if="activeEditableItem.abcType === 'contribution'" class="setting-section-title">综合权重定义</div>
         <div v-if="activeEditableItem.abcType === 'contribution'" class="setting-grid">
-          <el-form-item label="销售额占比">
-            <el-input-number v-model="activeEditableItem.salesPer" :min="0" :max="1" :step="0.01" :precision="2" />
-          </el-form-item>
-          <el-form-item label="毛利额占比">
-            <el-input-number v-model="activeEditableItem.grossPer" :min="0" :max="1" :step="0.01" :precision="2" />
-          </el-form-item>
-          <el-form-item label="销量占比">
-            <el-input-number v-model="activeEditableItem.salesQuantityPer" :min="0" :max="1" :step="0.01" :precision="2" />
-          </el-form-item>
+          <label class="setting-field">
+            <span>销售额占比</span>
+            <el-input-number v-model="activeEditableItem.salesPer" :min="0" :max="1" :step="0.01" :precision="2" controls-position="right" />
+          </label>
+          <label class="setting-field">
+            <span>毛利额占比</span>
+            <el-input-number v-model="activeEditableItem.grossPer" :min="0" :max="1" :step="0.01" :precision="2" controls-position="right" />
+          </label>
+          <label class="setting-field">
+            <span>销量占比</span>
+            <el-input-number v-model="activeEditableItem.salesQuantityPer" :min="0" :max="1" :step="0.01" :precision="2" controls-position="right" />
+          </label>
         </div>
 
+        <div class="setting-section-title">ABC参数定义</div>
         <div class="setting-grid">
-          <el-form-item label="A类阈值">
-            <el-input-number v-model="activeEditableItem.arate" :min="0" :max="100" :step="1" :precision="2" />
-          </el-form-item>
-          <el-form-item label="B类阈值">
-            <el-input-number v-model="activeEditableItem.brate" :min="0" :max="100" :step="1" :precision="2" />
-          </el-form-item>
-          <el-form-item label="C类阈值">
-            <el-input-number v-model="activeEditableItem.crate" :min="0" :max="100" :step="1" :precision="2" />
-          </el-form-item>
-          <el-form-item label="A类SKU占比">
-            <el-input-number v-model="activeEditableItem.askuRate" :min="0" :max="100" :step="1" :precision="2" />
-          </el-form-item>
-          <el-form-item label="B类SKU占比">
-            <el-input-number v-model="activeEditableItem.bskuRate" :min="0" :max="100" :step="1" :precision="2" />
-          </el-form-item>
-          <el-form-item label="C类SKU占比">
-            <el-input-number v-model="activeEditableItem.cskuRate" :min="0" :max="100" :step="1" :precision="2" />
-          </el-form-item>
+          <label class="setting-field">
+            <span>A类业绩占比</span>
+            <el-input-number v-model="activeEditableItem.arate" :min="0" :max="100" :step="1" :precision="2" controls-position="right" />
+            <em>%</em>
+          </label>
+          <label class="setting-field">
+            <span>B类业绩占比</span>
+            <el-input-number v-model="activeEditableItem.brate" :min="0" :max="100" :step="1" :precision="2" controls-position="right" />
+            <em>%</em>
+          </label>
+          <label class="setting-field">
+            <span>C类业绩占比</span>
+            <el-input-number v-model="activeEditableItem.crate" :min="0" :max="100" :step="1" :precision="2" controls-position="right" />
+            <em>%</em>
+          </label>
+          <label class="setting-field">
+            <span>A类SKU占比</span>
+            <el-input-number v-model="activeEditableItem.askuRate" :min="0" :max="100" :step="1" :precision="2" controls-position="right" />
+            <em>%</em>
+          </label>
+          <label class="setting-field">
+            <span>B类SKU占比</span>
+            <el-input-number v-model="activeEditableItem.bskuRate" :min="0" :max="100" :step="1" :precision="2" controls-position="right" />
+            <em>%</em>
+          </label>
+          <label class="setting-field">
+            <span>C类SKU占比</span>
+            <el-input-number v-model="activeEditableItem.cskuRate" :min="0" :max="100" :step="1" :precision="2" controls-position="right" />
+            <em>%</em>
+          </label>
         </div>
       </el-form>
 
@@ -1141,19 +1170,131 @@ onBeforeUnmount(() => {
 }
 
 .setting-form {
-  margin-top: 8px;
+  margin-top: 18px;
+  padding: 0 18px 6px;
 }
 
 .setting-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px 18px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px 52px;
+  margin-bottom: 18px;
+}
+
+.setting-tip {
+  margin: 0 0 8px 18px;
+  color: #f56c6c;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.setting-tabs {
+  padding: 0 18px;
+}
+
+.setting-tabs :deep(.el-tabs__header) {
+  margin-bottom: 18px;
+}
+
+.setting-tabs :deep(.el-tabs__nav-wrap::after) {
+  height: 1px;
+  background: #e5e7eb;
+}
+
+.setting-tabs :deep(.el-tabs__active-bar) {
+  display: none;
+}
+
+.setting-tabs :deep(.el-tabs__item) {
+  height: 34px;
+  padding: 0 18px;
+  color: #4b5563;
+  font-size: 13px;
+  border: 0;
+}
+
+.setting-tabs :deep(.el-tabs__item.is-active) {
+  color: #111827;
+  font-weight: 600;
+}
+
+.tab-close {
+  margin-left: 6px;
+  color: #9ca3af;
+  font-size: 14px;
+}
+
+.setting-type-select {
+  width: 180px;
+}
+
+.setting-section-title {
+  position: relative;
+  margin: 8px 0 14px;
+  padding-left: 10px;
+  color: #4b5563;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.setting-section-title::before {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #f56c6c;
+  content: '';
+  transform: translateY(-50%);
+}
+
+.setting-field {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  column-gap: 8px;
+  min-width: 0;
+  color: #4b5563;
+  font-size: 13px;
+}
+
+.setting-field > span {
+  grid-column: 1 / -1;
+  margin-bottom: 6px;
+}
+
+.setting-field > em {
+  color: #6b7280;
+  font-style: normal;
+}
+
+.setting-field :deep(.el-input-number) {
+  width: 112px;
+}
+
+.setting-field :deep(.el-input__wrapper) {
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px #dcdfe6 inset;
+}
+
+.abc-setting-dialog :deep(.el-dialog__body) {
+  padding-top: 4px;
+}
+
+.abc-setting-dialog :deep(.el-dialog__footer) {
+  padding-top: 8px;
 }
 
 .dialog-footer {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 16px;
+}
+
+.dialog-footer .el-button {
+  min-width: 64px;
+  border-radius: 2px;
 }
 
 .change-text {
