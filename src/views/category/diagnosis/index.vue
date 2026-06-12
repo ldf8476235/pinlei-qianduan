@@ -39,7 +39,7 @@
             placeholder="请选择品类"
             popper-class="category-cascader-popper"
           >
-            <template #default="{ node, data }">
+            <template #default="{ data }">
               <span class="category-option-left">
                 <span class="category-radio-wrap">
                   <span class="category-radio-outer" :class="{ active: isCategoryActive(data) }">
@@ -127,8 +127,8 @@ const submitLoading = ref(false);
 
 const DEFAULT_DIAGNOSIS_CATEGORY_ID = '001';
 const DEFAULT_STORE_SCOPE = '0';
-const DEFAULT_CURRENT_DATE_RANGE = ['2026-04-01', '2026-04-30'];
-const DEFAULT_COMPARE_DATE_RANGE = ['2026-03-01', '2026-03-30'];
+const DEFAULT_CURRENT_DATE_RANGE = ['2026-05-01', '2026-05-30'];
+const DEFAULT_COMPARE_DATE_RANGE = ['2026-04-01', '2026-04-30'];
 
 const form = reactive<DiagnosisForm>({
   categoryId: undefined,
@@ -315,10 +315,7 @@ const toCategoryTreeOptions = (nodes: CategoryClassTreeNodeVO[]): CategoryTreeOp
   return toNodeList(normalizeTree(nodes));
 };
 
-const findCategoryOption = (
-  value: string | number | undefined,
-  list: CategoryTreeOption[]
-): CategoryTreeOption | undefined => {
+const findCategoryOption = (value: string | number | undefined, list: CategoryTreeOption[]): CategoryTreeOption | undefined => {
   const target = String(value || '');
   if (!target) return undefined;
   for (const item of list) {
@@ -367,7 +364,11 @@ const applyInitialFormValues = () => {
   const fallbackCategory = categoryTreeOptions.value[0];
   form.categoryId = defaultCategory?.value || fallbackCategory?.value;
   form.storeScope = resolveRouteStoreScope();
-  form.currentDateRange = resolveRouteDateRange(['currentStartDate', 'startDate', 'periodStart'], ['currentEndDate', 'endDate', 'periodEnd'], DEFAULT_CURRENT_DATE_RANGE);
+  form.currentDateRange = resolveRouteDateRange(
+    ['currentStartDate', 'startDate', 'periodStart'],
+    ['currentEndDate', 'endDate', 'periodEnd'],
+    DEFAULT_CURRENT_DATE_RANGE
+  );
   form.compareDateRange = resolveRouteDateRange(['compareStartDate', 'compareStart'], ['compareEndDate', 'compareEnd'], DEFAULT_COMPARE_DATE_RANGE);
 };
 
@@ -386,10 +387,10 @@ const handleMockDemo = async () => {
       categoryName: '洗化部',
       categoryLevel: '1',
       storeNo: '',
-      startDate: '2026-04-01',
-      endDate: '2026-04-30',
-      compareStartDate: '2026-03-01',
-      compareEndDate: '2026-03-30',
+      startDate: '2026-05-01',
+      endDate: '2026-05-30',
+      compareStartDate: '2026-04-01',
+      compareEndDate: '2026-04-30',
       initialView: 'performance',
       demo: '1'
     }
@@ -474,8 +475,7 @@ onMounted(() => {
 <style scoped lang="scss">
 .category-diagnosis-page {
   background:
-    radial-gradient(circle at 12% 6%, rgba(249, 115, 22, 0.1), transparent 28%),
-    linear-gradient(180deg, #fffaf5 0%, #f6f7fb 42%, #f5f7fa 100%);
+    radial-gradient(circle at 12% 6%, rgba(249, 115, 22, 0.1), transparent 28%), linear-gradient(180deg, #fffaf5 0%, #f6f7fb 42%, #f5f7fa 100%);
   min-height: calc(100vh - 84px);
 }
 
@@ -486,9 +486,7 @@ onMounted(() => {
 .feature-card {
   position: relative;
   overflow: hidden;
-  background:
-    radial-gradient(circle at 86% 16%, rgba(251, 146, 60, 0.18), transparent 30%),
-    linear-gradient(180deg, #ffffff 0%, #fffaf5 100%);
+  background: radial-gradient(circle at 86% 16%, rgba(251, 146, 60, 0.18), transparent 30%), linear-gradient(180deg, #ffffff 0%, #fffaf5 100%);
   border: 1px solid #fed7aa;
   box-shadow: 0 12px 30px rgba(154, 52, 18, 0.08);
   text-align: center;
@@ -529,9 +527,7 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   border-radius: 26px;
-  background:
-    linear-gradient(135deg, rgba(255, 237, 213, 0.96), rgba(255, 247, 237, 0.96)),
-    #fff7ed;
+  background: linear-gradient(135deg, rgba(255, 237, 213, 0.96), rgba(255, 247, 237, 0.96)), #fff7ed;
   border: 1px solid rgba(251, 146, 60, 0.34);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.9),

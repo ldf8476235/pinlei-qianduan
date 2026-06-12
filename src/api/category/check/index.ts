@@ -4,6 +4,7 @@ import { getCategoryFilterOptions, findStore as fetchStoreOptions, queryCategory
 import type {
   CategoryCheckAlertVO,
   CategoryCheckFilterVO,
+  CategoryCheckOverviewVO,
   CategoryCheckQuery,
   CategoryCheckRoleVO,
   CategoryCheckSalesQuery,
@@ -24,6 +25,67 @@ const toNumber = (value: any): number => {
 };
 
 const toText = (value: any): string => String(value ?? '');
+
+const mapCategoryCheckAlert = (roleData: any, skuData: any, skuDiffData: any): CategoryCheckAlertVO => ({
+  roleAbnormalCount: toNumber(roleData.warn ?? roleData.list?.length),
+  skuStructureAbnormalCount: toNumber(skuData.warn ?? skuData.list?.length),
+  skuPresetAbnormalCount: toNumber(skuDiffData.warn ?? skuDiffData.list?.length)
+});
+
+const mapCategoryCheckRole = (payload: any): CategoryCheckRoleVO => {
+  const x = toNumber(payload.xyData?.avgPointX ?? 10);
+  const y = toNumber(payload.xyData?.avgPointY ?? 10);
+  const list = (payload.list || []).map((item: any) => {
+    const contributionRate = toNumber(item.contributionRatePer ?? item.contributionRate);
+    const growthRate = toNumber(item.salesCompareRate ?? item.growthRate);
+    const presetRole = toText(item.presetRole ?? item.classRole);
+    const evaluatedRole = toText(item.evaluatedRole);
+    const roleWarning =
+      typeof item.roleWarning === 'boolean' ? item.roleWarning : Boolean(presetRole && evaluatedRole && presetRole !== evaluatedRole);
+    const roleMatchStatus: CategoryRoleScatterItemVO['roleMatchStatus'] = !presetRole ? 'unset' : roleWarning ? 'mismatch' : 'match';
+
+    return {
+      categoryId: item.classNo,
+      categoryCode: item.classNo,
+      categoryName: item.className,
+      roleName: item.evaluatedRoleName || item.classRoleName || item.classRoleTypeDescribe || item.classRoleType,
+      presetRoleName: item.presetRoleName || item.classRoleName || item.classRoleTypeDescribe || item.classRoleType,
+      evaluatedRoleName: item.evaluatedRoleName,
+      roleWarning,
+      roleMatchStatus,
+      growthRate,
+      contributionRate,
+      skuCount: toNumber(item.saleQuantity),
+      salesAmount: toNumber(item.sales),
+      rawData: item
+    } as CategoryRoleScatterItemVO;
+  });
+
+  return {
+    list,
+    splitLineX: x,
+    splitLineY: y
+  };
+};
+
+const mapCategoryCheckSku = (skuPayload: any, skuDiffPayload: any): CategoryCheckSkuVO => {
+  const diffMap = new Map<string, any>((skuDiffPayload.list || []).map((item: any) => [toText(item.classNo), item]));
+  const list = (skuPayload.list || []).map((item: any) => {
+    const diffItem = diffMap.get(toText(item.classNo)) || {};
+    return {
+      categoryId: item.classNo,
+      categoryName: item.className,
+      skuRatio: toNumber(item.skuPer),
+      salesRatio: toNumber(item.salesPer),
+      ratioDiff: toNumber(item.skuDifference),
+      currentSkuCount: toNumber(diffItem.saleSku ?? item.classSku),
+      presetSkuCount: toNumber(diffItem.suggestSaleSku),
+      skuDiff: toNumber(diffItem.skuDiffer ?? 0)
+    } as CategorySkuChartItemVO;
+  });
+
+  return { list };
+};
 
 export type CategoryCheckTreeOption = OptionVO & {
   children?: CategoryCheckTreeOption[];
@@ -163,11 +225,7 @@ export const getCategoryCheckAlert = async (data: CategoryCheckQuery): BackendWr
   const skuDiffData = unwrap<any>(skuDiffRes) || {};
 
   return {
-    data: {
-      roleAbnormalCount: toNumber(roleData.warn ?? roleData.list?.length),
-      skuStructureAbnormalCount: toNumber(skuData.warn ?? skuData.list?.length),
-      skuPresetAbnormalCount: toNumber(skuDiffData.warn ?? skuDiffData.list?.length)
-    }
+    data: mapCategoryCheckAlert(roleData, skuData, skuDiffData)
   };
 };
 
@@ -179,40 +237,9 @@ export const getCategoryCheckRole = async (data: CategoryCheckQuery): BackendWra
   });
 
   const payload = unwrap<any>(res) || {};
-  const x = toNumber(payload.xyData?.avgPointX ?? 10);
-  const y = toNumber(payload.xyData?.avgPointY ?? 10);
-  const list = (payload.list || []).map((item: any) => {
-    const contributionRate = toNumber(item.contributionRatePer ?? item.contributionRate);
-    const growthRate = toNumber(item.salesCompareRate ?? item.growthRate);
-    const presetRole = toText(item.presetRole ?? item.classRole);
-    const evaluatedRole = toText(item.evaluatedRole);
-    const roleWarning =
-      typeof item.roleWarning === 'boolean' ? item.roleWarning : Boolean(presetRole && evaluatedRole && presetRole !== evaluatedRole);
-    const roleMatchStatus: CategoryRoleScatterItemVO['roleMatchStatus'] = !presetRole ? 'unset' : roleWarning ? 'mismatch' : 'match';
-
-    return {
-      categoryId: item.classNo,
-      categoryCode: item.classNo,
-      categoryName: item.className,
-      roleName: item.evaluatedRoleName || item.classRoleName || item.classRoleTypeDescribe || item.classRoleType,
-      presetRoleName: item.presetRoleName || item.classRoleName || item.classRoleTypeDescribe || item.classRoleType,
-      evaluatedRoleName: item.evaluatedRoleName,
-      roleWarning,
-      roleMatchStatus,
-      growthRate,
-      contributionRate,
-      skuCount: toNumber(item.saleQuantity),
-      salesAmount: toNumber(item.sales),
-      rawData: item
-    } as CategoryRoleScatterItemVO;
-  });
 
   return {
-    data: {
-      list,
-      splitLineX: x,
-      splitLineY: y
-    }
+    data: mapCategoryCheckRole(payload)
   };
 };
 
@@ -233,25 +260,41 @@ export const getCategoryCheckSku = async (data: CategoryCheckQuery): BackendWrap
 
   const skuPayload = unwrap<any>(skuRes) || {};
   const skuDiffPayload = unwrap<any>(skuDiffRes) || {};
-  const diffMap = new Map<string, any>((skuDiffPayload.list || []).map((item: any) => [toText(item.classNo), item]));
 
-  const list = (skuPayload.list || []).map((item: any) => {
-    const diffItem = diffMap.get(toText(item.classNo)) || {};
-    return {
-      categoryId: item.classNo,
-      categoryName: item.className,
-      skuRatio: toNumber(item.skuPer),
-      salesRatio: toNumber(item.salesPer),
-      ratioDiff: toNumber(item.skuDifference),
-      currentSkuCount: toNumber(diffItem.saleSku ?? item.classSku),
-      presetSkuCount: toNumber(diffItem.suggestSaleSku),
-      skuDiff: toNumber(diffItem.skuDiffer ?? 0)
-    } as CategorySkuChartItemVO;
-  });
+  return {
+    data: mapCategoryCheckSku(skuPayload, skuDiffPayload)
+  };
+};
+
+export const getCategoryCheckOverview = async (data: CategoryCheckQuery): BackendWrap<CategoryCheckOverviewVO> => {
+  const payload = toBackendQuery(data);
+  const [roleRes, skuRes, skuDiffRes] = await Promise.all([
+    request({
+      url: '/salesStoreClass/allClassCheck',
+      method: 'post',
+      data: payload
+    }),
+    request({
+      url: '/salesStoreClass/findClassSku',
+      method: 'post',
+      data: payload
+    }),
+    request({
+      url: '/salesStoreClass/findClassSkuDiffer',
+      method: 'post',
+      data: payload
+    })
+  ]);
+
+  const roleData = unwrap<any>(roleRes) || {};
+  const skuData = unwrap<any>(skuRes) || {};
+  const skuDiffData = unwrap<any>(skuDiffRes) || {};
 
   return {
     data: {
-      list
+      alert: mapCategoryCheckAlert(roleData, skuData, skuDiffData),
+      role: mapCategoryCheckRole(roleData),
+      sku: mapCategoryCheckSku(skuData, skuDiffData)
     }
   };
 };
@@ -302,6 +345,7 @@ export const getCategoryCheckSales = async (data: CategoryCheckSalesQuery): Back
 export default {
   getCategoryCheckFilter,
   getCategoryCheckAlert,
+  getCategoryCheckOverview,
   getCategoryCheckRole,
   getCategoryCheckSku,
   getCategoryCheckSales

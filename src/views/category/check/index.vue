@@ -277,14 +277,7 @@ import * as echarts from 'echarts';
 import { ArrowDown } from '@element-plus/icons-vue';
 import treeStrategyImage from '@/assets/images/tree1.ae4aedc.png';
 import { useRequest } from '@/hooks/useRequest';
-import {
-  getCategoryCheckAlert,
-  getCategoryCheckCategoryOptions,
-  getCategoryCheckFilter,
-  getCategoryCheckRole,
-  getCategoryCheckSales,
-  getCategoryCheckSku
-} from '@/api/category/check';
+import { getCategoryCheckCategoryOptions, getCategoryCheckFilter, getCategoryCheckOverview, getCategoryCheckSales } from '@/api/category/check';
 import type { CategoryCheckTreeOption } from '@/api/category/check';
 import {
   CategoryCheckAlertVO,
@@ -300,8 +293,8 @@ import {
 const proxy = getCurrentInstance()?.proxy as any;
 const router = useRouter();
 const ALL_CATEGORY_LABEL = '全部';
-const DEFAULT_CURRENT_DATE_RANGE: [string, string] = ['2026-04-01', '2026-04-30'];
-const DEFAULT_COMPARE_DATE_RANGE: [string, string] = ['2026-03-01', '2026-03-31'];
+const DEFAULT_CURRENT_DATE_RANGE: [string, string] = ['2026-05-01', '2026-05-30'];
+const DEFAULT_COMPARE_DATE_RANGE: [string, string] = ['2026-04-01', '2026-04-30'];
 const ROLE_MATCH_SERIES = [
   { key: 'match', name: '品类角色与设定一致', color: '#2A9D8F' },
   { key: 'mismatch', name: '品类角色与设定不一致', color: '#F4A261' },
@@ -394,13 +387,11 @@ const salesPage = reactive({
 
 const filterRequest = useRequest(async () => await getCategoryCheckFilter());
 const categoryOptionsRequest = useRequest(async (level: string | number) => await getCategoryCheckCategoryOptions(level));
-const alertRequest = useRequest(async (params: CategoryCheckQuery) => await getCategoryCheckAlert(params));
-const roleRequest = useRequest(async (params: CategoryCheckQuery) => await getCategoryCheckRole(params));
-const skuRequest = useRequest(async (params: CategoryCheckQuery) => await getCategoryCheckSku(params));
+const overviewRequest = useRequest(async (params: CategoryCheckQuery) => await getCategoryCheckOverview(params));
 const salesRequest = useRequest(async (params: CategoryCheckSalesQuery) => await getCategoryCheckSales(params));
 
-const roleLoading = computed(() => roleRequest.loading.value);
-const skuLoading = computed(() => skuRequest.loading.value);
+const roleLoading = computed(() => overviewRequest.loading.value);
+const skuLoading = computed(() => overviewRequest.loading.value);
 const salesLoading = computed(() => salesRequest.loading.value);
 const selectedCategoryLabelMap = computed(() => {
   const map = new Map<string, string>();
@@ -591,14 +582,21 @@ const pointsToNumericValues = (values: unknown[], fallback: number) => {
 const resolveRoleAxisRange = (values: number[], threshold: number, fallbackMin: number, fallbackMax: number) => {
   const finiteThreshold = Number.isFinite(threshold) ? threshold : 0;
   const finiteValues = values.filter((item) => Number.isFinite(item));
-  const rawMin = Math.min(fallbackMin, finiteThreshold, ...finiteValues);
-  const rawMax = Math.max(fallbackMax, finiteThreshold, ...finiteValues);
-  const span = Math.max(rawMax - rawMin, 10);
-  const padding = span * 0.08;
+  const valuesForRange = finiteValues.length ? [...finiteValues, finiteThreshold] : [fallbackMin, fallbackMax, finiteThreshold];
+  const rawMin = Math.min(...valuesForRange);
+  const rawMax = Math.max(...valuesForRange);
+  const span = Math.max(rawMax - rawMin, 1);
+  const padding = Math.max(span * 0.12, 0.5);
+  const paddedMin = rawMin - padding;
+  const paddedMax = rawMax + padding;
+  const roughStep = Math.max((paddedMax - paddedMin) / 6, 0.1);
+  const magnitude = 10 ** Math.floor(Math.log10(roughStep));
+  const normalizedStep = roughStep / magnitude;
+  const step = (normalizedStep <= 1 ? 1 : normalizedStep <= 2 ? 2 : normalizedStep <= 5 ? 5 : 10) * magnitude;
 
   return {
-    min: Math.floor((rawMin - padding) / 5) * 5,
-    max: Math.ceil((rawMax + padding) / 5) * 5
+    min: Math.floor(paddedMin / step) * step,
+    max: Math.ceil(paddedMax / step) * step
   };
 };
 
@@ -632,8 +630,14 @@ const renderRoleChart = (data: CategoryCheckRoleVO) => {
   const numericXThreshold = Number(xThreshold);
   const numericYThreshold = Number(yThreshold);
   const resolveRoleMatchColor = (status?: string) => ROLE_MATCH_SERIES.find((item) => item.key === status)?.color || ROLE_MATCH_SERIES[2].color;
-  const xValues = pointsToNumericValues(list.map((item) => item.contributionRate), numericXThreshold);
-  const yValues = pointsToNumericValues(list.map((item) => item.growthRate), numericYThreshold);
+  const xValues = pointsToNumericValues(
+    list.map((item) => item.contributionRate),
+    numericXThreshold
+  );
+  const yValues = pointsToNumericValues(
+    list.map((item) => item.growthRate),
+    numericYThreshold
+  );
   const xRange = resolveRoleAxisRange(xValues, numericXThreshold, 0, 50);
   const yRange = resolveRoleAxisRange(yValues, numericYThreshold, -40, 40);
   const formatCategoryBubbleLabel = (item: any) => {
@@ -684,105 +688,110 @@ const renderRoleChart = (data: CategoryCheckRoleVO) => {
     ];
   };
 
-  roleChartIns.value.setOption({
-    color: ROLE_MATCH_SERIES.map((item) => item.color),
-    legend: {
-      top: 6,
-      data: ROLE_MATCH_SERIES.map((item) => ({
-        name: item.name,
-        itemStyle: { color: item.color }
-      }))
-    },
-    tooltip: {
-      trigger: 'item',
-      formatter: (params: any) => {
-        const row = params.data?.rawData || {};
-        return [
-          `${row.categoryCode || ''} ${row.categoryName || ''}`,
-          `实际角色：${row.evaluatedRoleName || row.roleName || '--'}`,
-          `设定角色：${row.presetRoleName || '--'}`,
-          `销售额：${formatWanYuan(row.salesAmount)}`,
-          `销售对比增长率%：${Number(row.growthRate ?? 0).toFixed(2)}%`,
-          `综合贡献率%：${Number(row.contributionRate ?? 0).toFixed(2)}%`
-        ].join('<br/>');
-      }
-    },
-    grid: { left: 72, right: 78, top: 82, bottom: 68 },
-    xAxis: {
-      type: 'value',
-      name: '综合贡献率%',
-      min: xRange.min,
-      max: xRange.max,
-      axisLabel: { formatter: '{value}%' },
-      axisLine: { lineStyle: { color: '#94A3B8' } },
-      axisTick: { lineStyle: { color: '#CBD5E1' } },
-      splitLine: { show: true, lineStyle: { color: '#EEF2F7' } }
-    },
-    yAxis: {
-      type: 'value',
-      name: '销售对比增长率%',
-      min: yRange.min,
-      max: yRange.max,
-      axisLabel: { formatter: '{value}%' },
-      axisLine: { lineStyle: { color: '#94A3B8' } },
-      axisTick: { lineStyle: { color: '#CBD5E1' } },
-      splitLine: { show: true, lineStyle: { color: '#EEF2F7' } }
-    },
-    dataZoom: [
-      {
-        type: 'inside',
-        xAxisIndex: 0,
-        moveOnMouseWheel: true,
-        zoomOnMouseWheel: true
-      }
-    ],
-    series: [
-      {
-        name: '角色象限',
-        type: 'scatter',
-        silent: true,
-        symbolSize: 0,
-        tooltip: { show: false },
-        data: [],
-        markArea: {
-          silent: true,
-          itemStyle: { opacity: 1 },
-          label: { show: false },
-          data: ROLE_QUADRANTS.map(buildQuadrantArea)
+  roleChartIns.value.setOption(
+    {
+      color: ROLE_MATCH_SERIES.map((item) => item.color),
+      legend: {
+        top: 6,
+        data: ROLE_MATCH_SERIES.map((item) => ({
+          name: item.name,
+          itemStyle: { color: item.color }
+        }))
+      },
+      tooltip: {
+        trigger: 'item',
+        formatter: (params: any) => {
+          const row = params.data?.rawData || {};
+          return [
+            `${row.categoryCode || ''} ${row.categoryName || ''}`,
+            `实际角色：${row.evaluatedRoleName || row.roleName || '--'}`,
+            `设定角色：${row.presetRoleName || '--'}`,
+            `销售额：${formatWanYuan(row.salesAmount)}`,
+            `销售对比增长率%：${Number(row.growthRate ?? 0).toFixed(2)}%`,
+            `综合贡献率%：${Number(row.contributionRate ?? 0).toFixed(2)}%`
+          ].join('<br/>');
         }
       },
-      ...ROLE_MATCH_SERIES.map((item) => ({
-        name: item.name,
-        type: 'scatter',
-        z: 5,
-        label: bubbleLabelOption,
-        itemStyle: { color: item.color },
-        data: points.filter((point: any) => point.rawData.roleMatchStatus === item.key)
-      })),
-      {
-        name: '角色分界线',
-        type: 'line',
-        tooltip: { show: false },
-        markLine: {
-          silent: true,
-          symbol: ['none', 'none'],
-          label: {
-            show: true,
-            formatter: (params: any) => (params.data?.xAxis !== undefined ? `贡献率 ${numericXThreshold}%` : `增长率 ${numericYThreshold}%`),
-            color: '#B45309',
-            fontSize: 12,
-            backgroundColor: 'rgba(255, 247, 237, 0.94)',
-            borderColor: '#FDBA74',
-            borderWidth: 1,
-            borderRadius: 4,
-            padding: [3, 6]
-          },
-          lineStyle: { color: '#EA580C', width: 1.8, type: 'solid', opacity: 0.72 },
-          data: [{ xAxis: numericXThreshold }, { yAxis: numericYThreshold }]
+      grid: { left: 72, right: 78, top: 82, bottom: 68 },
+      xAxis: {
+        type: 'value',
+        name: '综合贡献率%',
+        min: xRange.min,
+        max: xRange.max,
+        axisLabel: { formatter: '{value}%' },
+        axisLine: { lineStyle: { color: '#94A3B8' } },
+        axisTick: { lineStyle: { color: '#CBD5E1' } },
+        splitLine: { show: true, lineStyle: { color: '#EEF2F7' } }
+      },
+      yAxis: {
+        type: 'value',
+        name: '销售对比增长率%',
+        min: yRange.min,
+        max: yRange.max,
+        axisLabel: { formatter: '{value}%' },
+        axisLine: { lineStyle: { color: '#94A3B8' } },
+        axisTick: { lineStyle: { color: '#CBD5E1' } },
+        splitLine: { show: true, lineStyle: { color: '#EEF2F7' } }
+      },
+      dataZoom: [
+        {
+          type: 'inside',
+          xAxisIndex: 0,
+          start: 0,
+          end: 100,
+          moveOnMouseWheel: true,
+          zoomOnMouseWheel: true
         }
-      }
-    ]
-  });
+      ],
+      series: [
+        {
+          name: '角色象限',
+          type: 'scatter',
+          silent: true,
+          symbolSize: 0,
+          tooltip: { show: false },
+          data: [],
+          markArea: {
+            silent: true,
+            itemStyle: { opacity: 1 },
+            label: { show: false },
+            data: ROLE_QUADRANTS.map(buildQuadrantArea)
+          }
+        },
+        ...ROLE_MATCH_SERIES.map((item) => ({
+          name: item.name,
+          type: 'scatter',
+          z: 5,
+          label: bubbleLabelOption,
+          itemStyle: { color: item.color },
+          data: points.filter((point: any) => point.rawData.roleMatchStatus === item.key)
+        })),
+        {
+          name: '角色分界线',
+          type: 'line',
+          tooltip: { show: false },
+          markLine: {
+            silent: true,
+            symbol: ['none', 'none'],
+            label: {
+              show: true,
+              formatter: (params: any) => (params.data?.xAxis !== undefined ? `贡献率 ${numericXThreshold}%` : `增长率 ${numericYThreshold}%`),
+              color: '#B45309',
+              fontSize: 12,
+              backgroundColor: 'rgba(255, 247, 237, 0.94)',
+              borderColor: '#FDBA74',
+              borderWidth: 1,
+              borderRadius: 4,
+              padding: [3, 6]
+            },
+            lineStyle: { color: '#EA580C', width: 1.8, type: 'solid', opacity: 0.72 },
+            data: [{ xAxis: numericXThreshold }, { yAxis: numericYThreshold }]
+          }
+        }
+      ]
+    },
+    { notMerge: true }
+  );
 };
 
 const hideSkuTooltip = () => {
@@ -1012,19 +1021,12 @@ const renderSalesChart = (data: CategoryCheckSalesVO) => {
   });
 };
 
-const loadAlert = async () => {
-  const res = await alertRequest.run(buildQuery());
-  Object.assign(alertData, res?.data || {});
-};
-
-const loadRole = async () => {
-  const res = await roleRequest.run(buildQuery());
-  renderRoleChart(res?.data || { list: [] });
-};
-
-const loadSku = async () => {
-  const res = await skuRequest.run(buildQuery());
-  renderSkuCharts(res?.data || { list: [] });
+const loadOverview = async () => {
+  const res = await overviewRequest.run(buildQuery());
+  const data = res?.data;
+  Object.assign(alertData, data?.alert || {});
+  renderRoleChart(data?.role || { list: [] });
+  renderSkuCharts(data?.sku || { list: [] });
 };
 
 const loadSales = async () => {
@@ -1040,7 +1042,7 @@ const loadSales = async () => {
 };
 
 const loadAll = async () => {
-  await Promise.all([loadAlert(), loadRole(), loadSku(), loadSales()]);
+  await Promise.all([loadOverview(), loadSales()]);
 };
 
 const handleSearch = async () => {

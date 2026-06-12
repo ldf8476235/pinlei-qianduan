@@ -66,6 +66,12 @@ export interface CategoryCheckSkuVO {
   list: CategorySkuChartItemVO[];
 }
 
+export interface CategoryCheckOverviewVO {
+  alert: CategoryCheckAlertVO;
+  role: CategoryCheckRoleVO;
+  sku: CategoryCheckSkuVO;
+}
+
 export interface CategorySalesChartItemVO {
   categoryId: string | number;
   categoryName: string;
